@@ -1,0 +1,168 @@
+/*
+ * ============================================================
+ *  البصمة الذكية v2 — Design Tokens
+ *  Centralized CSS Custom Properties (Design Token Layer)
+ *  Audit Ref: Core Architectural & Design Principles
+ * ============================================================
+ */
+
+/* ── Google Fonts: IBM Plex Sans Arabic + IBM Plex Mono ── */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* ── Color Palette ── */
+  --color-bg-base:     #0A0F1A;
+  --color-bg-surface:  #111827;
+  --color-bg-raised:   #1C2537;
+  --color-bg-hover:    #2C3A52;
+  --color-border-dim:  #374151;
+  --color-border-bright: #4B5563;
+
+  --color-accent:      #0EA5E9;
+  --color-accent-dim:  rgba(14, 165, 233, 0.12);
+  --color-accent-hover:#38BDF8;
+
+  --color-success:     #10B981;
+  --color-success-dim: rgba(16, 185, 129, 0.12);
+  --color-warning:     #F59E0B;
+  --color-warning-dim: rgba(245, 158, 11, 0.12);
+  --color-danger:      #EF4444;
+  --color-danger-dim:  rgba(239, 68, 68, 0.12);
+  --color-purple:      #8B5CF6;
+  --color-purple-dim:  rgba(139, 92, 246, 0.12);
+
+  /* ── Text ── */
+  --color-text-primary:   #F9FAFB;
+  --color-text-secondary: #9CA3AF;
+  --color-text-muted:     #6B7280;
+  --color-text-inverse:   #0A0F1A;
+
+  /* ── Typography Scale ── */
+  --text-xs:   12px;   /* labels, badges, meta */
+  --text-sm:   14px;   /* body, table cells */
+  --text-base: 16px;   /* subheadings, inputs */
+  --text-lg:   20px;   /* section titles */
+  --text-xl:   28px;   /* KPIs, page titles */
+
+  --font-ui:   'IBM Plex Sans Arabic', 'Tajawal', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+
+  --leading-tight:  1.2;
+  --leading-normal: 1.5;
+  --leading-loose:  1.75;
+
+  /* ── Spacing ── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* ── Radius ── */
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+  --radius-xl:  20px;
+  --radius-pill: 9999px;
+
+  /* ── Nav Rail ── */
+  --nav-rail-width: 56px;
+
+  /* ── ZATCA Status Bar ── */
+  --zatca-bar-height: 28px;
+
+  /* ── Shadows ── */
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md:  0 4px 12px rgba(0,0,0,0.5);
+  --shadow-lg:  0 12px 32px rgba(0,0,0,0.6);
+  --glow-accent: 0 0 16px rgba(14, 165, 233, 0.25);
+
+  /* ── Transitions ── */
+  --transition-fast:   0.12s ease;
+  --transition-normal: 0.2s ease;
+}
+
+/* ── Legacy variable aliases (bridge for existing code) ── */
+:root {
+  --bg-app:          var(--color-bg-base);
+  --bg-card:         var(--color-bg-surface);
+  --bg-raised:       var(--color-bg-raised);
+  --border-subtle:   var(--color-border-dim);
+  --text-main:       var(--color-text-primary);
+  --text-muted:      var(--color-text-secondary);
+  --primary:         var(--color-accent);
+  --primary-hover:   var(--color-accent-hover);
+}
+
+/* ── Typography Utility Classes ── */
+.font-ui   { font-family: var(--font-ui) !important; }
+.font-mono { font-family: var(--font-mono) !important; }
+
+/* Any element that shows a number/price/quantity → monospace */
+.num,
+[data-type="price"],
+[data-type="quantity"],
+[data-type="kpi"] {
+  font-family: var(--font-mono) !important;
+  letter-spacing: -0.02em;
+}
+
+/* ── Base HTML Resets using tokens ── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
+  margin: 0;
+  overflow: hidden;
+}
+
+/* ── Scrollbar Styling (dark theme) ── */
+::-webkit-scrollbar              { width: 6px; height: 6px; }
+::-webkit-scrollbar-track        { background: var(--color-bg-surface); }
+::-webkit-scrollbar-thumb        { background: var(--color-border-dim); border-radius: var(--radius-pill); }
+::-webkit-scrollbar-thumb:hover  { background: var(--color-border-bright); }
+
+/* ── Focus Ring ── */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ── Selection ── */
+::selection {
+  background: var(--color-accent-dim);
+  color: var(--color-text-primary);
+}
+
+/* ── Pulse animation for live indicators ── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+@keyframes fly-in-right {
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes fly-in-up {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}

@@ -1,0 +1,10 @@
+/* App.css — Production POS root reset
+   The Vite scaffold styles (#root max-width, logo animation, .card, .read-the-docs)
+   were removed — they break the full-bleed POS layout by constraining #root to 1280px
+   and text-aligning it to center. */
+
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}

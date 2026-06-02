@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>البصمة الذكية — نظام نقطة البيع الأذكى في السعودية | Smart Touch POS</title>
+<meta name="description" content="البصمة الذكية — نظام نقطة بيع متكامل للمنشآت التجارية السعودية. فواتير ZATCA، إدارة مخزون، تقارير مالية، CRM، ونظام مطاعم. نسخة أساسية مجانية للأبد.">
+<meta name="keywords" content="نقطة بيع, POS, كاشير, فاتورة ضريبية, ZATCA, مخزون, مطاعم, سعودية, البصمة الذكية">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#050810">
+<meta property="og:title" content="البصمة الذكية — نظام نقطة البيع الأذكى">
+<meta property="og:description" content="نظام نقطة بيع متكامل متوافق مع ZATCA. نسخة أساسية مجانية للأبد.">
+<meta property="og:type" content="website">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+
+<!-- JSON-LD Structured Data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "البصمة الذكية — Smart Touch POS",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Windows",
+  "description": "نظام نقطة بيع متكامل للمنشآت التجارية السعودية والخليجية. متوافق مع ZATCA، يدعم الفوترة الإلكترونية، إدارة المخزون، التقارير المالية، CRM، ونظام مطاعم.",
+  "offers": [
+    {
+      "@type": "Offer",
+      "name": "أساسي (Core)",
+      "price": "0",
+      "priceCurrency": "SAR",
+      "billingDuration": "P1M",
+      "description": "نسخة مجانية للأبد، ميزات أساسية"
+    },
+    {
+      "@type": "Offer",
+      "name": "نمو (Growth)",
+      "price": "79",
+      "priceCurrency": "SAR",
+      "billingDuration": "P1M",
+      "description": "ZATCA المرحلة الثانية + CRM + حتى 5 موظفين"
+    },
+    {
+      "@type": "Offer",
+      "name": "احترافي (Pro)",
+      "price": "199",
+      "priceCurrency": "SAR",
+      "billingDuration": "P1M",
+      "description": "المالية والمحاسبة + نظام مطاعم متكامل وشاشة المطبخ KDS + موظفين غير محدود"
+    },
+    {
+      "@type": "Offer",
+      "name": "مؤسسي (Enterprise)",
+      "price": "0",
+      "priceCurrency": "SAR",
+      "billingDuration": "P1M",
+      "description": "أسعار مخصصة للفروع والسلاسل والدعم الفني بأولوية قصوى"
+    }
+  ],
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.8",
+    "reviewCount": "127"
+  },
+  "author": {
+    "@type": "Organization",
+    "name": "البصمة الذكية"
+  }
+}
+</script>
+</head>
+<body>
+
+<!-- ═══════════════ NAVBAR ═══════════════ -->
+<nav id="navbar">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">
+      <div class="logo-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </div>
+      <span>البصمة الذكية</span>
+    </a>
+    <div class="nav-links" id="navLinks">
+      <a href="#features">المميزات</a>
+      <a href="#screens">الشاشات</a>
+      <a href="#pricing">الأسعار</a>
+      <a href="#testimonials">آراء العملاء</a>
+      <a href="#faq">الأسئلة الشائعة</a>
+    </div>
+    <div class="nav-actions">
+      <a href="#download" class="nav-btn-outline">تحميل التطبيق</a>
+      <a href="https://wa.me/966533174895" class="nav-btn-primary" target="_blank" rel="noopener">نسخة مجانية</a>
+      <button class="burger" id="burger" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══════════════ HERO ═══════════════ -->
+<section class="hero" id="hero">
+  <canvas id="particleCanvas"></canvas>
+  <div class="hero-glow hero-glow-1"></div>
+  <div class="hero-glow hero-glow-2"></div>
+  <div class="hero-glow hero-glow-3"></div>
+  
+  <div class="hero-content">
+    <div class="hero-text">
+      <div class="hero-badge animate-in">
+        <span class="badge-dot"></span>
+        🇸🇦 متوافق 100% مع هيئة الزكاة والضريبة والجمارك
+      </div>
+      <h1 class="hero-title animate-in delay-1">
+        <span class="text-gradient">البصمة</span>
+        <span class="text-gradient">الذكية</span>
+      </h1>
+      <p class="hero-subtitle animate-in delay-2">
+        نظام نقطة البيع الأكثر تطوراً للمنشآت التجارية السعودية — بُني بأحدث التقنيات ليمنحك <strong>سرعة، أمان، وتوافق كامل</strong> مع فاتورة ZATCA
+      </p>
+      <div class="hero-cta animate-in delay-3">
+        <a href="#download" class="btn-hero-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          حمّل مجاناً
+        </a>
+        <a href="https://wa.me/966533174895" class="btn-hero-secondary" target="_blank" rel="noopener">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.494A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.325 0-4.47-.744-6.236-2.008l-.436-.322-2.647.886.886-2.646-.324-.437A9.96 9.96 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+          تواصل عبر واتساب
+        </a>
+      </div>
+      <div class="hero-trust animate-in delay-4">
+        <div class="trust-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          نسخة أساسية مجانية للأبد
+        </div>
+        <div class="trust-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          لا بطاقة ائتمان
+        </div>
+        <div class="trust-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          إعداد في 60 ثانية
+        </div>
+      </div>
+    </div>
+    <div class="hero-visual animate-in delay-2">
+      <div class="hero-device">
+        <div class="device-frame">
+          <img src="assets/img/dashboard.png" alt="لوحة تحكم البصمة الذكية" class="device-screen" loading="eager">
+        </div>
+        <div class="device-reflection"></div>
+      </div>
+      <div class="floating-card card-1">
+        <div class="fc-icon" style="background:rgba(16,185,129,0.15);color:#10b981">📊</div>
+        <div><div class="fc-label">مبيعات اليوم</div><div class="fc-value">SAR 12,480</div></div>
+      </div>
+      <div class="floating-card card-2">
+        <div class="fc-icon" style="background:rgba(59,130,246,0.15);color:#3b82f6">🧾</div>
+        <div><div class="fc-label">فاتورة ZATCA</div><div class="fc-value">✓ معتمدة</div></div>
+      </div>
+      <div class="floating-card card-3">
+        <div class="fc-icon" style="background:rgba(245,158,11,0.15);color:#f59e0b">⚡</div>
+        <div><div class="fc-label">سرعة المعالجة</div><div class="fc-value">&lt; 0.3 ثانية</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ STATS BAR ═══════════════ -->
+<section class="stats-bar">
+  <div class="stats-inner">
+    <div class="stat-item">
+      <div class="stat-number" data-target="21">0</div>
+      <div class="stat-label">صفحة وميزة متكاملة</div>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <div class="stat-number" data-target="100" data-suffix="%">0</div>
+      <div class="stat-label">متوافق مع ZATCA</div>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <div class="stat-number" data-target="24" data-suffix="/7">0</div>
+      <div class="stat-label">دعم فني مستمر</div>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <div class="stat-number" data-target="6">0</div>
+      <div class="stat-label">دول خليجية مدعومة</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ FEATURES ═══════════════ -->
+<section class="features-section" id="features">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-badge">المميزات</div>
+      <h2 class="section-title">كل ما تحتاجه في <span class="text-gradient-inline">نظام واحد</span></h2>
+      <p class="section-desc">مصمم خصيصاً للسوق السعودي والخليجي — يجمع بين القوة والبساطة</p>
+    </div>
+    
+    <div class="features-grid">
+      <div class="feature-card" data-aos>
+        <div class="feature-icon-wrap" style="--accent:#3b82f6">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <h3 class="feature-title">نقطة بيع سريعة</h3>
+        <p class="feature-desc">واجهة كاشير عربية سلسة مع دعم الباركود وقارئ البطاقات والدفع المتعدد — نقد، بطاقة، STC Pay، آجل</p>
+        <div class="feature-tags">
+          <span class="ftag">باركود</span>
+          <span class="ftag">متعدد الدفع</span>
+          <span class="ftag">تعليق الطلب</span>
+        </div>
+      </div>
+
+      <div class="feature-card" data-aos>
+        <div class="feature-icon-wrap" style="--accent:#10b981">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </div>
+        <h3 class="feature-title">فاتورة ZATCA معتمدة</h3>
+        <p class="feature-desc">فاتورة ضريبية مبسطة وقياسية مع QR كود TLV ومتوافقة مع المرحلة الثانية من التحول الرقمي</p>
+        <div class="feature-tags">
+          <span class="ftag">B2C</span>
+          <span class="ftag">B2B</span>
+          <span class="ftag">QR Code</span>
+        </div>
+      </div>
+
+      <div class="feature-card" data-aos>
+        <div class="feature-icon-wrap" style="--accent:#8b5cf6">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <h3 class="feature-title">لوحة تحكم تحليلية</h3>
+        <p class="feature-desc">تقارير المبيعات، هوامش الربح، أعلى المنتجات مبيعاً، وتحليل العملاء في رسوم بيانية تفاعلية</p>
+        <div class="feature-tags">
+          <span class="ftag">رسوم بيانية</span>
+          <span class="ftag">تقارير Z</span>
+          <span class="ftag">مقارنة يومية</span>
+        </div>
+      </div>
+
+      <div class="feature-card" data-aos>
+        <div class="feature-icon-wrap" style="--accent:#f59e0b">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        </div>
+        <h3 class="feature-title">إدارة مخزون ذكية</h3>
+        <p class="feature-desc">تنبيهات نقص المخزون، سجل حركة البضاعة، جرد تلقائي، وطباعة ملصقات الباركود مباشرة</p>
+        <div class="feature-tags">
+          <span class="ftag">تنبيهات</span>
+          <span class="ftag">باركود</span>
+          <span class="ftag">جرد</span>
+        </div>
+      </div>
+
+      <div class="feature-card" data-aos>
+        <div class="feature-icon-wrap" style="--accent:#ec4899">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <h3 class="feature-title">CRM ونقاط الولاء</h3>
+        <p class="feature-desc">إدارة ملفات العملاء، برنامج نقاط مكافآت قابل للتخصيص بتصنيفات برونزي وفضي وذهبي</p>
+        <div class="feature-tags">
+          <span class="ftag">برونزي</span>
+          <span class="ftag">فضي</span>
+          <span class="ftag">ذهبي</span>
+        </div>
+      </div>
+
+      <div class="feature-card" data-aos>
+        <div class="feature-icon-wrap" style="--accent:#06b6d4">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <h3 class="feature-title">إيصالات واتساب</h3>
+        <p class="feature-desc">إرسال تفاصيل الفاتورة للعميل مباشرة عبر واتساب بنقرة واحدة مع رسالة مخصصة لمتجرك</p>
+        <div class="feature-tags">
+          <span class="ftag">واتساب</span>
+          <span class="ftag">رسائل مخصصة</span>
+        </div>
+      </div>
+
+      <div class="feature-card" data-aos>
+        <div class="feature-icon-wrap" style="--accent:#ef4444">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+        </div>
+        <h3 class="feature-title">نظام مطاعم متكامل</h3>
+        <p class="feature-desc">خريطة طاولات تفاعلية، شاشة مطبخ KDS، إدارة الطلبات والإضافات، وأوامر التوصيل والسفري</p>
+        <div class="feature-tags">
+          <span class="ftag">طاولات</span>
+          <span class="ftag">KDS</span>
+          <span class="ftag">توصيل</span>
+        </div>
+      </div>
+
+      <div class="feature-card" data-aos>
+        <div class="feature-icon-wrap" style="--accent:#14b8a6">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        </div>
+        <h3 class="feature-title">إدارة الصيانة والخدمات</h3>
+        <p class="feature-desc">تذاكر خدمة بحالات "قيد التنفيذ" و"جاهز للتسليم" مع إرسال فوري للكاشير للدفع</p>
+        <div class="feature-tags">
+          <span class="ftag">تذاكر خدمة</span>
+          <span class="ftag">حالات</span>
+        </div>
+      </div>
+
+      <div class="feature-card" data-aos>
+        <div class="feature-icon-wrap" style="--accent:#6366f1">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <h3 class="feature-title">أمان بمستوى المؤسسات</h3>
+        <p class="feature-desc">تفعيل بمفتاح مرتبط بالجهاز (HWID)، صلاحيات متعددة، ومهلة جلسة تلقائية لحماية البيانات</p>
+        <div class="feature-tags">
+          <span class="ftag">HWID</span>
+          <span class="ftag">صلاحيات</span>
+          <span class="ftag">تشفير</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ APP SCREENSHOTS ═══════════════ -->
+<section class="screens-section" id="screens">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-badge">لقطات الشاشة</div>
+      <h2 class="section-title">شاهد <span class="text-gradient-inline">النظام</span> بنفسك</h2>
+      <p class="section-desc">أكثر من 21 شاشة متخصصة — كل قسم صُمم ليحل مشكلة حقيقية</p>
+    </div>
+
+    <div class="screens-showcase">
+      <div class="screen-tab-nav" role="tablist">
+        <button class="screen-tab active" data-tab="dashboard" role="tab" aria-label="عرض شاشة لوحة التحكم" aria-selected="true" id="tab-dashboard">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          لوحة التحكم
+        </button>
+        <button class="screen-tab" data-tab="pos" role="tab" aria-label="عرض شاشة نقطة البيع" aria-selected="false" id="tab-pos">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          نقطة البيع
+        </button>
+        <button class="screen-tab" data-tab="inventory" role="tab" aria-label="عرض شاشة المخزون" aria-selected="false" id="tab-inventory">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          المخزون
+        </button>
+      </div>
+
+      <div class="screen-display">
+        <div class="screen-monitor">
+          <div class="monitor-bezel">
+            <div class="monitor-dots">
+              <span style="background:#ef4444"></span>
+              <span style="background:#f59e0b"></span>
+              <span style="background:#10b981"></span>
+            </div>
+            <img id="screenImage" src="assets/img/dashboard.png" alt="شاشة لوحة التحكم — لوحة تحكم تحليلية مع رسوم بيانية للمبيعات والأرباح" class="monitor-screen" loading="lazy">
+          </div>
+          <div class="monitor-stand"></div>
+        </div>
+      </div>
+
+      <!-- Feature modules list -->
+      <div class="modules-grid">
+        <div class="module-card">
+          <div class="module-icon">🖥️</div>
+          <div class="module-name">نقطة البيع</div>
+        </div>
+        <div class="module-card">
+          <div class="module-icon">📊</div>
+          <div class="module-name">لوحة التحكم</div>
+        </div>
+        <div class="module-card">
+          <div class="module-icon">🏦</div>
+          <div class="module-name">المالية</div>
+        </div>
+        <div class="module-card">
+          <div class="module-icon">📦</div>
+          <div class="module-name">المخزون</div>
+        </div>
+        <div class="module-card">
+          <div class="module-icon">🧾</div>
+          <div class="module-name">المشتريات</div>
+        </div>
+        <div class="module-card">
+          <div class="module-icon">👥</div>
+          <div class="module-name">العملاء</div>
+        </div>
+        <div class="module-card">
+          <div class="module-icon">🎁</div>
+          <div class="module-name">العروض</div>
+        </div>
+        <div class="module-card">
+          <div class="module-icon">🛡️</div>
+          <div class="module-name">الموظفين</div>
+        </div>
+        <div class="module-card">
+          <div class="module-icon">🍽️</div>
+          <div class="module-name">المطاعم</div>
+        </div>
+        <div class="module-card">
+          <div class="module-icon">🔧</div>
+          <div class="module-name">الصيانة</div>
+        <div class="module-card">
+          <div class="module-icon">⏱️</div>
+          <div class="module-name">الورديات</div>
+        </div>
+        <div class="module-card">
+          <div class="module-icon">📋</div>
+          <div class="module-name">سجل الأحداث</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ WHY US ═══════════════ -->
+<section class="why-section">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-badge">لماذا البصمة الذكية؟</div>
+      <h2 class="section-title">مقارنة مع <span class="text-gradient-inline">الأنظمة السحابية والتقليدية</span></h2>
+    </div>
+    <div class="comparison-grid">
+      <div class="compare-card ours">
+        <div class="compare-header">
+          <span class="compare-badge best">البصمة الذكية</span>
+        </div>
+        <ul class="compare-list">
+          <li><span class="check">✓</span> خطة أساسية مجانية بالكامل للأبد</li>
+          <li><span class="check">✓</span> يعمل بدون اتصال بالإنترنت تماماً (Offline-first)</li>
+          <li><span class="check">✓</span> متوافق بالكامل مع متطلبات ZATCA (المرحلة 1 و2)</li>
+          <li><span class="check">✓</span> إدارة مخزون ومبيعات وعملاء ونظام مطاعم (KDS) مدمج</li>
+          <li><span class="check">✓</span> تثبيت وإعداد فوري على نظام Windows في 60 ثانية</li>
+          <li><span class="check">✓</span> نسخ احتياطي تلقائي لبياناتك محلياً لحمايتها</li>
+          <li><span class="check">✓</span> دعم فني سريع ومباشر باللغة العربية عبر واتساب</li>
+        </ul>
+      </div>
+      <div class="compare-card others">
+        <div class="compare-header">
+          <span class="compare-badge">الأنظمة السحابية والتقليدية</span>
+        </div>
+        <ul class="compare-list">
+          <li><span class="cross">✗</span> اشتراكات باهظة تبدأ من 120 إلى 300+ ريال شهرياً</li>
+          <li><span class="cross">✗</span> تتوقف عن العمل أو تتعطل عند انقطاع الإنترنت</li>
+          <li><span class="cross">✗</span> رسوم إضافية ومستترة للميزات المتقدمة مثل الـ KDS</li>
+          <li><span class="cross">✗</span> صعوبة في الربط والتفعيل والامتثال لهيئة الزكاة</li>
+          <li><span class="cross">✗</span> فترة تجريبية محدودة (7-14 يوم) ثم الإغلاق التام</li>
+          <li><span class="cross">✗</span> تتطلب شراء أجهزة خاصة مكلفة (أيباد/جهاز محدد)</li>
+          <li><span class="cross">✗</span> دعم فني بطيء أو باللغة الإنجليزية فقط</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════ PRICING ═══════════════ -->
+<section class="pricing-section" id="pricing">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-badge">الأسعار</div>
+      <h2 class="section-title">خطط تناسب <span class="text-gradient-inline">جميع الأعمال</span></h2>
+      <p class="section-desc">خطة أساسية مجانية للأبد، أو اختر إحدى خططنا المتقدمة لتنمية تجارتك</p>
+      
+      <!-- billing cycle toggle -->
+      <div class="pricing-toggle-wrap">
+        <span class="toggle-label active" id="label-monthly">شهري</span>
+        <label class="pricing-switch">
+          <input type="checkbox" id="pricing-toggle">
+          <span class="pricing-slider round"></span>
+        </label>
+        <span class="toggle-label" id="label-yearly">سنوي (وفّر حتى 29%)</span>
+      </div>
+    </div>
+    
+    <div class="pricing-grid">
+      <!-- 1. Core (Free) -->
+      <div class="price-card" data-aos>
+        <div class="price-header">
+          <h3 class="price-name">أساسي (Core)</h3>
+          <div class="price-amount">
+            <span class="price-value">0</span>
+            <span class="price-currency">ريال</span>
+          </div>
+          <div class="price-period">مجاناً للأبد</div>
+        </div>
+        <ul class="price-features">
+          <li>نقطة بيع كاملة وكاشير (POS)</li>
+          <li>متوافق مع ZATCA المرحلة الأولى</li>
+          <li>طباعة الفواتير الحرارية والورديات</li>
+          <li>إدارة مخزون مبسطة (عرض وتعديل)</li>
+          <li>موظف كاشير واحد (1 Staff)</li>
+          <li>دعم فني مجاني عبر البريد</li>
+        </ul>
+        <a href="#download" class="price-btn">حمّل مجاناً</a>
+      </div>
+
+      <!-- 2. Growth (79 SAR / mo) -->
+      <div class="price-card featured" data-aos>
+        <div class="price-popular">🏆 الأكثر طلباً</div>
+        <div class="price-header">
+          <h3 class="price-name">نمو (Growth)</h3>
+          <div class="price-amount">
+            <span class="price-value" data-monthly="79" data-yearly="690" id="price-growth">79</span>
+            <span class="price-currency" id="curr-growth">ريال</span>
+          </div>
+          <div class="price-period" id="period-growth">شهرياً</div>
+        </div>
+        <ul class="price-features">
+          <li>جميع ميزات الخطة الأساسية</li>
+          <li>متوافق مع ZATCA المرحلة الثانية (P2)</li>
+          <li>لوحة تحكم وتقارير مبيعات متقدمة</li>
+          <li>إدارة العملاء ونقاط الولاء (CRM)</li>
+          <li>إدارة الموردين وفواتير المشتريات</li>
+          <li>حتى 5 موظفين بصلاحيات مخصصة</li>
+          <li>دعم فني سريع ومباشر عبر واتساب</li>
+        </ul>
+        <a href="https://wa.me/966533174895?text=%D8%A3%D8%B1%D9%8A%D8%AF%20%D8%A7%D9%84%D8%A7%D8%B4%D8%AA%D8%B1%D8%A7%D9%83%20%D9%81%D9%8A%20%D8%AE%D8%B7%D8%A9%20%D8%A7%D9%84%D9%86%D9%85%D9%88%20(Growth)" class="price-btn primary" target="_blank" rel="noopener">اشترك الآن</a>
+      </div>
+
+      <!-- 3. Pro (199 SAR / mo) -->
+      <div class="price-card pro-card" data-aos>
+        <div class="price-badge-pro">⭐ موصى به للمطاعم والشركات</div>
+        <div class="price-header">
+          <h3 class="price-name">احترافي (Pro)</h3>
+          <div class="price-amount">
+            <span class="price-value" data-monthly="199" data-yearly="1,690" id="price-pro">199</span>
+            <span class="price-currency" id="curr-pro">ريال</span>
+          </div>
+          <div class="price-period" id="period-pro">شهرياً</div>
+        </div>
+        <ul class="price-features">
+          <li>جميع ميزات خطة النمو</li>
+          <li>المالية والمحاسبة (Finance Hub)</li>
+          <li>نظام مطاعم متكامل وشاشة المطبخ (KDS)</li>
+          <li>خريطة طاولات تفاعلية وإدارة الطلبات</li>
+          <li>عدد غير محدود من الموظفين والكاشير</li>
+          <li>حساب تكلفة المخزون (FIFO) والتحليلات</li>
+          <li>دعم فني ذو أولوية على مدار الساعة</li>
+        </ul>
+        <a href="https://wa.me/966533174895?text=%D8%A3%D8%B1%D9%8A%D8%AF%20%D8%A7%D9%84%D8%A7%D8%B4%D8%AA%D8%B1%D8%A7%D9%83%20%D9%81%D9%8A%20%D8%AE%D8%B7%D8%A9%20%D8%A7%D9%84%D9%85%D8%A4%D8%B3%D8%B3%D9%8A%20(Enterprise)" class="price-btn pro-btn" target="_blank" rel="noopener">اشترك الآن</a>
+      </div>
+
+      <!-- 4. Enterprise (Custom) -->
+      <div class="price-card" data-aos>
+        <div class="price-header">
+          <h3 class="price-name">مؤسسي (Enterprise)</h3>
+          <div class="price-amount">
+            <span class="price-value">تواصل معنا</span>
+          </div>
+          <div class="price-period">أسعار مخصصة للفروع والسلاسل</div>
+        </div>
+        <ul class="price-features">
+          <li>جميع ميزات الخطة الاحترافية</li>
+          <li>ربط وإدارة الفروع المتعددة (Multi-branch)</li>
+          <li>إعادة تسمية النظام بشعارك (White-label)</li>
+          <li>شبكة محلية متصلة بالكامل (مطبخ، صالة)</li>
+          <li>تدريب مخصص وإعداد أولي شامل</li>
+          <li>دعم فني بأولوية قصوى مع SLA</li>
+        </ul>
+        <a href="https://wa.me/966533174895?text=%D8%A3%D8%B1%D9%8A%D8%AF%20%D8%A7%D9%84%D8%A7%D8%B3%D8%AA%D9%81%D8%B3%D8%A7%D8%B1%20%D8%B9%D9%86%20%D8%AE%D8%B7%D8%A9%20%D8%A7%D9%84%D9%85%D8%A4%D8%B3%D8%B3%D9%8A%20(Enterprise)" class="price-btn" target="_blank" rel="noopener">تواصل معنا</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ TESTIMONIALS ═══════════════ -->
+<section class="testimonials-section" id="testimonials">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-badge">آراء العملاء</div>
+      <h2 class="section-title">ماذا يقول <span class="text-gradient-inline">عملاؤنا</span></h2>
+      <p class="section-desc">أصحاب أعمال حقيقيون اختاروا البصمة الذكية لإدارة مبيعاتهم</p>
+    </div>
+    
+    <div class="testimonials-track">
+      <div class="testimonial-card" data-aos>
+        <div class="test-stars">★★★★★</div>
+        <p class="test-quote">النظام غيّر طريقة إدارتي للمحل بالكامل. الفاتورة الإلكترونية متوافقة مع ZATCA بدون أي تعقيد، والبرنامج يشتغل حتى لو الإنترنت فصل.</p>
+        <div class="test-footer">
+          <div class="test-avatar">م</div>
+          <div>
+            <div class="test-name">محمد العتيبي</div>
+            <div class="test-role">صاحب سوبرماركت — الرياض</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="testimonial-card" data-aos>
+        <div class="test-stars">★★★★★</div>
+        <p class="test-quote">جربت أكثر من ثلاث أنظمة كاشير قبل البصمة الذكية. الفرق واضح — السرعة، الدعم بالعربي، وميزة نقاط الولاء رفعت مبيعاتي 20%.</p>
+        <div class="test-footer">
+          <div class="test-avatar">ن</div>
+          <div>
+            <div class="test-name">نورة الشمري</div>
+            <div class="test-role">صاحبة بوتيك أزياء — جدة</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="testimonial-card" data-aos>
+        <div class="test-stars">★★★★★</div>
+        <p class="test-quote">نظام المطاعم مع شاشة المطبخ KDS وخريطة الطاولات — بالضبط اللي كنت أدور عليه. الأوردرات ما تضيع والتنسيق بين المطبخ والصالة صار ممتاز.</p>
+        <div class="test-footer">
+          <div class="test-avatar">ع</div>
+          <div>
+            <div class="test-name">عبدالله القحطاني</div>
+            <div class="test-role">مدير مطعم — الدمام</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="testimonial-card" data-aos>
+        <div class="test-stars">★★★★★</div>
+        <p class="test-quote">أفضل شي إنه مجاني بالنسخة الأساسية وما يحتاج إنترنت. ثبتته على جهاز الكاشير وبدأت أشتغل في أقل من دقيقة. الدعم عبر واتساب سريع جداً.</p>
+        <div class="test-footer">
+          <div class="test-avatar">خ</div>
+          <div>
+            <div class="test-name">خالد المالكي</div>
+            <div class="test-role">صاحب محل إلكترونيات — مكة</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ FAQ ═══════════════ -->
+<section class="faq-section" id="faq">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-badge">الأسئلة الشائعة</div>
+      <h2 class="section-title">كل ما تريد <span class="text-gradient-inline">معرفته</span></h2>
+      <p class="section-desc">إجابات على أكثر الأسئلة شيوعاً حول البصمة الذكية</p>
+    </div>
+
+    <div class="faq-list">
+      <div class="faq-item">
+        <button class="faq-question" aria-expanded="false">
+          <span>هل البصمة الذكية فعلاً مجاني؟</span>
+          <svg class="faq-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="faq-answer">
+          <p>نعم! خطة المبتدئ (Starter) تتيح لك نقطة بيع كاملة مع فاتورة ZATCA المرحلة الأولى وإدارة مخزون مبسطة. يمكنك البدء مجاناً بالفترة التجريبية لمدة 30 يوم ثم الاشتراك بالخطة المناسبة لعملك.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" aria-expanded="false">
+          <span>هل يعمل النظام بدون إنترنت؟</span>
+          <svg class="faq-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="faq-answer">
+          <p>نعم، البصمة الذكية مصمم بتقنية Offline-first. جميع البيانات تُحفظ محلياً على جهازك، ولا يحتاج اتصال بالإنترنت للعمل اليومي. الإنترنت مطلوب فقط للتفعيل الأول وربط ZATCA المرحلة الثانية.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" aria-expanded="false">
+          <span>هل النظام متوافق مع هيئة الزكاة والضريبة (ZATCA)؟</span>
+          <svg class="faq-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="faq-answer">
+          <p>نعم 100%. خطة المبتدئ تدعم المرحلة الأولى (5 TLV tags + QR Code)، وخطط النمو والاحترافي تدعم المرحلة الثانية بالكامل (التوقيع الرقمي، UUID، وربط API مع ZATCA).</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" aria-expanded="false">
+          <span>ما هي طريقة الدفع المتاحة؟</span>
+          <svg class="faq-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="faq-answer">
+          <p>نقبل التحويل البنكي المباشر. بعد التحويل، سيتم تفعيل ترخيصك خلال دقائق. تواصل معنا عبر واتساب لتفاصيل الحساب البنكي.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" aria-expanded="false">
+          <span>هل يمكنني الترقية من خطة لخطة أعلى؟</span>
+          <svg class="faq-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="faq-answer">
+          <p>بالتأكيد! يمكنك الترقية في أي وقت. عند الترقية، ستُحسب لك المتبقي من اشتراكك الحالي ويُخصم من قيمة الخطة الجديدة. تواصل معنا عبر واتساب لترتيب الترقية.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" aria-expanded="false">
+          <span>على أي أنظمة تشغيل يعمل البرنامج؟</span>
+          <svg class="faq-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="faq-answer">
+          <p>البصمة الذكية متوفر حالياً لنظام Windows (ويندوز 10 وما فوق). التطبيق مبني بتقنية Electron ويعمل على أي جهاز كمبيوتر بمواصفات عادية.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question" aria-expanded="false">
+          <span>هل بياناتي آمنة؟</span>
+          <svg class="faq-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="faq-answer">
+          <p>نعم. جميع البيانات محفوظة محلياً على جهازك ولا تُرسل لأي خادم خارجي. النظام يأخذ نسخاً احتياطية تلقائية، ومفتاح الترخيص مرتبط بجهازك (HWID) لمنع الاستخدام غير المصرح.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ DOWNLOAD ═══════════════ -->
+<section class="download-section" id="download">
+  <div class="container">
+    <div class="download-card">
+      <div class="download-glow"></div>
+      <div class="download-content">
+        <div class="download-text">
+          <h2 class="download-title">حمّل البصمة الذكية <span class="text-gradient-inline">مجاناً</span></h2>
+          <p class="download-desc">ابدأ الآن مع فترة تجريبية 7 أيام لجميع الميزات. لا حاجة لبطاقة ائتمان — فقط حمّل وثبّت في أقل من دقيقة.</p>
+          <div class="download-btns">
+            <a href="https://drive.google.com/file/d/11-MUHwkIb_4aQmieSYbEV1ClRSW0WTxN/view?usp=drive_link" class="download-btn-primary" target="_blank" rel="noopener">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+              <div>
+                <small>تحميل لنظام</small>
+                <strong>Windows 10/11</strong>
+              </div>
+            </a>
+          </div>
+          <div class="download-meta">
+            <span>📦 الحجم: ~85 MB</span>
+            <span>⚡ التثبيت: أقل من 60 ثانية</span>
+            <span>🔒 آمن 100%</span>
+          </div>
+        </div>
+        <div class="download-visual">
+          <div class="dl-window">
+            <div class="dlw-bar">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="dlw-body">
+              <div class="dlw-icon">📥</div>
+              <div class="dlw-name">Smart Touch POS</div>
+              <div class="dlw-ver">الإصدار v1.0.7 — أحدث نسخة</div>
+              <div class="dlw-progress"><div class="dlw-progress-bar"></div></div>
+              <div class="dlw-status">✓ جاهز للتثبيت</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ CTA ═══════════════ -->
+<section class="cta-section">
+  <div class="cta-bg">
+    <div class="cta-glow cta-glow-1"></div>
+    <div class="cta-glow cta-glow-2"></div>
+  </div>
+  <div class="container" style="position:relative;z-index:2">
+    <h2 class="cta-title">ابدأ رحلتك مع البصمة الذكية اليوم</h2>
+    <p class="cta-desc">تجربة مجانية 7 أيام — إعداد في أقل من دقيقة — دعم فني على مدار الساعة</p>
+    <div class="cta-btns">
+      <a href="https://wa.me/966533174895" class="btn-hero-primary" target="_blank" rel="noopener">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.494A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0z"/></svg>
+        تواصل عبر واتساب
+      </a>
+      <a href="mailto:ea.gaber10@gmail.com" class="btn-hero-secondary">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        راسلنا بالإيميل
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ FOOTER ═══════════════ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="footer-logo">
+          <div class="logo-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </div>
+          <span>البصمة الذكية</span>
+        </div>
+        <p class="footer-tagline">نظام إدارة نقاط البيع المتكامل للمنشآت التجارية السعودية والخليجية</p>
+      </div>
+      
+      <div class="footer-col">
+        <h4>روابط سريعة</h4>
+        <a href="#features">المميزات</a>
+        <a href="#screens">الشاشات</a>
+        <a href="#pricing">الأسعار</a>
+        <a href="#faq">الأسئلة الشائعة</a>
+        <a href="#download">تحميل</a>
+      </div>
+      
+      <div class="footer-col">
+        <h4>تواصل معنا</h4>
+        <a href="https://wa.me/966533174895" target="_blank" rel="noopener">💬 واتساب: 966533174895</a>
+        <a href="mailto:ea.gaber10@gmail.com">📧 support@smarttouch-pos.com</a>
+        <a href="https://github.com/EbrahimAgaber/smart-touch-pos" target="_blank" rel="noopener">🔗 GitHub</a>
+      </div>
+    </div>
+    
+    <div class="footer-bottom">
+      <p>© 2026 البصمة الذكية — جميع الحقوق محفوظة |طور عن طريق إبراهيم جابر</p>
+    </div>
+  </div>
+</footer>
+
+<!-- Floating WhatsApp Button -->
+<a href="https://wa.me/966533174895" class="whatsapp-float" target="_blank" rel="noopener" aria-label="تواصل عبر واتساب" id="whatsappFloat">
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.494A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0z"/></svg>
+</a>
+
+<script src="script.js"></script>
+</body>
+</html>

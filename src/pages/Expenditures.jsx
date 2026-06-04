@@ -211,12 +211,12 @@ export default function Expenditures() {
                     </div>
                   </td>
                   <td style={tdStyle}>
-                    <div style={{ fontWeight:'700', color:'#1e293b' }}>{e.supplier_name || 'مصروف عام'}</div>
-                    <div style={{ fontSize:'11px', color:'#94a3b8' }}>{e.description || 'بدون وصف'}</div>
+                    <div style={{ fontWeight:'700', color:'var(--text-main)' }}>{e.supplier_name || 'مصروف عام'}</div>
+                    <div style={{ fontSize:'11px', color:'var(--text-muted)' }}>{e.description || 'بدون وصف'}</div>
                   </td>
                   <td style={tdStyle}><span style={badgeStyle}>{e.category}</span></td>
-                  <td style={tdStyle}><span style={{ fontWeight:'800', fontSize:'15px' }}>SAR {e.amount.toFixed(2)}</span></td>
-                  <td style={tdStyle}><span style={{ color:'#94a3b8', fontSize:'12px' }}>{e.vat_amount > 0 ? `SAR ${e.vat_amount.toFixed(2)}` : '0.00'}</span></td>
+                  <td style={tdStyle}><span style={{ fontWeight:'800', fontSize:'15px' , fontFamily: "'Inter', sans-serif"}}>SAR {e.amount.toFixed(2)}</span></td>
+                  <td style={tdStyle}><span style={{ color:'var(--text-muted)', fontSize:'12px' }}>{e.vat_amount > 0 ? `SAR ${e.vat_amount.toFixed(2)}` : '0.00'}</span></td>
                   <td style={tdStyle}>
                     <div style={{ display:'flex', gap:'8px' }}>
                       <button onClick={() => handleOpenEdit(e)} style={{ ...deleteBtnStyle, color:'#3b82f6', opacity:1 }} title="تعديل"><Search size={16}/></button>
@@ -228,10 +228,10 @@ export default function Expenditures() {
             </tbody>
           </table>
           {expenses.length === 0 && !loading && (
-            <div style={{ padding:'60px', textAlign:'center', color:'#94a3b8' }}>لا توجد سجلات مصروفات مطابقة للبحث</div>
+            <div style={{ padding:'60px', textAlign:'center', color:'var(--text-muted)' }}>لا توجد سجلات مصروفات مطابقة للبحث</div>
           )}
           {loading && (
-            <div style={{ padding:'40px', textAlign:'center', color:'#94a3b8' }}>جاري التحميل...</div>
+            <div style={{ padding:'40px', textAlign:'center', color:'var(--text-muted)' }}>جاري التحميل...</div>
           )}
         </div>
 
@@ -239,7 +239,7 @@ export default function Expenditures() {
         {total > limit && (
           <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:'20px', marginTop:'20px' }}>
              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} style={paginationBtnStyle}>السابق</button>
-             <span style={{ fontSize:'14px', fontWeight:'700', color:'#64748b' }}>صفحة {page + 1} من {Math.ceil(total / limit)}</span>
+             <span style={{ fontSize:'14px', fontWeight:'700', color:'var(--text-muted)' }}>صفحة {page + 1} من {Math.ceil(total / limit)}</span>
              <button onClick={() => setPage(p => p + 1)} disabled={(page + 1) * limit >= total} style={paginationBtnStyle}>التالي</button>
           </div>
         )}
@@ -266,9 +266,9 @@ export default function Expenditures() {
               <Input label="التاريخ" type="date" value={form.date} onChange={v => setForm({...form, date:v})} />
               <Input label="المبلغ الإجمالي (SAR)" type="number" value={form.amount} onChange={v => setForm({...form, amount:v})} required />
               
-              <div style={{ display:'flex', alignItems:'center', gap:'12px', background:'#f8fafc', padding:'12px', borderRadius:'14px', border:'1px solid #e2e8f0', gridColumn:'span 1' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:'12px', background:'var(--bg-card)', padding:'12px', borderRadius:'14px', border:'1px solid #e2e8f0', gridColumn:'span 1' }}>
                 <input type="checkbox" checked={form.vat_eligible} onChange={e => setForm({...form, vat_eligible:e.target.checked})} style={{ width:'20px', height:'20px' }} />
-                <span style={{ fontSize:'13px', fontWeight:'700', color:'#475569' }}>فاتورة ضريبية (15%)</span>
+                <span style={{ fontSize:'13px', fontWeight:'700', color:'var(--text-muted)' }}>فاتورة ضريبية (15%)</span>
               </div>
 
               <div style={{ gridColumn:'span 2' }}>
@@ -289,11 +289,11 @@ export default function Expenditures() {
 // COMPONENTS
 function SummaryCard({ label, value, icon, color }) {
   return (
-    <div style={{ background:'white', padding:'24px', borderRadius:'24px', border:`1px solid ${color}15`, display:'flex', alignItems:'center', gap:'16px', boxShadow:'0 1px 2px rgba(0,0,0,0.02)' }}>
+    <div style={{ background:'var(--bg-card)', padding:'24px', borderRadius:'24px', border:`1px solid ${color}15`, display:'flex', alignItems:'center', gap:'16px', boxShadow:'0 1px 2px rgba(0,0,0,0.02)' }}>
       <div style={{ width:'48px', height:'48px', background:`${color}08`, borderRadius:'14px', display:'flex', alignItems:'center', justifyContent:'center' }}>{icon}</div>
       <div>
-        <div style={{ fontSize:'13px', color:'#94a3b8', fontWeight:'700', marginBottom:'4px' }}>{label}</div>
-        <div style={{ fontSize:'22px', fontWeight:'900', color:'#1e293b' }}>{value}</div>
+        <div style={{ fontSize:'13px', color:'var(--text-muted)', fontWeight:'700', marginBottom:'4px' }}>{label}</div>
+        <div style={{ fontSize:'22px', fontWeight:'900', color:'var(--text-main)' }}>{value}</div>
       </div>
     </div>
   );
@@ -317,16 +317,16 @@ function Input({ label, value, onChange, placeholder, type='text', required=fals
 const containerStyle = { display:'flex', flexDirection:'column', gap:'32px', direction:'rtl' };
 const statsGridStyle = { display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'20px' };
 const controlsRowStyle = { display:'flex', justifyContent:'space-between', alignItems:'center', gap:'20px' };
-const filterGroupStyle = { display:'flex', alignItems:'center', gap:'12px', background:'white', padding:'10px 20px', borderRadius:'16px', border:'1px solid #f1f5f9' };
-const panelStyle = { background:'white', borderRadius:'28px', border:'1px solid #f1f5f9', overflow:'hidden' };
+const filterGroupStyle = { display:'flex', alignItems:'center', gap:'12px', background:'var(--bg-card)', padding:'10px 20px', borderRadius:'16px', border:'1px solid #f1f5f9' };
+const panelStyle = { background:'var(--bg-card)', borderRadius:'28px', border:'1px solid #f1f5f9', overflow:'hidden' };
 
 const tableStyle = { width:'100%', borderCollapse:'collapse', textAlign:'right' };
-const theadRowStyle = { background:'#f8fafc', borderBottom:'1px solid #f1f5f9' };
-const thStyle = { padding:'16px 24px', fontSize:'12px', fontWeight:'800', color:'#94a3b8' };
+const theadRowStyle = { background:'var(--bg-card)', borderBottom:'1px solid #f1f5f9' };
+const thStyle = { padding:'16px 24px', fontSize:'12px', fontWeight:'800', color:'var(--text-muted)' };
 const trStyle = { borderBottom:'1px solid #f8fafc' };
 const tdStyle = { padding:'20px 24px' };
 
-const badgeStyle = { background:'#f1f5f9', color:'#64748b', padding:'4px 10px', borderRadius:'8px', fontSize:'11px', fontWeight:'700' };
+const badgeStyle = { background:'#f1f5f9', color:'var(--text-muted)', padding:'4px 10px', borderRadius:'8px', fontSize:'11px', fontWeight:'700' };
 const deleteBtnStyle = { background:'transparent', border:'none', color:'#ef4444', opacity:0.3, cursor:'pointer', transition:'opacity 0.2s', hover:{opacity:1} };
 
 const addBtnStyle = { 
@@ -335,19 +335,19 @@ const addBtnStyle = {
   display:'flex', alignItems:'center', gap:'10px', fontSize:'14px'
 };
 
-const selectStyle = { border:'none', background:'transparent', fontSize:'14px', fontWeight:'700', outline:'none', cursor:'pointer', color:'#475569' };
+const selectStyle = { border:'none', background:'transparent', fontSize:'14px', fontWeight:'700', outline:'none', cursor:'pointer', color:'var(--text-muted)' };
 const selectStyleFull = { width:'100%', padding:'12px', borderRadius:'12px', border:'1px solid #e2e8f0', outline:'none', fontSize:'14px' };
-const dateInputStyle = { border:'1px solid #e2e8f0', borderRadius:'10px', padding:'6px 10px', fontSize:'13px', color:'#475569', outline:'none' };
+const dateInputStyle = { border:'1px solid #e2e8f0', borderRadius:'10px', padding:'6px 10px', fontSize:'13px', color:'var(--text-muted)', outline:'none' };
 const filterBtnStyle = { background:'#f1f5f9', border:'none', padding:'8px 16px', borderRadius:'10px', color:'#3b82f6', fontWeight:'800', fontSize:'13px', cursor:'pointer' };
 
 const modalOverlayStyle = { position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(15,23,42,0.4)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 };
-const modalStyle = { background:'white', width:'100%', maxWidth:'640px', borderRadius:'32px', padding:'40px', direction:'rtl' };
+const modalStyle = { background:'var(--bg-card)', width:'100%', maxWidth:'640px', borderRadius:'32px', padding:'40px', direction:'rtl' };
 const modalHeaderStyle = { display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'32px' };
-const closeBtnStyle = { border:'none', background:'transparent', color:'#94a3b8', cursor:'pointer' };
+const closeBtnStyle = { border:'none', background:'transparent', color:'var(--text-muted)', cursor:'pointer' };
 
 const inputGroupStyle = { display:'flex', flexDirection:'column', gap:'10px' };
-const labelStyle = { fontSize:'14px', fontWeight:'800', color:'#475569' };
+const labelStyle = { fontSize:'14px', fontWeight:'800', color:'var(--text-muted)' };
 const inputStyle = { padding:'14px', borderRadius:'14px', border:'1px solid #e2e8f0', outline:'none', fontSize:'14px' };
-const paginationBtnStyle = { background:'white', border:'1px solid #e2e8f0', padding:'8px 20px', borderRadius:'10px', color:'#3b82f6', fontWeight:'800', cursor:'pointer', fontSize:'13px', opacity:0.8 };
+const paginationBtnStyle = { background:'var(--bg-card)', border:'1px solid #e2e8f0', padding:'8px 20px', borderRadius:'10px', color:'#3b82f6', fontWeight:'800', cursor:'pointer', fontSize:'13px', opacity:0.8 };
 const submitBtnStyle = { width:'100%', padding:'16px', borderRadius:'16px', border:'none', background:'linear-gradient(135deg, #3b82f6, #2563eb)', color:'white', fontWeight:'800', fontSize:'16px', cursor:'pointer', boxShadow:'0 10px 15px -3px rgba(37,99,235,0.3)' };
 

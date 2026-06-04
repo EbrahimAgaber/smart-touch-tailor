@@ -29,6 +29,7 @@ import {
   buildLabelCSS,
   fuzzyMatchProfile,
   mmToPx,
+  printLabel,
 } from '../utils/LabelPrintEngine.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -234,14 +235,7 @@ export default function LabelPrintSettings({ value, onChange, settings, printers
   const handleTestPrint = async () => {
     setPrintLoading(true);
     try {
-      const html = await buildLabelHTML({ Name:'منتج تجريبي', Price:25, Barcode:testBarcode, ID:1 }, settings||{}, cfg.size, 1,
-        fuzzyMatchProfile(cfg.labelPrinterName || ''));
-      if (window?.api?.printLabel) {
-        const preset = LABEL_PRESETS[cfg.size] || LABEL_PRESETS['58x40'];
-        await window.api.printLabel({ html, widthMm: preset.w, heightMm: preset.h, printerName: cfg.labelPrinterName || '' });
-      } else {
-        await window.api.printHTML(html);
-      }
+      await printLabel({ Name:'منتج تجريبي', Price:25, Barcode:testBarcode, ID:1 }, settings||{}, cfg.size, 1, cfg);
     } catch (e) { console.error('Test print failed:', e); }
     setPrintLoading(false);
   };

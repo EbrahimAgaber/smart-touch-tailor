@@ -54,6 +54,8 @@ export const PRINTER_PROFILES = {
   'Zebra ZD220':        { lnpzMm:3,   rnpzMm:3,   tnpzMm:2,   bnpzMm:2,   maxDPI:203, driverType:'zpl',    fontStrategy:'embed'  },
   'Zebra ZD420':        { lnpzMm:3,   rnpzMm:3,   tnpzMm:2,   bnpzMm:2,   maxDPI:300, driverType:'zpl',    fontStrategy:'embed'  },
   'Zebra ZD620':        { lnpzMm:3,   rnpzMm:3,   tnpzMm:2,   bnpzMm:2,   maxDPI:300, driverType:'zpl',    fontStrategy:'embed'  },
+  'Zebra GK420t':       { lnpzMm:1.5, rnpzMm:1.5, tnpzMm:1.5, bnpzMm:1.5, maxDPI:203, driverType:'zpl',    fontStrategy:'embed'  },
+  'Zebra GK':           { lnpzMm:1.5, rnpzMm:1.5, tnpzMm:1.5, bnpzMm:1.5, maxDPI:203, driverType:'zpl',    fontStrategy:'embed'  },
   'Bixolon SRP-350':    { lnpzMm:1,   rnpzMm:1,   tnpzMm:1,   bnpzMm:1,   maxDPI:203, driverType:'gdi',    fontStrategy:'embed'  },
   'Bixolon SLP-720':    { lnpzMm:1.5, rnpzMm:1.5, tnpzMm:1.5, bnpzMm:1.5, maxDPI:300, driverType:'gdi',    fontStrategy:'embed'  },
   'SATO CL4NX':         { lnpzMm:0.8, rnpzMm:0.8, tnpzMm:0.8, bnpzMm:0.8, maxDPI:305, driverType:'zpl',    fontStrategy:'embed'  },
@@ -398,12 +400,32 @@ ${cssBlock}
 
 // ─── P1: BATCH BUILDER ────────────────────────────────────────────────────────
 // CSS extracted once. Body loop emits only <div class="lbl"> blocks.
-export async function printLabelBatch(products, settings, labelKey, copiesEach = 1) {
-  if (!products.length) return;
-  const cfg = parseCfg(settings);
+export async function printLabelBatch(products, settings, labelKey, copiesEach = 1, configOverride = null) {
+  if (!products || !products.length) return;
+  const cfg = { ...parseCfg(settings), ...(configOverride || {}) };
   const key = labelKey || cfg.size || '58x40';
   const profile = fuzzyMatchProfile(cfg.labelPrinterName || '');
   const { w, h } = LABEL_PRESETS[key] || LABEL_PRESETS['58x40'];
+
+  // ZPL bypass for batch
+  if (profile.driverType === 'zpl') {
+    let fullZpl = '';
+    for (const p of products) {
+      const hasCustomCopies = p && p.product !== undefined && p.copies !== undefined;
+      const actualProduct = hasCustomCopies ? p.product : p;
+      const actualCopies = hasCustomCopies ? p.copies : copiesEach;
+      fullZpl += buildZPL(actualProduct, cfg, key, actualCopies, profile) + '\n';
+    }
+    const result = await window.api.printLabelZPL({ zpl: fullZpl, printerName: cfg.labelPrinterName || '' });
+    // Log prints
+    for (const p of products) {
+      const hasCustomCopies = p && p.product !== undefined && p.copies !== undefined;
+      const actualProduct = hasCustomCopies ? p.product : p;
+      const actualCopies = hasCustomCopies ? p.copies : copiesEach;
+      await _logPrint(actualProduct, actualCopies, key, result);
+    }
+    return result;
+  }
 
   // P1: build CSS once from the first product's config
   const cssBlock = buildLabelCSS(key, cfg, profile);
@@ -411,8 +433,12 @@ export async function printLabelBatch(products, settings, labelKey, copiesEach =
   // Build all label div blocks — no per-label <html>/<head>/<style>
   const allLabelDivs = [];
   for (const p of products) {
-    for (let i = 0; i < copiesEach; i++) {
-      const fullHtml = await buildLabelHTML(p, settings, key, 1, profile);
+    const hasCustomCopies = p && p.product !== undefined && p.copies !== undefined;
+    const actualProduct = hasCustomCopies ? p.product : p;
+    const actualCopies = hasCustomCopies ? p.copies : copiesEach;
+
+    for (let i = 0; i < actualCopies; i++) {
+      const fullHtml = await buildLabelHTML(actualProduct, cfg, key, 1, profile);
       // Extract just the <div class="lbl">…</div>
       const m = fullHtml.match(/<div class="lbl">[\s\S]*?<\/div>\s*(?=<div class="lbl">|<script|<\/body>)/g);
       if (m) allLabelDivs.push(...m);
@@ -438,21 +464,21 @@ ${allLabelDivs.join('\n')}
 }
 
 // ─── P3 / P9: PRINT SINGLE LABEL ─────────────────────────────────────────────
-export async function printLabel(product, settings, labelKey, copies = 1) {
-  const cfg = parseCfg(settings);
+export async function printLabel(product, settings, labelKey, copies = 1, configOverride = null) {
+  const cfg = { ...parseCfg(settings), ...(configOverride || {}) };
   const key = labelKey || cfg.size || '58x40';
   const profile = fuzzyMatchProfile(cfg.labelPrinterName || '');
   const { w, h } = LABEL_PRESETS[key] || LABEL_PRESETS['58x40'];
 
   // P8: ZPL bypass
   if (profile.driverType === 'zpl') {
-    const zpl = buildZPL(product, settings, key, copies, profile);
+    const zpl = buildZPL(product, cfg, key, copies, profile);
     const result = await window.api.printLabelZPL({ zpl, printerName: cfg.labelPrinterName || '' });
     await _logPrint(product, copies, key, result);
     return result;
   }
 
-  const html = await buildLabelHTML(product, settings, key, copies, profile);
+  const html = await buildLabelHTML(product, cfg, key, copies, profile);
   return _sendPrintJob(html, w, h, cfg, profile, product, copies, key);
 }
 
@@ -533,7 +559,7 @@ ${bizLine}^FO${padL},${nameY}^A0N,24,24^FD${name}^FS
 function parseCfg(settings) {
   try {
     const raw = settings?.label_config;
-    return {
+    const base = {
       showBusinessName: true,
       showProductName:  true,
       showPrice:        true,
@@ -555,8 +581,18 @@ function parseCfg(settings) {
       copies:           1,
       size:             '58x40',
       labelPrinterName: '',
-      ...(typeof raw === 'string' ? JSON.parse(raw) : (raw || {})),
     };
+    if (raw !== undefined) {
+      return {
+        ...base,
+        ...(typeof raw === 'string' ? JSON.parse(raw) : (raw || {})),
+      };
+    } else {
+      return {
+        ...base,
+        ...settings,
+      };
+    }
   } catch { return { size:'58x40', copies:1, labelPrinterName:'' }; }
 }
 

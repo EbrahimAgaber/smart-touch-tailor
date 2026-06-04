@@ -108,10 +108,10 @@ export default function Staff() {
         )}
 
         {/* Actions Bar */}
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', background:'white', padding:'20px 24px', borderRadius:'20px', border:'1px solid #f1f5f9', boxShadow:'0 1px 3px rgba(0,0,0,0.04)' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', background:'var(--bg-card)', padding:'20px 24px', borderRadius:'20px', border:'1px solid #f1f5f9', boxShadow:'0 1px 3px rgba(0,0,0,0.04)' }}>
           <div>
-            <div style={{ fontWeight:'800', fontSize:'16px', color:'#0f172a' }}>فريق العمل</div>
-            <div style={{ fontSize:'13px', color:'#94a3b8', marginTop:'2px' }}>إدارة حسابات الدخول وصلاحيات كل موظف</div>
+            <div style={{ fontWeight:'800', fontSize:'16px', color:'var(--text-main)' }}>فريق العمل</div>
+            <div style={{ fontSize:'13px', color:'var(--text-muted)', marginTop:'2px' }}>إدارة حسابات الدخول وصلاحيات كل موظف</div>
           </div>
           <button onClick={openAdd} style={primaryBtnStyle}>
             <UserPlus size={18} /> إضافة موظف جديد
@@ -130,9 +130,9 @@ export default function Staff() {
 
         {/* Staff Cards Grid */}
         {loading ? (
-          <div style={{ textAlign:'center', padding:'60px', color:'#94a3b8' }}>جاري التحميل...</div>
+          <div style={{ textAlign:'center', padding:'60px', color:'var(--text-muted)' }}>جاري التحميل...</div>
         ) : staff.length === 0 ? (
-          <div style={{ textAlign:'center', padding:'80px', color:'#94a3b8', background:'white', borderRadius:'20px', border:'1px solid #f1f5f9' }}>
+          <div style={{ textAlign:'center', padding:'80px', color:'var(--text-muted)', background:'var(--bg-card)', borderRadius:'20px', border:'1px solid #f1f5f9' }}>
             <div style={{ fontSize:'48px', marginBottom:'16px', opacity:.4 }}>🛡️</div>
             <div style={{ fontWeight:'700', marginBottom:'8px' }}>لا يوجد موظفون حتى الآن</div>
             <div style={{ fontSize:'13px' }}>ابدأ بإضافة أول موظف</div>
@@ -142,7 +142,7 @@ export default function Staff() {
             {staff.map(s => {
               const perms = JSON.parse(s.permissions_json || '[]');
               return (
-                <div key={s.id} style={{ background:'white', borderRadius:'20px', padding:'24px', border:'1px solid #f1f5f9', boxShadow:'0 1px 3px rgba(0,0,0,0.04)', position:'relative', overflow:'hidden' }}>
+                <div key={s.id} className="hover-lift" style={{ background:'var(--bg-card)', padding:'24px', border:'1px solid #f1f5f9', boxShadow:'0 1px 3px rgba(0,0,0,0.04)', position:'relative', overflow:'hidden' }}>
                   <div style={{ position:'absolute', top:0, left:0, right:0, height:'4px', background: String(s.role || '').toLowerCase() === 'admin' ? 'linear-gradient(90deg,#8b5cf6,#7c3aed)' : 'linear-gradient(90deg,#3b82f6,#2563eb)' }} />
 
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'16px' }}>
@@ -151,7 +151,7 @@ export default function Staff() {
                         {String(s.role || '').toLowerCase() === 'admin' ? '👑' : '👤'}
                       </div>
                       <div>
-                        <div style={{ fontWeight:'800', fontSize:'16px', color:'#0f172a' }}>{s.name}</div>
+                        <div style={{ fontWeight:'800', fontSize:'16px', color:'var(--text-main)' }}>{s.name}</div>
                         <div style={{ fontSize:'11px', fontWeight:'700', color: String(s.role || '').toLowerCase() === 'admin' ? '#8b5cf6' : '#3b82f6', background: String(s.role || '').toLowerCase() === 'admin' ? '#f5f3ff' : '#eff6ff', padding:'2px 8px', borderRadius:'99px', display:'inline-block', marginTop:'4px' }}>
                           {String(s.role || '').toLowerCase() === 'admin' ? 'مدير نظام' : 'كاشير'}
                         </div>
@@ -160,7 +160,7 @@ export default function Staff() {
                   </div>
 
                   <div style={{ borderTop:'1px solid #f1f5f9', paddingTop:'14px', marginBottom:'16px' }}>
-                    <div style={{ fontSize:'12px', color:'#94a3b8', fontWeight:'700', marginBottom:'8px' }}>الصلاحيات النشطة</div>
+                    <div style={{ fontSize:'12px', color:'var(--text-muted)', fontWeight:'700', marginBottom:'8px' }}>الصلاحيات النشطة</div>
                     {perms.length === 0 ? (
                       <div style={{ fontSize:'12px', color:'#cbd5e1' }}>لا توجد صلاحيات محددة</div>
                     ) : (
@@ -192,10 +192,10 @@ export default function Staff() {
       {/* Delete Confirmation */}
       {delConfirm && (
         <div style={overlayStyle}>
-          <div style={{ background:'white', borderRadius:'20px', padding:'36px', maxWidth:'400px', width:'90%', textAlign:'center' }} dir="rtl">
+          <div className="hover-lift" style={{ background:'var(--bg-card)', padding:'36px', maxWidth:'400px', width:'90%', textAlign:'center' }} dir="rtl">
             <div style={{ fontSize:'48px', marginBottom:'16px' }}>⚠️</div>
             <h3 style={{ fontWeight:'800', marginBottom:'8px' }}>تأكيد الحذف</h3>
-            <p style={{ color:'#64748b', marginBottom:'24px' }}>هل أنت متأكد من حذف هذا الموظف؟ لا يمكن التراجع عن هذا الإجراء.</p>
+            <p style={{ color:'var(--text-muted)', marginBottom:'24px' }}>هل أنت متأكد من حذف هذا الموظف؟ لا يمكن التراجع عن هذا الإجراء.</p>
             <div style={{ display:'flex', gap:'12px', justifyContent:'center' }}>
               <button onClick={() => setDelConfirm(null)} style={{ padding:'12px 24px', background:'#f1f5f9', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'700', fontFamily:'inherit' }}>إلغاء</button>
               <button onClick={() => handleDelete(delConfirm)} style={{ padding:'12px 24px', background:'#ef4444', color:'white', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'700', fontFamily:'inherit' }}>نعم، احذف</button>
@@ -207,10 +207,10 @@ export default function Staff() {
       {/* Add / Edit Modal */}
       {showModal && (
         <div style={overlayStyle}>
-          <div style={{ background:'white', borderRadius:'24px', padding:'32px', maxWidth:'600px', width:'95%', maxHeight:'90vh', overflowY:'auto' }} dir="rtl">
+          <div style={{ background:'var(--bg-card)', borderRadius:'24px', padding:'32px', maxWidth:'600px', width:'95%', maxHeight:'90vh', overflowY:'auto' }} dir="rtl">
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'28px' }}>
               <h2 style={{ fontWeight:'900', fontSize:'20px' }}>{editingId ? 'تعديل بيانات الموظف' : 'إضافة موظف جديد'}</h2>
-              <button onClick={() => setShowModal(false)} style={{ background:'transparent', border:'none', cursor:'pointer', color:'#94a3b8' }}><X size={22} /></button>
+              <button onClick={() => setShowModal(false)} style={{ background:'transparent', border:'none', cursor:'pointer', color:'var(--text-muted)' }}><X size={22} /></button>
             </div>
 
             {error && (
@@ -271,5 +271,5 @@ function Field({ label, value, onChange, type='text', placeholder='', maxLength 
 const primaryBtnStyle = { background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'white', border:'none', padding:'12px 24px', borderRadius:'14px', fontWeight:'700', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px', fontSize:'14px', fontFamily:'inherit', boxShadow:'0 4px 12px rgba(37,99,235,0.2)' };
 const overlayStyle = { position:'fixed', inset:0, background:'rgba(15,23,42,0.5)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 };
 const fGroup = { display:'flex', flexDirection:'column', gap:'8px' };
-const fLabel = { fontSize:'13px', fontWeight:'700', color:'#64748b' };
-const fInput = { padding:'12px 14px', borderRadius:'12px', border:'1px solid #e2e8f0', fontSize:'14px', outline:'none', fontFamily:'inherit', background:'#fcfdfe' };
+const fLabel = { fontSize:'13px', fontWeight:'700', color:'var(--text-muted)' };
+const fInput = { padding:'16px 20px', borderRadius:'12px', border:'1px solid #e2e8f0', fontSize:'14px', outline:'none', fontFamily:'inherit', background:'var(--bg-card)' };

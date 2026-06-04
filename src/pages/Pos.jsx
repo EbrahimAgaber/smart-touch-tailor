@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -43,20 +44,20 @@ const getCategoryIcon = (cat, businessType) => {
 };
 
 // ── Payment types ───────────────────────────────────────────────
-const PAY_TYPES = [
-  { value:'Cash',   label:'نقد 💵' },
-  { value:'Card',   label:'بطاقة 💳' },
-  { value:'STC',    label:'STC Pay 📱' },
-  { value:'Credit', label:'آجل 📄' },
+const PAY_TYPES = (t) => [
+  { value:'Cash',   label: t('pos.pay_types.cash') },
+  { value:'Card',   label: t('pos.pay_types.card') },
+  { value:'STC',    label: t('pos.pay_types.stc') },
+  { value:'Credit', label: t('pos.pay_types.credit') },
 ];
 
 // ── Order types ─────────────────────────────────────────────────
-const ORDER_TYPES = [
-  { value:'counter',  label:'كاونتر 🏪' },
-  { value:'service',  label:'صيانة / خدمة 🔧' },
-  { value:'dineIn',   label:'طاولة 🍽️' },
-  { value:'takeaway', label:'سفري 📦' },
-  { value:'delivery', label:'توصيل 🛵' },
+const ORDER_TYPES = (t) => [
+  { value:'counter',  label: t('pos.order_types.counter') },
+  { value:'service',  label: t('pos.order_types.service') },
+  { value:'dineIn',   label: t('pos.order_types.dine_in') },
+  { value:'takeaway', label: t('pos.order_types.takeaway') },
+  { value:'delivery', label: t('pos.order_types.delivery') },
 ];
 
 // ── FIX: Normalize a phone number to international format for wa.me ──
@@ -87,6 +88,7 @@ const normalizeWhatsAppPhone = (raw = '') => {
 };
 
 export default function Pos() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { role } = useAuthStore();
@@ -96,7 +98,7 @@ export default function Pos() {
 
   const [settings, setSettings]       = useState({});
   const [menu, setMenu]               = useState([]);
-  const [activeCategory, setActiveCategory] = useState('الكل');
+  const [activeCategory, setActiveCategory] = useState('__all__');
   const [search, setSearch]           = useState('');
   const [table, setTable] = useState(location.state?.tableName ? { id: location.state.tableId, name: location.state.tableName } : null);
   const isRestaurant = settings?.business_type === 'restaurant';
@@ -208,8 +210,24 @@ export default function Pos() {
       for (const item of (held.items || [])) {
         addItem(item, item.Mods || []);
       }
+      
+      setOrderType('service');
+      setOrderNote(held.note || held.label || '');
+      
+      if (!held.items || held.items.length === 0) {
+        addItem({
+          id: 'service_' + (held.id || Date.now()),
+          Name: `تذكرة: ${held.label || 'صيانة عامة'}`,
+          Price: parseFloat(held.final_price) || 0,
+          Category: 'صيانة / خدمة',
+          Barcode: held.id ? `TKT-${held.id}` : ''
+        });
+      }
+
       // Clean up the held order from the queue
       api?.deleteHeldOrder?.(held.id);
+      
+      navigate(location.pathname, { replace: true, state: {} });
     }
     
     fetchHeld();
@@ -229,7 +247,7 @@ export default function Pos() {
   const handleBarcodeKeyDown = (e) => {
     if (e.key === 'Enter' && barcode) {
       if (!isShiftOpen) {
-        alert("⚠️ لا يمكن إضافة عناصر: يجب فتح وردية أولاً من صفحة الوردية.");
+        alert(t('pos.alerts.shift_required'));
         return;
       }
       const item = menu.find(m => m.Barcode === barcode) || menu.find(m => m.Name.toLowerCase() === barcode.toLowerCase());
@@ -241,10 +259,10 @@ export default function Pos() {
 
   // ── Derived ──────────────────────────────────────────────────────
   const vatRate   = parseFloat(settings.vat_rate || '0.15');
-  const categories = ['الكل', ...Array.from(new Set(menu.map(m => m.Category || 'عام')))];
+  const categories = ['__all__', ...Array.from(new Set(menu.map(m => m.Category || 'عام')))];
 
   const filteredRaw = menu.filter(m => {
-    const catMatch = activeCategory === 'الكل' || (m.Category || 'عام') === activeCategory;
+    const catMatch = activeCategory === '__all__' || (m.Category || 'عام') === activeCategory;
     const searchMatch = !search || m.Name.toLowerCase().includes(search.toLowerCase())
                         || (m.Barcode && m.Barcode.includes(search));
     return catMatch && searchMatch;
@@ -294,12 +312,13 @@ export default function Pos() {
   const paidAmount  = payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
   const remaining   = Math.max(0, finalTotal - paidAmount);
   const change      = Math.max(0, paidAmount - finalTotal);
-  const canFinalize = finalTotal >= 0 && remaining <= 0.005 && (order.length > 0);
+  const hasCredit = payments.some(p => p.type === 'Credit');
+  const canFinalize = finalTotal >= 0 && remaining <= 0.005 && (order.length > 0) && !(hasCredit && !selectedCustomer);
 
   // ── Modifiers ───────────────────────────────────────────────────
   const handleItemClick = (item) => {
     if (!isShiftOpen) {
-      alert("⚠️ لا يمكن إضافة عناصر: يجب فتح وردية أولاً من صفحة الوردية.");
+      alert(t('pos.alerts.shift_required'));
       return;
     }
     if (item.isVariantGroup) {
@@ -329,7 +348,7 @@ export default function Pos() {
 
   const confirmSerial = (e) => {
     e?.preventDefault();
-    if (!serialInput.trim()) return alert("يجب إدخال الرقم التسلسلي / IMEI!");
+    if (!serialInput.trim()) return alert(t('pos.alerts.serial_required'));
     addItem(modTarget, [], `SN: ${serialInput.trim()}`);
     setShowSerial(false);
     setModTarget(null);
@@ -389,7 +408,7 @@ export default function Pos() {
 
     // 1-F: Prevent sales if shift is not open
     if (!isShiftOpen) {
-      alert("⚠️ لا يمكن إتمام البيع: يجب فتح وردية أولاً من صفحة الوردية.");
+      alert(t('pos.alerts.shift_required'));
       setIsProcessing(false);
       navigate('/shift?action=open');
       return;
@@ -442,9 +461,9 @@ export default function Pos() {
         if (res.code === 'INSUFFICIENT_STOCK') {
           setStockOutItems(res.payload || []);
           setShowPayment(false);
-          alert(`⚠️ عذراً، الكمية غير كافية للأصناف التالية: \n${(res.payload || []).map(p => `• ${p.productName}`).join('\n')}`);
+          alert(`${t('pos.alerts.insufficient_stock')}\n${(res.payload || []).map(p => `• ${p.productName}`).join('\n')}`);
         } else {
-          alert('خطأ في البيع: ' + (res.error || res.message || 'حدث خطأ غير معروف'));
+          alert(`${t('pos.alerts.sale_error')} ` + (res.error || res.message || t('pos.alerts.unknown_error')));
         }
         setIsProcessing(false);
         return;
@@ -483,7 +502,7 @@ export default function Pos() {
       setStockOutItems([]);
       api.getHeldOrders?.().then(setHeldOrders).catch(() => {});
     } catch (err) {
-      alert('خطأ فني في الاتصال: ' + (err.message || err));
+      alert(`${t('pos.alerts.network_error')} ` + (err.message || err));
     } finally {
       setIsProcessing(false);
     }
@@ -494,7 +513,7 @@ export default function Pos() {
     setIsProcessing(true);
 
     if (!isShiftOpen) {
-      alert("⚠️ لا يمكن إتمام البيع: يجب فتح وردية أولاً من صفحة الوردية.");
+      alert(t('pos.alerts.shift_required'));
       setIsProcessing(false);
       navigate('/shift?action=open');
       return;
@@ -538,9 +557,9 @@ export default function Pos() {
       if (res && res.success === false) {
         if (res.code === 'INSUFFICIENT_STOCK') {
           setStockOutItems(res.payload || []);
-          alert(`⚠️ عذراً، الكمية غير كافية للأصناف التالية: \n${(res.payload || []).map(p => `• ${p.productName}`).join('\n')}`);
+          alert(`${t('pos.alerts.insufficient_stock')}\n${(res.payload || []).map(p => `• ${p.productName}`).join('\n')}`);
         } else {
-          alert('خطأ في البيع: ' + (res.error || res.message || 'حدث خطأ غير معروف'));
+          alert(`${t('pos.alerts.sale_error')} ` + (res.error || res.message || t('pos.alerts.unknown_error')));
         }
         return;
       }
@@ -576,10 +595,10 @@ export default function Pos() {
       if (shouldPrint) {
         await printReceiptData(invoiceData, forceWidth);
       } else {
-        showToast('تم حفظ الفاتورة بنجاح!');
+        showToast(t('pos.alerts.invoice_saved'));
       }
     } catch (err) {
-      alert('خطأ فني في الاتصال: ' + (err.message || err));
+      alert(`${t('pos.alerts.network_error')} ` + (err.message || err));
     } finally {
       setIsProcessing(false);
     }
@@ -587,11 +606,11 @@ export default function Pos() {
 
   const handleVoidSale = async () => {
     if (!lastInvoice?.invoice) return;
-    await window.api?.voidSale?.({ invoiceId: lastInvoice.invoice, reason: voidReason || 'طلب الكاشير' });
+    await window.api?.voidSale?.({ invoiceId: lastInvoice.invoice, reason: voidReason || t('pos.void.default_reason') });
     setShowVoid(false);
     setVoidReason('');
     setShowSuccess(false);
-    alert('تم إلغاء الفاتورة بنجاح');
+    alert(t('pos.alerts.void_success'));
   };
 
   // ── Keyboard shortcuts ─────────────────────────────────────────
@@ -608,7 +627,7 @@ export default function Pos() {
   const holdCurrentOrder = async (isKds = false) => {
     if (order.length === 0) return;
     try {
-      const label = table ? `طاولة ${table.name}` : (orderNote || `طلب ${new Date().toLocaleTimeString('ar-SA')}`);
+      const label = table ? `${t('pos.hold.table')} ${table.name}` : (orderNote || `${t('pos.hold.order')} ${new Date().toLocaleTimeString('ar-SA')}`);
       const res = await window.api?.holdOrder?.({ 
         items: order, 
         customer_id: selectedCustomer?.id, 
@@ -635,9 +654,9 @@ export default function Pos() {
       setTable(null);
       const held = await window.api?.getHeldOrders?.();
       setHeldOrders(held || []);
-      alert(isKds ? '👨‍🍳 تم إرسال الطلب للمطبخ!' : '✅ تم تعليق الطلب بنجاح');
+      alert(isKds ? t('pos.alerts.sent_to_kitchen') : t('pos.alerts.order_held'));
     } catch (e) {
-      alert('فشل تعليق الطلب: ' + e.message);
+      alert(t('pos.alerts.hold_failed') + e.message);
     }
   };
 
@@ -653,7 +672,7 @@ export default function Pos() {
   const saveAsQuote = async () => {
     if (order.length === 0) return;
     try {
-      const label = orderNote || `عرض سعر ${new Date().toLocaleTimeString('ar-SA')}`;
+      const label = orderNote || `${t('pos.quote.label')} ${new Date().toLocaleTimeString('ar-SA')}`;
       const res = await window.api?.holdOrder?.({ 
         items: order, 
         customer_id: selectedCustomer?.id, 
@@ -676,7 +695,7 @@ export default function Pos() {
       setTable(null);
       setShowQuoteConfirm(true);
     } catch (e) {
-      alert('فشل حفظ عرض السعر: ' + e.message);
+      alert(t('pos.alerts.quote_save_failed') + e.message);
     }
   };
 
@@ -860,11 +879,12 @@ export default function Pos() {
   };
 
   const resumeHeldOrder = (held) => {
-    if (order.length > 0 && !window.confirm('الطلب الحالي سيُحذف. هل تريد المتابعة؟')) return;
+    if (order.length > 0 && !window.confirm(t('pos.hold.resume_confirm'))) return;
     clearCart();
     for (const item of held.items) {
       addItem(item, item.Mods || []);
     }
+    if (held.order_type) setOrderType(held.order_type);
     window.api?.deleteHeldOrder?.(held.id);
     setHeldOrders(prev => prev.filter(h => h.id !== held.id));
     setShowHeld(false);
@@ -1542,7 +1562,7 @@ export default function Pos() {
   const performWAShare = async (rawPhone, msg) => {
     const phone = normalizeWhatsAppPhone(rawPhone);
     if (!phone || phone.length < 10) {
-      alert('رقم الهاتف غير صحيح.');
+      alert(t('pos.alerts.invalid_phone'));
       return;
     }
 
@@ -1583,8 +1603,8 @@ export default function Pos() {
           {/* Order type selector */}
           <select value={orderType} onChange={e => setOrderType(e.target.value)}
             style={{ width:'100%', padding:'8px 10px', borderRadius:'10px', border:'1px solid #e2e8f0', fontSize:'12px', fontFamily:'inherit', background:'#f8fafc', marginBottom:'8px' }}>
-            {ORDER_TYPES.filter(t => isRestaurant || t.value !== 'dineIn').map(t => (
-              <option key={t.value} value={t.value}>{t.label}</option>
+            {ORDER_TYPES(t).filter(type => isRestaurant || type.value !== 'dineIn').map(type => (
+              <option key={type.value} value={type.value}>{type.label}</option>
             ))}
           </select>
         </div>
@@ -1593,7 +1613,7 @@ export default function Pos() {
         {viewMode === 'grid' && (
           <div style={{ padding:'12px 14px', borderBottom:'1px solid #f1f5f9' }}>
             <input ref={barcodeRef} autoFocus value={barcode} onChange={handleBarcodeChange} onKeyDown={handleBarcodeKeyDown}
-              placeholder="🔍 اسم أو باركود المنتج..."
+              placeholder={t('pos.grid.search_placeholder')}
               style={{ width:'100%', padding:'10px 12px', borderRadius:'10px', border:'2px solid #3b82f6', background:'#f0f7ff', fontSize:'13px', fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} />
           </div>
         )}
@@ -1601,13 +1621,13 @@ export default function Pos() {
         {/* Categories (Only in Grid Mode) */}
         {viewMode === 'grid' && (
           <div style={{ padding:'10px 12px', flex:1, overflowY:'auto' }}>
-            <p style={{ fontSize:'11px', color:'#94a3b8', marginBottom:'6px', fontWeight:'700' }}>الأقسام</p>
+            <p style={{ fontSize:'11px', color:'#94a3b8', marginBottom:'6px', fontWeight:'700' }}>{t('pos.categories.all')}</p>
             {categories.map(c => (
               <div key={c} onClick={() => setActiveCategory(c)}
                 style={{ padding:'9px 12px', borderRadius:'10px', cursor:'pointer', fontWeight:'600', fontSize:'12px', marginBottom:'3px', transition:'all 0.15s',
                   background: activeCategory===c ? '#3b82f6' : 'transparent',
                   color: activeCategory===c ? 'white' : '#64748b' }}>
-                {c === 'الكل' ? '🗂️ ' : getCategoryIcon(c, settings?.business_type) + ' '}{c}
+                {c === '__all__' ? `🗂️ ${t('pos.categories.all')}` : `${getCategoryIcon(c, settings?.business_type)} ${c}`}
               </div>
             ))}
           </div>
@@ -1617,30 +1637,30 @@ export default function Pos() {
         <div style={{ padding:'12px', borderTop:'1px solid #f1f5f9', display:'flex', flexDirection:'column', gap:'6px' }}>
           <button onClick={() => setShowHeld(true)}
             style={{ padding:'9px', background: heldOrders.length > 0 ? '#fef3c7' : '#f8fafc', border:`1px solid ${heldOrders.length > 0 ? '#fcd34d' : '#e2e8f0'}`, borderRadius:'10px', cursor:'pointer', fontWeight:'700', fontSize:'12px', fontFamily:'inherit', color: heldOrders.length > 0 ? '#d97706' : '#64748b', display:'flex', justifyContent:'space-between', position:'relative' }}>
-            ⏸️ الطلبات المعلقة
+            ⏸️ {t('pos.sidebar.held_orders')}
             <div style={{ display:'flex', gap:'4px' }}>
-              {isRestaurant && readyCount > 0 && <span style={{ background:'#ef4444', color:'white', borderRadius:'99px', padding:'2px 7px', fontSize:'10px', animation:'pulse 2s infinite' }}>{readyCount} جاهز</span>}
+              {isRestaurant && readyCount > 0 && <span style={{ background:'#ef4444', color:'white', borderRadius:'99px', padding:'2px 7px', fontSize:'10px', animation:'pulse 2s infinite' }}>{readyCount} {t('pos.sidebar.ready')}</span>}
               {heldOrders.length > 0 && <span style={{ background:'#f59e0b', color:'white', borderRadius:'99px', padding:'2px 7px', fontSize:'10px' }}>{heldOrders.length}</span>}
             </div>
           </button>
           {String(role || '').toLowerCase() === 'admin' && (
             <button onClick={() => navigate('/dashboard')}
               style={{ padding:'9px', background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'10px', cursor:'pointer', fontWeight:'700', fontSize:'12px', fontFamily:'inherit', color:'#64748b' }}>
-              📊 لوحة التحكم
+              📊 {t('pos.sidebar.dashboard')}
             </button>
           )}
           <button onClick={() => navigate('/shift?action=close')}
             style={{ padding:'9px', background:'#fef2f2', border:'1px solid #fecaca', borderRadius:'10px', cursor:'pointer', fontWeight:'700', fontSize:'12px', fontFamily:'inherit', color:'#ef4444' }}>
-            🔒 إغلاق الوردية
+            🔒 {t('pos.sidebar.close_shift')}
           </button>
           
           <div style={{ marginTop:'10px', padding:'12px', background:'#f0f9ff', borderRadius:'14px', border:'1px solid #bae6fd' }}>
             <div style={{ fontSize:'11px', fontWeight:'800', color:'#0369a1', marginBottom:'8px', display:'flex', alignItems:'center', gap:'6px' }}>
-              <Headphones size={14}/> الدعم الفني
+              <Headphones size={14}/> {t('pos.sidebar.tech_support')}
             </div>
             <div style={{ display:'flex', gap:'6px' }}>
-              <button onClick={() => window.api.openExternal('https://wa.me/966533174895')} style={{ flex:1, padding:'6px', background:'#10b981', color:'white', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'10px', fontWeight:'700' }}>واتساب</button>
-              <button onClick={() => window.api.openExternal('mailto:ea.gaber10@gmail.com')} style={{ flex:1, padding:'6px', background:'#3b82f6', color:'white', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'10px', fontWeight:'700' }}>إيميل</button>
+              <button onClick={() => window.api.openExternal('https://wa.me/966533174895')} style={{ flex:1, padding:'6px', background:'#10b981', color:'white', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'10px', fontWeight:'700' }}>{t('pos.sidebar.whatsapp')}</button>
+              <button onClick={() => window.api.openExternal('mailto:ea.gaber10@gmail.com')} style={{ flex:1, padding:'6px', background:'#3b82f6', color:'white', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'10px', fontWeight:'700' }}>{t('pos.sidebar.email')}</button>
             </div>
           </div>
         </div>
@@ -1651,7 +1671,7 @@ export default function Pos() {
         <div style={{ padding:'0 4px 12px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
             <h2 style={{ fontSize:'18px', fontWeight:'800', color:'#0f172a' }}>
-              {viewMode === 'grid' ? 'المنتجات' : 'إدخال الفاتورة السريع'}
+              {viewMode === 'grid' ? t('pos.header.products') : t('pos.header.quick_entry')}
             </h2>
             
             {/* View Mode Toggle */}
@@ -1661,14 +1681,14 @@ export default function Pos() {
                   background: viewMode === 'grid' ? 'white' : 'transparent',
                   color: viewMode === 'grid' ? '#3b82f6' : '#64748b',
                   boxShadow: viewMode === 'grid' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none' }}>
-                <LayoutGrid size={14} /> شبكي
+                <LayoutGrid size={14} /> {t('pos.header.grid')}
               </button>
               <button onClick={() => setViewMode('tabular')}
                 style={{ border:'none', padding:'6px 12px', borderRadius:'8px', cursor:'pointer', display:'flex', alignItems:'center', gap:'6px', fontSize:'11px', fontWeight:'700', transition:'all 0.2s',
                   background: viewMode === 'tabular' ? 'white' : 'transparent',
                   color: viewMode === 'tabular' ? '#3b82f6' : '#64748b',
                   boxShadow: viewMode === 'tabular' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none' }}>
-                <Table size={14} /> جدولي
+                <Table size={14} /> {t('pos.header.tabular')}
               </button>
             </div>
           </div>
@@ -1683,7 +1703,7 @@ export default function Pos() {
               <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', color:'#94a3b8', gap:'16px' }}>
                 <div style={{ fontSize:'56px', opacity:.4 }}>📦</div>
                 <div style={{ fontSize:'16px', fontWeight:'700' }}>
-                  {search ? `لا توجد نتائج لـ "${search}"` : 'لا توجد منتجات في هذا القسم'}
+                  {search ? `${t('pos.grid.no_results')} "${search}"` : t('pos.grid.no_products')}
                 </div>
               </div>
             ) : (
@@ -1700,7 +1720,7 @@ export default function Pos() {
                     <div style={{ fontWeight:'800', color:'#3b82f6', fontSize:'14px' }}>SAR {parseFloat(item.Price||0).toFixed(2)}</div>
                     {!item.IsService && (
                       <div style={{ fontSize:'10px', marginTop:'4px', color: item.Stock <= 5 ? '#ef4444' : '#94a3b8', fontWeight:'600' }}>
-                        {item.Stock <= 0 ? 'نفذت الكمية' : item.Stock <= 5 ? `⚠️ ${item.Stock} متبقي` : ''}
+                        {item.Stock <= 0 ? t('pos.grid.out_of_stock') : item.Stock <= 5 ? `⚠️ ${item.Stock} ${t('pos.grid.remaining')}` : ''}
                       </div>
                     )}
                   </div>
@@ -1733,17 +1753,17 @@ export default function Pos() {
           <div style={{ padding:'18px 20px', borderBottom:'1px solid #f1f5f9', background:'#f8fafc' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px' }}>
               <div>
-                <h3 style={{ fontSize:'16px', fontWeight:'800' }}>الطلب الحالي</h3>
+                <h3 style={{ fontSize:'16px', fontWeight:'800' }}>{t('pos.order.current_order')}</h3>
                 {isRestaurant && table && (
-                  <div style={{ fontSize:'12px', color:'#3b82f6', fontWeight:'700', marginTop:'2px' }}>📍 طاولة: {table.name}</div>
+                  <div style={{ fontSize:'12px', color:'#3b82f6', fontWeight:'700', marginTop:'2px' }}>📍 {t('pos.order.table')}: {table.name}</div>
                 )}
               </div>
               <div style={{ display:'flex', gap:'8px' }}>
                 {lastClearedCart && lastClearedCart.length > 0 && (
-                  <button onClick={restoreClearedCart} className="btn btn-secondary" style={{ fontSize:'11px', padding:'6px 10px', background:'#f8fafc', color:'#3b82f6', border:'1px solid #bfdbfe' }}>↩ تراجع</button>
+                  <button onClick={restoreClearedCart} className="btn btn-secondary" style={{ fontSize:'11px', padding:'6px 10px', background:'#f8fafc', color:'#3b82f6', border:'1px solid #bfdbfe' }}>↩ {t('pos.order.undo')}</button>
                 )}
                 {/* FIX: Removed duplicate hold button — hold is in the action buttons below */}
-                {order.length > 0 && <button onClick={clearCart} className="btn btn-danger" style={{ fontSize:'11px', padding:'6px 10px' }}>🗑️ مسح الكل</button>}
+                {order.length > 0 && <button onClick={clearCart} className="btn btn-danger" style={{ fontSize:'11px', padding:'6px 10px' }}>🗑️ {t('pos.order.clear_all')}</button>}
               </div>
             </div>
 
@@ -1755,7 +1775,7 @@ export default function Pos() {
                     <div style={{ width:'32px', height:'32px', borderRadius:'50%', background:'#3b82f6', color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', fontWeight:'800' }}>{selectedCustomer.name.charAt(0)}</div>
                     <div>
                       <div style={{ fontSize:'13px', fontWeight:'800', color:'#1d4ed8' }}>{selectedCustomer.name}</div>
-                      <div style={{ fontSize:'10px', color:'#3b82f6' }}>{selectedCustomer.loyalty_points || 0} نقطة • {selectedCustomer.tier === 'gold' ? '🏆 ذهبي' : selectedCustomer.tier === 'silver' ? '🥈 فضي' : '🥉 برونزي'}</div>
+                      <div style={{ fontSize:'10px', color:'#3b82f6' }}>{selectedCustomer.loyalty_points || 0} {t('pos.order.points')} • {selectedCustomer.tier === 'gold' ? '🏆 ' + t('pos.tiers.gold') : selectedCustomer.tier === 'silver' ? '🥈 ' + t('pos.tiers.silver') : '🥉 ' + t('pos.tiers.bronze')}</div>
                     </div>
                   </div>
                   <button onClick={() => setSelectedCustomer(null)} style={{ background:'none', border:'none', color:'#3b82f6', cursor:'pointer', fontSize:'18px' }}>×</button>
@@ -1767,7 +1787,7 @@ export default function Pos() {
                       value={custSearch} 
                       onChange={e => { setCustSearch(e.target.value); setShowCustResults(true); }}
                       onFocus={() => setShowCustResults(true)}
-                      placeholder="🔍 اختر عميل أو ابحث..."
+                      placeholder={t('pos.order.search_customer')}
                       style={{ width:'100%', padding:'10px 12px', borderRadius:'12px', border:'1px solid #e2e8f0', fontSize:'12px', outline:'none', background:'white' }}
                     />
                     {showCustResults && (custSearch || customers.length > 0) && (
@@ -1778,11 +1798,11 @@ export default function Pos() {
                             onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
                             onMouseLeave={e => e.currentTarget.style.background = 'white'}>
                             <div style={{ fontWeight:'700', fontSize:'13px' }}>{c.name}</div>
-                            <div style={{ fontSize:'11px', color:'#94a3b8' }}>{c.phone || 'بدون رقم'}</div>
+                            <div style={{ fontSize:'11px', color:'#94a3b8' }}>{c.phone || t('pos.order.no_phone')}</div>
                           </div>
                         ))}
                         {custSearch && !customers.some(c => c.name.includes(custSearch)) && (
-                          <div style={{ padding:'12px', textAlign:'center', color:'#94a3b8', fontSize:'12px' }}>لا توجد نتائج</div>
+                          <div style={{ padding:'12px', textAlign:'center', color:'#94a3b8', fontSize:'12px' }}>{t('pos.order.no_results')}</div>
                         )}
                       </div>
                     )}
@@ -1799,7 +1819,7 @@ export default function Pos() {
             {order.length === 0 ? (
               <div style={{ height:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', color:'#94a3b8', gap:'10px', padding:'32px' }}>
                 <span style={{ fontSize:'44px', opacity:.4 }}>🛒</span>
-                <p style={{ fontWeight:'600', fontSize:'13px' }}>الطلب فارغ</p>
+                <p style={{ fontWeight:'600', fontSize:'13px' }}>{t('pos.order.empty_cart')}</p>
               </div>
             ) : order.map((item, idx) => {
               const isStockOut = stockOutItems.some(s => s.id === item.ID);
@@ -1809,7 +1829,7 @@ export default function Pos() {
                   <div style={{ flex:1 }}>
                     <div style={{ fontWeight:'700', fontSize:'13px', color: isStockOut ? '#e11d48' : '#0f172a' }}>
                       {item.Name}
-                      {isStockOut && <span style={{ fontSize:'10px', display:'block', fontWeight:'800' }}>⚠️ كمية غير كافية بالمخزن</span>}
+                      {isStockOut && <span style={{ fontSize:'10px', display:'block', fontWeight:'800' }}>⚠️ {t('pos.order.insufficient_stock')}</span>}
                     </div>
                     <div style={{ color:'#94a3b8', fontSize:'11px', marginTop:'2px' }}>SAR {item.Price.toFixed(2)}</div>
                     {item.Mods && item.Mods.length > 0 && (
@@ -1819,21 +1839,21 @@ export default function Pos() {
                   <div style={{ display:'flex', alignItems:'center', background:'#f8fafc', borderRadius:'99px', padding:'3px' }}>
                     <button onClick={() => updateQuantity(idx, item.Qty + 1)} style={qtyBtn}>+</button>
                     <span style={{ minWidth:'24px', textAlign:'center', fontWeight:'800', fontSize:'13px' }}>{item.Qty}</span>
-                    <button onClick={() => updateQuantity(idx, item.Qty - 1)} style={qtyBtn}>−</button>
+            <button onClick={() => updateQuantity(idx, item.Qty - 1)} style={qtyBtn}>−</button>
                   </div>
                   <div style={{ fontWeight:'800', fontSize:'14px', minWidth:'52px', textAlign:'left', color:'#0f172a' }}>{(item.Price * item.Qty).toFixed(2)}</div>
                   <button onClick={() => removeItem(idx)} style={{ background:'transparent', border:'none', color:'#ef4444', cursor:'pointer', fontSize:'18px' }}>×</button>
                 </div>
               </div>
-            );
+              );
           })}
           </div>
 
           {/* Totals */}
           <div style={{ padding:'14px 18px', background:'white', borderTop:'1px solid #e2e8f0' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px', color:'#64748b', fontSize:'13px' }}><span>المجموع (بدون ضريبة)</span><span>SAR {subtotal.toFixed(2)}</span></div>
-            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'12px', color:'#64748b', fontSize:'13px' }}><span>ضريبة القيمة المضافة ({(vatRate*100).toFixed(0)}%)</span><span>SAR {tax.toFixed(2)}</span></div>
-            <div style={{ display:'flex', justifyContent:'space-between', fontWeight:'800', fontSize:'20px', color:'#3b82f6' }}><span>الإجمالي</span><span>SAR {total.toFixed(2)}</span></div>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px', color:'#64748b', fontSize:'13px' }}><span>{t('pos.order.subtotal_ex_tax')}</span><span>SAR {subtotal.toFixed(2)}</span></div>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'12px', color:'#64748b', fontSize:'13px' }}><span>{t('pos.order.vat')} ({(vatRate*100).toFixed(0)}%)</span><span>SAR {tax.toFixed(2)}</span></div>
+            <div style={{ display:'flex', justifyContent:'space-between', fontWeight:'800', fontSize:'20px', color:'#3b82f6' }}><span>{t('pos.order.total')}</span><span>SAR {total.toFixed(2)}</span></div>
           </div>
 
           {/* Action buttons */}
@@ -1842,22 +1862,22 @@ export default function Pos() {
               {isRestaurant ? (
                 <button onClick={() => holdCurrentOrder(true)} disabled={order.length===0}
                   style={{ ...holdBtnStyle, background:'#f59e0b', color:'white', border:'none' }}>
-                  <ChefHat size={18} /> للمطبخ
+                  <ChefHat size={18} /> {t('pos.actions.to_kitchen')}
                 </button>
               ) : (
                 <button onClick={saveAsQuote} disabled={order.length===0}
                   style={{ ...holdBtnStyle, background:'#f8fafc', color:'#475569', border:'1px solid #e2e8f0' }}>
-                  💼 كعرض سعر
+                  💼 {t('pos.actions.as_quote')}
                 </button>
               )}
               <button onClick={() => holdCurrentOrder(false)} disabled={order.length===0}
                 style={holdBtnStyle}>
-                <Pause size={18} /> {isRestaurant ? 'تعليق' : 'تعليق الطلب'}
+                <Pause size={18} /> {isRestaurant ? t('pos.actions.hold') : t('pos.actions.hold_order')}
               </button>
             </div>
             <button className="btn btn-primary" style={{ padding:'16px', fontSize:'16px', fontWeight:'900' }}
               disabled={order.length === 0} onClick={openPayment}>
-              إتمام الدفع 💳
+              {t('pos.actions.checkout')} 💳
             </button>
           </div>
         </section>
@@ -1868,51 +1888,51 @@ export default function Pos() {
         <div style={overlay} onClick={e => e.target === e.currentTarget && setShowPayment(false)}>
           <div style={modal} dir="rtl">
             <div style={{ padding:'18px 22px', borderBottom:'1px solid #f1f5f9', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <h3 style={{ fontWeight:'800', fontSize:'17px' }}>إتمام الدفع</h3>
+              <h3 style={{ fontWeight:'800', fontSize:'17px' }}>{t('pos.payment.title')}</h3>
               <span style={{ fontWeight:'900', fontSize:'18px', color:'#3b82f6' }}>SAR {finalTotal.toFixed(2)}</span>
             </div>
             <div style={{ padding:'20px', maxHeight:'70vh', overflowY:'auto' }}>
 
               {/* Invoice Type Toggle */}
               <div style={{ marginBottom:'16px', padding:'14px', background:'#f8fafc', borderRadius:'14px', border:'1px solid #f1f5f9' }}>
-                <div style={{ fontSize:'13px', fontWeight:'700', color:'#475569', marginBottom:'10px' }}>📄 نوع الفاتورة</div>
+                <div style={{ fontSize:'13px', fontWeight:'700', color:'#475569', marginBottom:'10px' }}>📄 {t('pos.payment.invoice_type')}</div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px' }}>
                   <button onClick={() => setInvoiceType('simplified')}
                     style={{ ...toggleBtn(invoiceType==='simplified'), display:'flex', flexDirection:'column', height:'auto', padding:'10px' }}>
-                    <span style={{ fontSize:'14px' }}>فاتورة مبسطة</span>
-                    <span style={{ fontSize:'10px', opacity:.7 }}>للأفراد والمستهلكين (B2C)</span>
+                    <span style={{ fontSize:'14px' }}>{t('pos.payment.simplified')}</span>
+                    <span style={{ fontSize:'10px', opacity:.7 }}>{t('pos.payment.b2c')}</span>
                   </button>
                   <button onClick={() => setInvoiceType('standard')}
                     style={{ ...toggleBtn(invoiceType==='standard'), display:'flex', flexDirection:'column', height:'auto', padding:'10px' }}>
-                    <span style={{ fontSize:'14px' }}>فاتورة ضريبية</span>
-                    <span style={{ fontSize:'10px', opacity:.7 }}>للشركات والمؤسسات (B2B)</span>
+                    <span style={{ fontSize:'14px' }}>{t('pos.payment.standard')}</span>
+                    <span style={{ fontSize:'10px', opacity:.7 }}>{t('pos.payment.b2b')}</span>
                   </button>
                 </div>
                 {invoiceType === 'standard' && (
                   <div style={{ marginTop:'12px' }}>
-                    <label style={{ fontSize:'11px', fontWeight:'700', color:'#64748b', display:'block', marginBottom:'6px' }}>بيانات العميل الضريبية</label>
+                    <label style={{ fontSize:'11px', fontWeight:'700', color:'#64748b', display:'block', marginBottom:'6px' }}>{t('pos.payment.customer_tax_info')}</label>
                     <input 
                       style={{ width:'100%', padding:'10px', borderRadius:'10px', border:'1px solid #e2e8f0', fontSize:'13px', outline:'none' }}
                       value={customerTaxId}
                       onChange={e => setCustomerTaxId(e.target.value)}
-                      placeholder="أدخل الرقم الضريبي للعميل أو السجل التجاري..."
+                      placeholder={t('pos.payment.tax_id_placeholder')}
                     />
-                    {!selectedCustomer && <p style={{ color:'#ef4444', fontSize:'10px', marginTop:'4px' }}>⚠️ يجب اختيار عميل أولاً للفواتير الضريبية.</p>}
+                    {!selectedCustomer && <p style={{ color:'#ef4444', fontSize:'10px', marginTop:'4px' }}>⚠️ {t('pos.payment.tax_customer_required')}</p>}
                   </div>
                 )}
               </div>
 
-              {/* Loyalty Points — FIX: show capped redeemable amount */}
+              {/* Loyalty Points */}
               {selectedCustomer && selectedCustomer.loyalty_points > 0 && (
                 <div style={{ marginBottom:'16px', padding:'14px', background:'#fdf4ff', borderRadius:'14px', border:'1px solid #f5d0fe', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <div>
                     <div style={{ fontSize:'13px', fontWeight:'800', color:'#a21caf', display:'flex', alignItems:'center', gap:'6px' }}>
-                      🌟 نقاط الولاء المتاحة: {selectedCustomer.loyalty_points}
+                      🌟 {t('pos.payment.loyalty_points_available')}: {selectedCustomer.loyalty_points}
                     </div>
                     <div style={{ fontSize:'11px', color:'#c026d3', marginTop:'2px' }}>
-                      تعادل {pointsDiscount.toFixed(2)} SAR خصم
+                      {t('pos.payment.equals_discount', { amount: pointsDiscount.toFixed(2) })}
                       {selectedCustomer.loyalty_points * 0.1 > pointsDiscount
-                        ? ` (مقيّد بـ 50% من إجمالي الفاتورة)`
+                        ? ` (${t('pos.payment.capped_at_50')})`
                         : ''}
                     </div>
                   </div>
@@ -1925,11 +1945,11 @@ export default function Pos() {
                 </div>
               )}
 
-              {/* Discount */}
+              {/* Discount Section */}
               <div style={{ marginBottom:'12px', padding:'14px', background:'#f8fafc', borderRadius:'14px', border:'1px solid #f1f5f9' }}>
-                <div style={{ fontSize:'13px', fontWeight:'700', color:'#475569', marginBottom:'10px' }}>🏷️ الخصم</div>
+                <div style={{ fontSize:'13px', fontWeight:'700', color:'#475569', marginBottom:'10px' }}>🏷️ {t('pos.payment.discount')}</div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'8px', marginBottom:'10px' }}>
-                  {[['none','بدون خصم'],['pct','نسبة %'],['fixed','مبلغ ثابت']].map(([v,l]) => (
+                  {[['none', t('pos.payment.no_discount')],['pct', t('pos.payment.pct_discount')],['fixed', t('pos.payment.fixed_discount')]].map(([v,l]) => (
                     <button key={v} onClick={() => { setDiscountType(v); setDiscountVal(''); setShowAgreedOverride(false); }}
                       style={{ padding:'8px', borderRadius:'10px', border: discountType===v ? '2px solid #3b82f6' : '1px solid #e2e8f0', background: discountType===v ? '#eff6ff' : 'white', color: discountType===v ? '#1d4ed8' : '#64748b', fontWeight:'700', fontSize:'12px', cursor:'pointer', fontFamily:'inherit' }}>
                       {l}
@@ -1938,7 +1958,7 @@ export default function Pos() {
                 </div>
                 {discountType !== 'none' && (
                   <input type="number" value={discountVal} onChange={e => setDiscountVal(e.target.value)}
-                    placeholder={discountType==='pct' ? 'نسبة الخصم (%)' : 'مبلغ الخصم (SAR)'} min="0"
+                    placeholder={discountType==='pct' ? t('pos.payment.discount_pct_placeholder') : t('pos.payment.discount_fixed_placeholder')} min="0"
                     style={{ width:'100%', padding:'10px', borderRadius:'10px', border:'1px solid #e2e8f0', fontSize:'14px', fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} />
                 )}
               </div>
@@ -1946,23 +1966,23 @@ export default function Pos() {
               {/* Feature 6: Agreed Total Override */}
               <div style={{ marginBottom:'12px', padding:'14px', background: showAgreedOverride ? '#fffbeb' : '#f8fafc', borderRadius:'14px', border: showAgreedOverride ? '1px solid #fcd34d' : '1px solid #f1f5f9', transition:'all 0.2s' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: showAgreedOverride ? '10px' : '0' }}>
-                  <div style={{ fontSize:'13px', fontWeight:'700', color: showAgreedOverride ? '#92400e' : '#475569' }}>✏️ المبلغ المتفق عليه (شامل الضريبة)</div>
+                  <div style={{ fontSize:'13px', fontWeight:'700', color: showAgreedOverride ? '#92400e' : '#475569' }}>✏️ {t('pos.payment.agreed_total')}</div>
                   <button onClick={() => { setShowAgreedOverride(!showAgreedOverride); setAgreedTotalInput(''); setDiscountType('none'); }}
                     style={{ padding:'4px 12px', borderRadius:'8px', border:'none', background: showAgreedOverride ? '#fde68a' : '#e2e8f0', color: showAgreedOverride ? '#92400e' : '#64748b', fontWeight:'700', fontSize:'11px', cursor:'pointer', fontFamily:'inherit' }}>
-                    {showAgreedOverride ? 'إلغاء التعديل' : 'تعديل'}
+                    {showAgreedOverride ? t('pos.payment.cancel_edit') : t('pos.payment.edit')}
                   </button>
                 </div>
                 {showAgreedOverride && (
                   <div>
                     <input type="number" value={agreedTotalInput} onChange={e => { setAgreedTotalInput(e.target.value); setPayments([{ type: payments[0]?.type || 'Cash', amount: e.target.value }]); }}
-                      placeholder={`مثال: ${(total * 0.8).toFixed(0)} (الإجمالي الأصلي ${total.toFixed(2)})`} min="0"
+                      placeholder={t('pos.payment.agreed_placeholder', { example: (total * 0.8).toFixed(0), orig: total.toFixed(2) })} min="0"
                       autoFocus
                       style={{ width:'100%', padding:'10px', borderRadius:'10px', border:'2px solid #fbbf24', fontSize:'15px', fontWeight:'700', fontFamily:'inherit', outline:'none', boxSizing:'border-box', marginBottom:'8px' }} />
                     {agreedOverrideVal !== null && (
                       <div style={{ fontSize:'11px', color:'#92400e', display:'flex', gap:'16px', flexWrap:'wrap' }}>
-                        <span>الضريبة: <strong>SAR {(agreedOverrideVal * vatRate / (1 + vatRate)).toFixed(2)}</strong></span>
-                        <span>الصافي: <strong>SAR {(agreedOverrideVal / (1 + vatRate)).toFixed(2)}</strong></span>
-                        <span style={{ color:'#dc2626' }}>الخصم الفعلي: <strong>SAR {(total - agreedOverrideVal).toFixed(2)}</strong></span>
+                        <span>{t('pos.payment.tax')}: <strong>SAR {(agreedOverrideVal * vatRate / (1 + vatRate)).toFixed(2)}</strong></span>
+                        <span>{t('pos.payment.net')}: <strong>SAR {(agreedOverrideVal / (1 + vatRate)).toFixed(2)}</strong></span>
+                        <span style={{ color:'#dc2626' }}>{t('pos.payment.actual_discount')}: <strong>SAR {(total - agreedOverrideVal).toFixed(2)}</strong></span>
                       </div>
                     )}
                   </div>
@@ -1971,19 +1991,29 @@ export default function Pos() {
 
               {/* Payment methods */}
               <div style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', marginBottom:'6px', display:'flex', justifyContent:'space-between' }}>
-                <span>طريقة الدفع والمبلغ</span>
+                <span>{t('pos.payment.method_and_amount')}</span>
                 <button onClick={() => setPayments([{ type: payments[0]?.type || 'Cash', amount: finalTotal.toFixed(2) }])}
                   style={{ background:'#eff6ff', color:'#2563eb', border:'none', borderRadius:'6px', padding:'2px 8px', fontSize:'10px', fontWeight:'700', cursor:'pointer', fontFamily:'inherit' }}>
-                  ⟳ مزامنة المبلغ
+                  ⟳ {t('pos.payment.sync_amount')}
                 </button>
               </div>
+              {/* Credit warning: block finalization if Credit is selected but no customer */}
+              {payments.some(p => p.type === 'Credit') && !selectedCustomer && (
+                <div style={{ marginBottom:'12px', padding:'12px 14px', background:'#fef2f2', border:'1px solid #fecaca', borderRadius:'12px', display:'flex', alignItems:'center', gap:'10px' }}>
+                  <span style={{ fontSize:'20px' }}>⚠️</span>
+                  <div>
+                    <div style={{ fontWeight:'800', color:'#dc2626', fontSize:'13px' }}>يجب اختيار عميل للبيع الآجل</div>
+                    <div style={{ fontSize:'11px', color:'#b91c1c', marginTop:'2px' }}>لا يمكن تسجيل دين بدون تحديد عميل. اختر عميلاً أو غيّر طريقة الدفع.</div>
+                  </div>
+                </div>
+              )}
               {payments.map((p, i) => (
                 <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 2fr', gap:'8px', background:'#f8fafc', borderRadius:'12px', padding:'10px', marginBottom:'8px' }}>
                   <select value={p.type} onChange={e => { const n=[...payments]; n[i].type=e.target.value; setPayments(n); }}
                     style={{ border:'none', borderRadius:'8px', padding:'9px', fontWeight:'600', fontFamily:'inherit', background:'white', fontSize:'13px' }}>
-                    {PAY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    {PAY_TYPES(t).map(pt => <option key={pt.value} value={pt.value}>{pt.label}</option>)}
                   </select>
-                  <input type="number" value={p.amount} placeholder="المبلغ"
+                  <input type="number" value={p.amount} placeholder={t('pos.payment.amount')}
                     onChange={e => { const n=[...payments]; n[i].amount=e.target.value; setPayments(n); }}
                     style={{ border:'none', borderRadius:'8px', padding:'9px', fontWeight:'700', fontFamily:'inherit', background:'white', fontSize:'16px', outline:'none', textAlign:'center' }} />
                 </div>
@@ -2035,16 +2065,16 @@ export default function Pos() {
 
               {/* Balance */}
               <div style={{ padding:'12px', background: remaining > 0.005 ? '#fef2f2' : '#ecfdf5', borderRadius:'12px', display:'flex', justifyContent:'space-between', fontWeight:'700', fontSize:'15px', color: remaining > 0.005 ? '#ef4444' : '#10b981' }}>
-                <span>{remaining > 0.005 ? 'المبلغ المتبقي:' : 'الباقي للعميل:'}</span>
+                <span>{remaining > 0.005 ? t('pos.payment.remaining') : t('pos.payment.change')}</span>
                 <span>SAR {remaining > 0.005 ? remaining.toFixed(2) : change.toFixed(2)}</span>
               </div>
             </div>
 
             <div style={{ padding:'14px 22px', borderTop:'1px solid #f1f5f9', display:'flex', gap:'10px', justifyContent:'flex-end' }}>
-              <button onClick={() => setShowPayment(false)} className="btn btn-secondary">إلغاء</button>
+              <button onClick={() => setShowPayment(false)} className="btn btn-secondary">{t('pos.actions.cancel')}</button>
               <button onClick={finalizeSale} disabled={!canFinalize} className="btn btn-primary"
                 style={{ opacity: canFinalize ? 1 : .5 }}>
-                تأكيد ودفع الفاتورة
+                {t('pos.actions.confirm_pay')}
               </button>
             </div>
           </div>
@@ -2057,22 +2087,22 @@ export default function Pos() {
           <div style={{ ...modal, maxWidth:'380px', textAlign:'center', padding:'36px' }} dir="rtl">
             {/* Success icon */}
             <div style={{ width:'80px', height:'80px', background:'linear-gradient(135deg,#ecfdf5,#d1fae5)', color:'#10b981', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'40px', margin:'0 auto 20px', boxShadow:'0 8px 24px rgba(16,185,129,0.2)' }}>✓</div>
-            <h3 style={{ fontSize:'22px', fontWeight:'900', marginBottom:'6px', color:'#0f172a' }}>تمت عملية البيع بنجاح</h3>
-            <p style={{ color:'#94a3b8', marginBottom:'28px', fontSize:'13px' }}>فاتورة: <strong style={{ color:'#3b82f6' }}>{lastInvoice?.invoice}</strong></p>
+            <h3 style={{ fontSize:'22px', fontWeight:'900', marginBottom:'6px', color:'#0f172a' }}>{t('pos.success.sale_success')}</h3>
+            <p style={{ color:'#94a3b8', marginBottom:'28px', fontSize:'13px' }}>{t('pos.success.invoice')}: <strong style={{ color:'#3b82f6' }}>{lastInvoice?.invoice}</strong></p>
 
             {/* PRIMARY: Print */}
-            <button onClick={() => { printReceipt(); setShowSuccess(false); }} style={{ width:'100%', padding:'15px', marginBottom:'10px', background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'white', border:'none', borderRadius:'14px', fontWeight:'900', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', fontSize:'15px', fontFamily:'inherit', boxShadow:'0 6px 16px rgba(37,99,235,0.3)' }}>🖨️ طباعة الفاتورة (حراري)</button>
+            <button onClick={() => { printReceipt(); setShowSuccess(false); }} style={{ width:'100%', padding:'15px', marginBottom:'10px', background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'white', border:'none', borderRadius:'14px', fontWeight:'900', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', fontSize:'15px', fontFamily:'inherit', boxShadow:'0 6px 16px rgba(37,99,235,0.3)' }}>🖨️ {t('pos.success.print_thermal')}</button>
 
             {/* A4 Tax Invoice Print */}
-            <button onClick={() => { printReceiptData(lastInvoice, 'A4'); setShowSuccess(false); }} style={{ width:'100%', padding:'15px', marginBottom:'10px', background:'linear-gradient(135deg,#0f172a,#1e293b)', color:'white', border:'none', borderRadius:'14px', fontWeight:'900', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', fontSize:'15px', fontFamily:'inherit', boxShadow:'0 6px 16px rgba(15,23,42,0.3)' }}>📄 طباعة A4 (ضريبية)</button>
+            <button onClick={() => { printReceiptData(lastInvoice, 'A4'); setShowSuccess(false); }} style={{ width:'100%', padding:'15px', marginBottom:'10px', background:'linear-gradient(135deg,#0f172a,#1e293b)', color:'white', border:'none', borderRadius:'14px', fontWeight:'900', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', fontSize:'15px', fontFamily:'inherit', boxShadow:'0 6px 16px rgba(15,23,42,0.3)' }}>📄 {t('pos.success.print_a4')}</button>
 
             {/* SECONDARY: WhatsApp */}
-            <button onClick={shareViaWhatsApp} style={{ width:'100%', padding:'13px', marginBottom:'10px', background:'#f0fdf4', color:'#059669', border:'2px solid #a7f3d0', borderRadius:'14px', fontWeight:'800', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', fontSize:'14px', fontFamily:'inherit' }}>💬 إرسال الإيصال عبر واتساب</button>
+            <button onClick={shareViaWhatsApp} style={{ width:'100%', padding:'13px', marginBottom:'10px', background:'#f0fdf4', color:'#059669', border:'2px solid #a7f3d0', borderRadius:'14px', fontWeight:'800', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', fontSize:'14px', fontFamily:'inherit' }}>💬 {t('pos.success.send_whatsapp')}</button>
 
             {/* TERTIARY: Void + Continue */}
             <div style={{ display:'flex', gap:'8px' }}>
-              <button onClick={() => setShowVoid(true)} style={{ flex:1, padding:'11px', background:'#fff1f2', color:'#e11d48', border:'1px solid #fecdd3', borderRadius:'12px', fontWeight:'700', cursor:'pointer', fontSize:'12px', fontFamily:'inherit' }}>↩ إلغاء الفاتورة</button>
-              <button onClick={() => setShowSuccess(false)} style={{ flex:2, padding:'11px', background:'#f8fafc', color:'#475569', border:'1px solid #e2e8f0', borderRadius:'12px', fontWeight:'700', cursor:'pointer', fontSize:'13px', fontFamily:'inherit' }}>➕ طلب جديد</button>
+              <button onClick={() => setShowVoid(true)} style={{ flex:1, padding:'11px', background:'#fff1f2', color:'#e11d48', border:'1px solid #fecdd3', borderRadius:'12px', fontWeight:'700', cursor:'pointer', fontSize:'12px', fontFamily:'inherit' }}>↩ {t('pos.success.void_invoice')}</button>
+              <button onClick={() => setShowSuccess(false)} style={{ flex:2, padding:'11px', background:'#f8fafc', color:'#475569', border:'1px solid #e2e8f0', borderRadius:'12px', fontWeight:'700', cursor:'pointer', fontSize:'13px', fontFamily:'inherit' }}>➕ {t('pos.success.new_order')}</button>
             </div>
           </div>
         </div>
@@ -2083,7 +2113,7 @@ export default function Pos() {
         <div style={overlay}>
           <div style={{ ...modal, maxWidth:'400px' }} dir="rtl">
             <div style={{ padding:'20px', borderBottom:'1px solid #f1f5f9', background:'#f8fafc' }}>
-              <h3 style={{ fontWeight:'900', fontSize:'18px' }}>إضافات لـ: {modTarget.Name}</h3>
+              <h3 style={{ fontWeight:'900', fontSize:'18px' }}>{t('pos.mods.title')} {modTarget.Name}</h3>
             </div>
             <div style={{ padding:'20px', maxHeight:'50vh', overflowY:'auto' }}>
               {(modTarget.Modifiers || []).map(m => (
@@ -2102,8 +2132,8 @@ export default function Pos() {
               ))}
             </div>
             <div style={{ padding:'16px 20px', borderTop:'1px solid #f1f5f9', display:'flex', gap:'10px' }}>
-               <button onClick={() => setShowMods(false)} style={{ flex:1, padding:'12px', background:'#f1f5f9', border:'none', borderRadius:'12px', fontWeight:'700', cursor:'pointer' }}>إلغاء</button>
-               <button onClick={confirmMods} style={{ flex:2, padding:'12px', background:'#3b82f6', color:'white', border:'none', borderRadius:'12px', fontWeight:'800', cursor:'pointer' }}>تأكيد الإضافات</button>
+               <button onClick={() => setShowMods(false)} style={{ flex:1, padding:'12px', background:'#f1f5f9', border:'none', borderRadius:'12px', fontWeight:'700', cursor:'pointer' }}>{t('pos.actions.cancel')}</button>
+               <button onClick={confirmMods} style={{ flex:2, padding:'12px', background:'#3b82f6', color:'white', border:'none', borderRadius:'12px', fontWeight:'800', cursor:'pointer' }}>{t('pos.mods.confirm')}</button>
             </div>
           </div>
         </div>
@@ -2114,7 +2144,7 @@ export default function Pos() {
         <div style={overlay} onClick={e => e.target === e.currentTarget && setShowVariants(false)}>
           <div style={{ ...modal, maxWidth:'450px' }} dir="rtl">
             <div style={{ padding:'20px', borderBottom:'1px solid #f1f5f9', background:'#f8fafc', display:'flex', justifyContent:'space-between' }}>
-              <h3 style={{ fontWeight:'900', fontSize:'18px' }}>الخيارات المتاحة لـ: {modTarget.Name}</h3>
+              <h3 style={{ fontWeight:'900', fontSize:'18px' }}>{t('pos.variants.title')} {modTarget.Name}</h3>
               <button onClick={() => setShowVariants(false)} style={{ background:'none', border:'none', fontSize:'22px', cursor:'pointer', color:'#94a3b8' }}>×</button>
             </div>
             <div style={{ padding:'20px', maxHeight:'60vh', overflowY:'auto', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px' }}>
@@ -2124,7 +2154,7 @@ export default function Pos() {
                   onMouseEnter={e => e.currentTarget.style.borderColor = '#3b82f6'} onMouseLeave={e => e.currentTarget.style.borderColor = '#e2e8f0'}>
                   <div style={{ fontWeight:'800', color:'#0f172a', fontSize:'14px' }}>{v.Name}</div>
                   <div style={{ color:'#3b82f6', fontWeight:'700', fontSize:'13px' }}>SAR {parseFloat(v.Price||0).toFixed(2)}</div>
-                  <div style={{ fontSize:'10px', color:v.Stock>0?'#10b981':'#ef4444' }}>{v.Stock>0?`المخزون: ${v.Stock}`:'نفذت الكمية'}</div>
+                  <div style={{ fontSize:'10px', color:v.Stock>0?'#10b981':'#ef4444' }}>{v.Stock>0 ? `${t('pos.variants.stock')}: ${v.Stock}` : t('pos.variants.out_of_stock')}</div>
                 </button>
               ))}
             </div>
@@ -2137,16 +2167,16 @@ export default function Pos() {
         <div style={overlay}>
           <div style={{ ...modal, maxWidth:'380px' }} dir="rtl">
             <div style={{ padding:'20px', borderBottom:'1px solid #f1f5f9', background:'#f8fafc' }}>
-              <h3 style={{ fontWeight:'900', fontSize:'17px' }}>تسجيل الرقم التسلسلي / IMEI</h3>
-              <p style={{ fontSize:'12px', color:'#64748b', marginTop:'4px' }}>المنتج: {modTarget.Name}</p>
+              <h3 style={{ fontWeight:'900', fontSize:'17px' }}>{t('pos.serial.title')}</h3>
+              <p style={{ fontSize:'12px', color:'#64748b', marginTop:'4px' }}>{t('pos.serial.product')}: {modTarget.Name}</p>
             </div>
             <form onSubmit={confirmSerial} style={{ padding:'20px' }}>
               <input autoFocus value={serialInput} onChange={e => setSerialInput(e.target.value)}
-                placeholder="امسح الباركود أو أدخل الرقم التسلسلي هنا..."
+                placeholder={t('pos.serial.placeholder')}
                 style={{ width:'100%', padding:'12px', borderRadius:'10px', border:'2px solid #3b82f6', fontSize:'14px', fontFamily:'inherit', outline:'none', boxSizing:'border-box', marginBottom:'20px' }} />
               <div style={{ display:'flex', gap:'10px' }}>
-                 <button type="button" onClick={() => setShowSerial(false)} style={{ flex:1, padding:'12px', background:'#f1f5f9', border:'none', borderRadius:'12px', fontWeight:'700', cursor:'pointer' }}>إلغاء</button>
-                 <button type="submit" style={{ flex:2, padding:'12px', background:'#3b82f6', color:'white', border:'none', borderRadius:'12px', fontWeight:'800', cursor:'pointer' }}>تأكيد وإضافة للسلة</button>
+                 <button type="button" onClick={() => setShowSerial(false)} style={{ flex:1, padding:'12px', background:'#f1f5f9', border:'none', borderRadius:'12px', fontWeight:'700', cursor:'pointer' }}>{t('pos.actions.cancel')}</button>
+                 <button type="submit" style={{ flex:2, padding:'12px', background:'#3b82f6', color:'white', border:'none', borderRadius:'12px', fontWeight:'800', cursor:'pointer' }}>{t('pos.serial.confirm')}</button>
               </div>
             </form>
           </div>
@@ -2158,12 +2188,12 @@ export default function Pos() {
         <div style={overlay} onClick={e => e.target === e.currentTarget && setShowHeld(false)}>
           <div style={{ ...modal, maxWidth:'480px' }} dir="rtl">
             <div style={{ padding:'18px 22px', borderBottom:'1px solid #f1f5f9', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <h3 style={{ fontWeight:'800', fontSize:'17px' }}>⏸️ الطلبات المعلقة</h3>
+              <h3 style={{ fontWeight:'800', fontSize:'17px' }}>⏸️ {t('pos.held.title')}</h3>
               <button onClick={() => setShowHeld(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', fontSize:'20px' }}>×</button>
             </div>
             <div style={{ padding:'20px', maxHeight:'60vh', overflowY:'auto' }}>
               {heldOrders.length === 0 ? (
-                <div style={{ textAlign:'center', padding:'40px', color:'#94a3b8' }}>لا توجد طلبات معلقة</div>
+                <div style={{ textAlign:'center', padding:'40px', color:'#94a3b8' }}>{t('pos.held.no_orders')}</div>
               ) : heldOrders.map(h => (
                 <div key={h.id} style={{ border:'1px solid #f1f5f9', borderRadius:'14px', padding:'14px', marginBottom:'10px' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -2174,7 +2204,7 @@ export default function Pos() {
                     <div style={{ display:'flex', gap:'8px' }}>
                       <button onClick={() => resumeHeldOrder(h)}
                         style={{ padding:'8px 16px', background:'#3b82f6', color:'white', border:'none', borderRadius:'10px', cursor:'pointer', fontWeight:'700', fontSize:'13px', fontFamily:'inherit' }}>
-                        ▶ استئناف
+                        ▶ {t('pos.held.resume')}
                       </button>
                     </div>
                   </div>
@@ -2190,20 +2220,20 @@ export default function Pos() {
         <div style={overlay}>
           <div style={{ ...modal, maxWidth:'380px' }} dir="rtl">
             <div style={{ padding:'20px', borderBottom:'1px solid #f1f5f9', background:'#f8fafc' }}>
-              <h3 style={{ fontWeight:'900', fontSize:'17px' }}>إضافة عميل سريع</h3>
+              <h3 style={{ fontWeight:'900', fontSize:'17px' }}>{t('pos.customer.quick_add_title')}</h3>
             </div>
             <div style={{ padding:'20px', display:'flex', flexDirection:'column', gap:'14px' }}>
               <input value={quickCustForm.name} onChange={e => setQuickCustForm({...quickCustForm, name:e.target.value})} 
-                placeholder="اسم العميل *" style={modalInput} />
+                placeholder={t('pos.customer.name_placeholder')} style={modalInput} />
               <input value={quickCustForm.phone} onChange={e => setQuickCustForm({...quickCustForm, phone:e.target.value})} 
-                placeholder="رقم الجوال" style={modalInput} />
+                placeholder={t('pos.customer.phone_placeholder')} style={modalInput} />
               <input value={quickCustForm.tax_id} onChange={e => setQuickCustForm({...quickCustForm, tax_id:e.target.value})} 
-                placeholder="الرقم الضريبي (B2B)" style={modalInput} />
+                placeholder={t('pos.customer.tax_id_placeholder')} style={modalInput} />
               <div style={{ display:'flex', gap:'10px', marginTop:'10px' }}>
-                <button onClick={() => setShowQuickCust(false)} style={{ flex:1, padding:'12px', background:'#f1f5f9', border:'none', borderRadius:'12px', fontWeight:'700', cursor:'pointer' }}>إلغاء</button>
+                <button onClick={() => setShowQuickCust(false)} style={{ flex:1, padding:'12px', background:'#f1f5f9', border:'none', borderRadius:'12px', fontWeight:'700', cursor:'pointer' }}>{t('pos.actions.cancel')}</button>
                 <button 
                   onClick={async () => {
-                    if (!quickCustForm.name) return alert('يجب إدخال الاسم');
+                    if (!quickCustForm.name) return alert(t('pos.customer.name_required'));
                     try {
                       const res = await window.api.addCustomer(quickCustForm);
                       const all = await window.api.getCustomers();
@@ -2215,7 +2245,7 @@ export default function Pos() {
                     } catch(e) { alert(e.message); }
                   }}
                   style={{ flex:2, padding:'12px', background:'#3b82f6', color:'white', border:'none', borderRadius:'12px', fontWeight:'800', cursor:'pointer' }}>
-                  حفظ واختيار
+                  {t('pos.customer.save_and_select')}
                 </button>
               </div>
             </div>
@@ -2229,15 +2259,15 @@ export default function Pos() {
           <div style={{ ...modal, maxWidth:'380px' }} dir="rtl">
             <div style={{ padding:'20px', display:'flex', flexDirection:'column', gap:'16px' }}>
               <div>
-                <label style={{ display:'block', fontSize:'12px', color:'#94a3b8', marginBottom:'6px', fontWeight:'700' }}>رقم الهاتف (مع رمز الدولة)</label>
+                <label style={{ display:'block', fontSize:'12px', color:'#94a3b8', marginBottom:'6px', fontWeight:'700' }}>{t('pos.whatsapp.phone_label')}</label>
                 <input autoFocus value={waPhone} onChange={e => setWAPhone(e.target.value)} 
-                  placeholder="مثال: 966512345678" style={modalInput} />
+                  placeholder="966512345678" style={modalInput} />
               </div>
               <div style={{ display:'flex', gap:'10px' }}>
-                <button onClick={() => setShowWAModal(false)} style={{ flex:1, padding:'12px', background:'#f1f5f9', border:'none', borderRadius:'12px', fontWeight:'700', cursor:'pointer' }}>إلغاء</button>
+                <button onClick={() => setShowWAModal(false)} style={{ flex:1, padding:'12px', background:'#f1f5f9', border:'none', borderRadius:'12px', fontWeight:'700', cursor:'pointer' }}>{t('pos.actions.cancel')}</button>
                 <button onClick={() => performWAShare(waPhone, waMsg)} 
                   style={{ flex:2, padding:'12px', background:'#10b981', color:'white', border:'none', borderRadius:'12px', fontWeight:'800', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>
-                  <span>🚀 إرسال الآن</span>
+                  <span>🚀 {t('pos.whatsapp.send')}</span>
                 </button>
               </div>
             </div>
@@ -2250,16 +2280,16 @@ export default function Pos() {
         <div style={overlay}>
           <div style={{ ...modal, maxWidth:'400px', textAlign:'center', padding:'32px' }} dir="rtl">
             <div style={{ fontSize:'42px', marginBottom:'16px' }}>💼</div>
-            <h3 style={{ fontWeight:'900', fontSize:'20px', marginBottom:'8px' }}>تم حفظ عرض السعر</h3>
-            <p style={{ color:'#64748b', fontSize:'13px', marginBottom:'24px' }}>بإمكانك طباعة العرض الآن أو تحويله لفاتورة لاحقاً من سجل المبيعات</p>
+            <h3 style={{ fontWeight:'900', fontSize:'20px', marginBottom:'8px' }}>{t('pos.quote.success_title')}</h3>
+            <p style={{ color:'#64748b', fontSize:'13px', marginBottom:'24px' }}>{t('pos.quote.success_desc')}</p>
             
             <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
-              <button onClick={printQuote} style={{ padding:'14px', background:'#3b82f6', color:'white', border:'none', borderRadius:'14px', fontWeight:'800', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>🖨️ طباعة عرض السعر</button>
+              <button onClick={printQuote} style={{ padding:'14px', background:'#3b82f6', color:'white', border:'none', borderRadius:'14px', fontWeight:'800', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>🖨️ {t('pos.quote.print')}</button>
               <button onClick={() => {
                 setShowQuoteConfirm(false);
                 navigate('/pos', { state: { resumeHeld: lastQuote } });
-              }} style={{ padding:'14px', background:'#f0fdf4', color:'#16a34a', border:'1px solid #bbf7d0', borderRadius:'14px', fontWeight:'800', cursor:'pointer' }}>🛒 تحويل لفاتورة فوراً</button>
-              <button onClick={() => setShowQuoteConfirm(false)} style={{ padding:'12px', background:'#f8fafc', color:'#64748b', border:'1px solid #e2e8f0', borderRadius:'14px', fontWeight:'700', cursor:'pointer' }}>إغلاق</button>
+              }} style={{ padding:'14px', background:'#f0fdf4', color:'#16a34a', border:'1px solid #bbf7d0', borderRadius:'14px', fontWeight:'800', cursor:'pointer' }}>🛒 {t('pos.quote.continue')}</button>
+              <button onClick={() => setShowQuoteConfirm(false)} style={{ padding:'12px', background:'#f8fafc', color:'#64748b', border:'1px solid #e2e8f0', borderRadius:'14px', fontWeight:'700', cursor:'pointer' }}>{t('pos.actions.cancel')}</button>
             </div>
           </div>
         </div>

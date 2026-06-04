@@ -1,0 +1,111 @@
+/*
+ * ============================================================
+ *  البصمة الذكية v2 — Utility Classes
+ *  Derived from tokens.css — do not use raw values here.
+ *  Import order: after tokens.css, before component CSS.
+ * ============================================================
+ */
+
+/* ── .hover-lift ────────────────────────────────────────────
+   Subtle hover lift effect for interactive cards and rows.
+──────────────────────────────────────────────────────────── */
+.hover-lift {
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06));
+}
+
+/* ── .pos-card ──────────────────────────────────────────────
+   Standard content card: surface background, rounded corners,
+   subtle border. Replaces repeated inline Card div styles.
+──────────────────────────────────────────────────────────── */
+.pos-card {
+  background:    var(--bg-card);
+  border-radius: var(--radius-lg);
+  border:        1px solid var(--border-subtle);
+  padding:       var(--space-5);
+  display:       flex;
+  flex-direction: column;
+  gap:           var(--space-3);
+}
+
+/* ── .pos-field ─────────────────────────────────────────────
+   Label + control column stack (replaces Field component
+   inline styles).
+──────────────────────────────────────────────────────────── */
+.pos-field {
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--space-1);
+}
+
+.pos-field > label {
+  font-size:   var(--text-xs);
+  font-weight: 700;
+  color:       var(--text-muted);
+}
+
+/* ── .pos-section-header ────────────────────────────────────
+   Horizontal rule + centred label separator used in System tab
+   and any two-section split layout.
+──────────────────────────────────────────────────────────── */
+.pos-section-header {
+  display:     flex;
+  align-items: center;
+  gap:         var(--space-3);
+  margin:      var(--space-1) 0;
+}
+
+.pos-section-header::before,
+.pos-section-header::after {
+  content:      '';
+  flex:         1;
+  border-top:   1px solid var(--border-subtle);
+}
+
+.pos-section-header span {
+  font-size:      var(--text-xs);
+  font-weight:    800;
+  color:          var(--text-muted);
+  white-space:    nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── .pos-info-banner ───────────────────────────────────────
+   Informational notice strip (blue tint). Used for tips,
+   warnings, and queue notices.
+──────────────────────────────────────────────────────────── */
+.pos-info-banner {
+  padding:       var(--space-2) var(--space-3);
+  background:    var(--color-accent-dim);
+  border:        1px solid rgba(14, 165, 233, 0.25);
+  border-radius: var(--radius-md);
+  font-size:     var(--text-xs);
+  font-weight:   600;
+  color:         var(--color-accent);
+  display:       flex;
+  align-items:   center;
+  gap:           var(--space-2);
+  line-height:   var(--leading-normal);
+}
+
+.pos-info-banner--warning {
+  background: var(--color-warning-dim);
+  border-color: rgba(245, 158, 11, 0.25);
+  color: var(--color-warning);
+}
+
+.pos-info-banner--danger {
+  background: var(--color-danger-dim);
+  border-color: rgba(239, 68, 68, 0.25);
+  color: var(--color-danger);
+}
+
+.pos-info-banner--success {
+  background: var(--color-success-dim);
+  border-color: rgba(16, 185, 129, 0.25);
+  color: var(--color-success);
+}

@@ -26,6 +26,7 @@ import Services from './pages/Services';
 import CustomerDisplay from './pages/CustomerDisplay';
 import Onboarding from './pages/Onboarding';
 import SubscriptionHub from './pages/SubscriptionHub';
+import Home from './pages/Home';
 import SecurityGuard from './components/SecurityGuard';
 import ErrorBoundary from './components/ErrorBoundary';
 import OfflineBanner from './components/OfflineBanner';
@@ -315,6 +316,7 @@ export default function App() {
 
                 {/* ── Shift ── */}
                 <Route path="/shift"            element={<P><Shift /></P>} />
+                <Route path="/home"             element={<P><Home /></P>} />
 
                 {/* ── POS ── */}
                 <Route path="/pos"              element={<P><Pos /></P>} />
@@ -347,7 +349,7 @@ export default function App() {
                 <Route path="*" element={
                   needsOnboarding
                     ? <Navigate to="/onboarding" replace />
-                    : <Navigate to="/shift" replace />
+                    : <Navigate to="/home" replace />
                 } />
               </Routes>
             </HashRouter>

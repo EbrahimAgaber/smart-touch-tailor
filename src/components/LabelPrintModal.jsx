@@ -22,6 +22,7 @@ import {
   computeBarcodeParams,
   detectBarcodeFormat,
   fuzzyMatchProfile,
+  printLabel,
 } from '../utils/LabelPrintEngine.js';
 import { useToast } from './ToastManager.jsx';
 
@@ -175,23 +176,11 @@ export default function LabelPrintModal({ product, settings, onClose }) {
   const handlePrint = async () => {
     setPrinting(true);
     try {
-      const html = await buildLabelHTML(mergedProduct, settings, labelKey, copies,
-        fuzzyMatchProfile(activeCfg.labelPrinterName || ''));
-      // P3: route through print:label IPC
-      if (window?.api?.printLabel) {
-        const preset = LABEL_PRESETS[labelKey] || LABEL_PRESETS['58x40'];
-        await window.api.printLabel({ html, widthMm: preset.w, heightMm: preset.h, printerName: activeCfg.labelPrinterName || '' });
-      } else {
-        await window.api.printHTML(html);
-      }
-      // P9: log success
-      window?.api?.logLabelPrint?.({ product_id: String(product.ID), copies, label_key: labelKey, status: 'success' });
+      await printLabel(mergedProduct, settings, labelKey, copies, activeCfg);
       showToast?.({ type:'success', message:'تمت الطباعة بنجاح' });
       onClose();
     } catch (e) {
-      // P9: replace alert() with toast
       showToast?.({ type:'error', message:'خطأ في الطباعة: ' + e.message });
-      window?.api?.logLabelPrint?.({ product_id: String(product.ID), copies, label_key: labelKey, status: 'failed', error: e.message });
     }
     setPrinting(false);
   };

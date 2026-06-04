@@ -4,8 +4,10 @@ import AppLayout from '../components/AppLayout';
 import { TrendingUp, TrendingDown, Package, Users, ArrowUpRight, Shield, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import { useCanAccess } from '../store/useLicenseStore';
+import { useTranslation } from 'react-i18next';
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const hasCustomers = useCanAccess('customers');
   const [stats, setStats] = useState({ todaySales:0, todayVat:0, todayExpenses:0, netProfit:0, lowStockCount:0, totalCustomers:0 });
@@ -69,15 +71,15 @@ export default function Dashboard() {
   const profitTrend = trendPct(stats.netProfit, yesterday.sales - yesterday.expenses);
 
   return (
-    <AppLayout title="لوحة القيادة الذكية">
+    <AppLayout title={t('dashboard.title')}>
       <div style={{ display:'flex', flexDirection:'column', gap:'28px', flex:1, minHeight:0 }}>
 
         {/* ── Top bar: subtitle + manager mode toggle ── */}
         <div style={{ display:'flex', flexWrap:'wrap', justifyContent:'space-between', alignItems:'center', gap:'12px' }}>
-          <p style={{ color:'var(--text-muted)', fontSize:'14px', fontWeight:'700' }}>تحليل شامل لأداء المنشأة</p>
+          <p style={{ color:'var(--text-muted)', fontSize:'14px', fontWeight:'700' }}>{t('dashboard.subtitle')}</p>
           <div style={{ display:'flex', alignItems:'center', gap:'10px', background:'var(--bg-card)', padding:'6px 12px', borderRadius:'12px', border:'1px solid var(--border-subtle)', flexShrink:0 }}>
             <span style={{ fontSize:'12px', fontWeight:'800', color: isManagerMode ? '#3b82f6' : '#94a3b8' }}>
-              {isManagerMode ? '🔓 وضع المدير: نشط' : '🔒 وضع العرض: مبيعات فقط'}
+              {isManagerMode ? t('dashboard.manager_mode_active') : t('dashboard.view_mode')}
             </span>
             <button onClick={() => setIsManagerMode(!isManagerMode)}
               style={{ width:'40px', height:'20px', background: isManagerMode ? '#3b82f6' : '#cbd5e1', borderRadius:'20px', position:'relative', border:'none', cursor:'pointer', transition:'0.3s', flexShrink:0 }}>
@@ -88,22 +90,22 @@ export default function Dashboard() {
 
         {/* ── KPI Cards ── */}
         <div className="grid gap-5" style={{ gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))' }}>
-          <KpiCard title="مبيعات اليوم" value={`SAR ${stats.todaySales.toLocaleString()}`}
+          <KpiCard title={t('dashboard.kpi.today_sales')} value={`SAR ${stats.todaySales.toLocaleString()}`}
             trend={salesTrend} icon={<TrendingUp size={22}/>} color="#3b82f6" loading={loading}/>
 
           {isManagerMode ? (
-            <KpiCard title="صافي الربح" value={`SAR ${stats.netProfit.toLocaleString()}`}
-              trend={profitTrend} subtitle={`هامش الربح الصافي: ${stats.netMarginPct?.toFixed(1)}%`}
+            <KpiCard title={t('dashboard.kpi.net_profit')} value={`SAR ${stats.netProfit.toLocaleString()}`}
+              trend={profitTrend} subtitle={t('dashboard.kpi.net_margin', { val: stats.netMarginPct?.toFixed(1) })}
               icon={stats.netProfit >= 0 ? <TrendingUp size={22}/> : <TrendingDown size={22}/>}
               color={stats.netProfit >= 0 ? '#10b981' : '#ef4444'} loading={loading}/>
           ) : (
-            <KpiCard title="عدد الفواتير" value={recentSales.length}
-              subtitle="تمت معالجتها اليوم" icon={<ArrowUpRight size={22}/>} color="#10b981" loading={loading}/>
+            <KpiCard title={t('dashboard.kpi.invoice_count')} value={recentSales.length}
+              subtitle={t('dashboard.kpi.processed_today')} icon={<ArrowUpRight size={22}/>} color="#10b981" loading={loading}/>
           )}
 
-          <KpiCard title="تنبيهات المخزون" value={stats.lowStockCount}
-            subtitle="منتجات تحتاج إعادة توريد" icon={<Package size={22}/>} color="#f59e0b" loading={loading}/>
-          <KpiCard title="إجمالي العملاء" value={stats.totalCustomers}
+          <KpiCard title={t('dashboard.kpi.stock_alerts')} value={stats.lowStockCount}
+            subtitle={t('dashboard.kpi.needs_restock')} icon={<Package size={22}/>} color="#f59e0b" loading={loading}/>
+          <KpiCard title={t('dashboard.kpi.total_customers')} value={stats.totalCustomers}
             icon={<Users size={22}/>} color="#8b5cf6" loading={loading}/>
         </div>
 
@@ -114,7 +116,7 @@ export default function Dashboard() {
           <div style={{ display:'flex', flexDirection:'column', gap:'24px' }}>
 
             <div style={dashCard}>
-              <h3 style={cardTitle}>أداء المبيعات (آخر 7 أيام)</h3>
+              <h3 style={cardTitle}>{t('dashboard.sales_chart')}</h3>
               <div style={{ height:'260px', width:'100%', minWidth:0, direction:'ltr' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={timeline} margin={{ top:10, right:30, left:0, bottom:0 }}>
@@ -128,7 +130,7 @@ export default function Dashboard() {
                     <XAxis dataKey="period" tick={{ fontSize:11, fill:'var(--text-muted)' }} tickLine={false} axisLine={false}/>
                     <YAxis tick={{ fontSize:11, fill:'var(--text-muted)' }} tickLine={false} axisLine={false} tickFormatter={val => `SAR ${val}`}/>
                     <Tooltip contentStyle={{ background:'var(--bg-card)', borderRadius:'12px', border:'1px solid var(--border-subtle)', color:'var(--text-main)', boxShadow:'0 4px 20px rgba(0,0,0,0.2)' }}/>
-                    <Area type="monotone" dataKey="total_sales" name="المبيعات" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)"/>
+                    <Area type="monotone" dataKey="total_sales" name={t('dashboard.sales_series')} stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)"/>
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -138,7 +140,7 @@ export default function Dashboard() {
               <div style={{ overflowX:'auto' }}>
                 <table style={{ width:'100%', borderCollapse:'collapse', textAlign:'right', minWidth:'400px' }}>
                   <thead style={{ borderBottom:'1px solid var(--border-subtle)' }}>
-                    <tr>{['رقم العملية','الوقت','العميل','القيمة','الحالة'].map(h =>
+                    <tr>{[t('dashboard.table.transaction_no'),t('dashboard.table.time'),t('dashboard.table.customer'),t('dashboard.table.value'),t('dashboard.table.status')].map(h =>
                       <th key={h} style={{ padding:'10px 0', fontSize:'11px', color:'var(--text-muted)', textTransform:'uppercase' }}>{h}</th>
                     )}</tr>
                   </thead>
@@ -147,11 +149,11 @@ export default function Dashboard() {
                       <tr key={i} style={{ borderBottom:'1px solid var(--border-subtle)' }}>
                         <td style={{ padding:'12px 0', fontSize:'13px', fontWeight:'700', color:'#3b82f6' }}>#{s.invoice}</td>
                         <td style={{ padding:'12px 0', fontSize:'12px', color:'var(--text-muted)' }}>{new Date(s.sale_date).toLocaleTimeString('ar-SA',{ hour:'2-digit', minute:'2-digit' })}</td>
-                        <td style={{ padding:'12px 0', fontSize:'13px', color:'var(--text-main)' }}>{s.customer_name || 'نقدي / عام'}</td>
+                        <td style={{ padding:'12px 0', fontSize:'13px', color:'var(--text-main)' }}>{s.customer_name || t('dashboard.table.cash_general')}</td>
                         <td style={{ padding:'12px 0', fontWeight:'800', color:'var(--text-main)' }}>SAR {Number(s.total||0).toFixed(2)}</td>
                         <td style={{ padding:'12px 0' }}>
                           <span style={{ padding:'4px 10px', borderRadius:'99px', fontSize:'10px', fontWeight:'800', background: s.status==='void' ? '#fef2f2' : '#ecfdf5', color: s.status==='void' ? '#ef4444' : '#10b981' }}>
-                            {s.status==='void' ? 'ملغى' : 'منفذ'}
+                            {s.status==='void' ? t('dashboard.table.voided') : t('dashboard.table.executed')}
                           </span>
                         </td>
                       </tr>
@@ -174,15 +176,15 @@ export default function Dashboard() {
                 <div style={{ width:'32px', height:'32px', background:'rgba(245,158,11,0.2)', color:'#f59e0b', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center' }}>
                   <Package size={18}/>
                 </div>
-                <h3 style={{ fontSize:'15px', fontWeight:'800' }}>مخزون حرج ({stats.lowStockCount})</h3>
+                <h3 style={{ fontSize:'15px', fontWeight:'800' }}>{t('dashboard.widgets.critical_stock', { count: stats.lowStockCount })}</h3>
               </div>
               {stats.lowStockCount === 0 ? (
-                <div style={{ padding:'20px', textAlign:'center', color:'rgba(255,255,255,0.4)', fontSize:'13px' }}>✅ جميع المنتجات متوفرة</div>
+                <div style={{ padding:'20px', textAlign:'center', color:'rgba(255,255,255,0.4)', fontSize:'13px' }}>{t('dashboard.widgets.all_available')}</div>
               ) : (
                 <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
-                  <p style={{ fontSize:'12px', color:'rgba(255,255,255,0.6)', lineHeight:'1.5' }}>هناك منتجات قاربت على النفاد، يرجى مراجعة طلبات الشراء.</p>
+                  <p style={{ fontSize:'12px', color:'rgba(255,255,255,0.6)', lineHeight:'1.5' }}>{t('dashboard.widgets.stock_warning')}</p>
                   <button onClick={() => navigate('/stock')} style={{ padding:'12px', background:'#3b82f6', color:'white', border:'none', borderRadius:'10px', fontWeight:'800', cursor:'pointer', fontFamily:'inherit', fontSize:'13px' }}>
-                    إدارة المخزون والطلبات
+                    {t('dashboard.widgets.manage_stock')}
                   </button>
                 </div>
               )}
@@ -190,7 +192,7 @@ export default function Dashboard() {
 
             {/* ── Top products ── */}
             <div style={dashCard}>
-              <h3 style={cardTitle}>الأكثر مبيعاً</h3>
+              <h3 style={cardTitle}>{t('dashboard.widgets.top_selling')}</h3>
               <div style={{ height:'200px', width:'100%', minWidth:0, direction:'ltr' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={topProducts} layout="vertical" margin={{ top:0, right:30, left:20, bottom:0 }}>
@@ -198,7 +200,7 @@ export default function Dashboard() {
                     <XAxis type="number" hide/>
                     <YAxis dataKey="item_name" type="category" width={80} tick={{ fontSize:11, fill:'var(--text-muted)' }} tickLine={false} axisLine={false}/>
                     <Tooltip cursor={{ fill:'transparent' }} contentStyle={{ background:'var(--bg-card)', borderRadius:'12px', border:'1px solid var(--border-subtle)', color:'var(--text-main)', boxShadow:'0 4px 20px rgba(0,0,0,0.2)', textAlign:'right' }}/>
-                    <Bar dataKey="qtySold" name="الكمية المباعة" radius={[0,4,4,0]} barSize={16}>
+                    <Bar dataKey="qtySold" name={t('dashboard.widgets.qty_sold')} radius={[0,4,4,0]} barSize={16}>
                       {topProducts.map((_, index) => (
                         <Cell key={`cell-${index}`} fill={['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ec4899'][index % 5]}/>
                       ))}
@@ -214,8 +216,8 @@ export default function Dashboard() {
                 <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
                   <div style={{ fontSize:'24px' }}>⭐</div>
                   <div>
-                    <div style={{ fontSize:'11px', color:'var(--primary)', fontWeight:'800' }}>قاعدة العملاء</div>
-                    <div style={{ fontSize:'16px', fontWeight:'900', color:'var(--text-main)' }}>{stats.totalCustomers} عميل مسجل</div>
+                    <div style={{ fontSize:'11px', color:'var(--primary)', fontWeight:'800' }}>{t('dashboard.widgets.customer_base')}</div>
+                    <div style={{ fontSize:'16px', fontWeight:'900', color:'var(--text-main)' }}>{t('dashboard.widgets.registered_customer', { count: stats.totalCustomers })}</div>
                   </div>
                 </div>
               </div>
@@ -224,8 +226,8 @@ export default function Dashboard() {
                 <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
                   <div style={{ fontSize:'20px' }}>🔒</div>
                   <div>
-                    <div style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:'800' }}>نظام إدارة العملاء (CRM)</div>
-                    <div style={{ fontSize:'12px', color:'var(--text-muted)', marginTop: '2px' }}>متاح في باقة النمو (Growth) أو أعلى</div>
+                    <div style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:'800' }}>{t('dashboard.widgets.crm')}</div>
+                    <div style={{ fontSize:'12px', color:'var(--text-muted)', marginTop: '2px' }}>{t('dashboard.widgets.growth_plan')}</div>
                   </div>
                 </div>
               </div>
@@ -246,6 +248,7 @@ export default function Dashboard() {
 //   3. Nominal — queue counters, acceptance rate bar, cert expiry
 //   4. Error — rejected invoices with inline retry button
 function ZatcaDashboardCard({ navigate }) {
+  const { t } = useTranslation();
   const hasZatcaP2 = useCanAccess('pos.zatca_p2');
   const [queue,    setQueue]    = useState(null);
   const [device,   setDevice]   = useState(undefined); // undefined = still loading
@@ -291,16 +294,16 @@ function ZatcaDashboardCard({ navigate }) {
             🔒
           </div>
           <div>
-            <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-main)' }}>هيئة الزكاة (ZATCA)</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>تتطلب باقة النمو (Growth) أو أعلى</div>
+            <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-main)' }}>{t('dashboard.zatca.title')}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t('dashboard.zatca.requires_growth')}</div>
           </div>
         </div>
         <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '12px' }}>
-          الربط الإلكتروني للمرحلة الثانية وإصدار الفواتير المعتمدة غير نشط في الباقة الحالية.
+          {t('dashboard.zatca.inactive_desc')}
         </p>
         <button onClick={() => navigate('/subscription-hub')}
           style={{ padding: '8px 14px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: '800', cursor: 'pointer', fontFamily: 'inherit', fontSize: '12px', width: '100%' }}>
-          ✨ ترقية الاشتراك الآن
+          {t('dashboard.zatca.upgrade_now')}
         </button>
       </div>
     );
@@ -314,8 +317,8 @@ function ZatcaDashboardCard({ navigate }) {
           <Shield size={17}/>
         </div>
         <div>
-          <div style={{ fontSize:'14px', fontWeight:'800', color:'var(--text-main)' }}>هيئة الزكاة — الامتثال</div>
-          <div style={{ fontSize:'11px', color:'#94a3b8', marginTop:'2px' }}>جاري تحميل البيانات...</div>
+          <div style={{ fontSize:'14px', fontWeight:'800', color:'var(--text-main)' }}>{t('dashboard.zatca.compliance')}</div>
+          <div style={{ fontSize:'11px', color:'#94a3b8', marginTop:'2px' }}>{t('dashboard.zatca.loading')}</div>
         </div>
       </div>
     );
@@ -325,22 +328,25 @@ function ZatcaDashboardCard({ navigate }) {
   // device is null (no record) or exists but has no production_csid
   if (!device || !device.production_csid) {
     return (
-      <div style={{ ...dashCard, border:'1.5px solid #fde68a', background:'#fffbeb' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'4px' }}>
-          <div style={{ width:'32px', height:'32px', background:'rgba(245,158,11,0.15)', color:'#b45309', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <AlertTriangle size={17}/>
+      <div style={{ ...dashCard, border: '1px solid rgba(226, 232, 240, 0.6)', background: 'var(--bg-card)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+          <div style={{ width: '32px', height: '32px', background: 'rgba(245,158,11,0.1)', color: '#f59e0b', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Shield size={17} color="#f59e0b" />
           </div>
           <div>
-            <div style={{ fontSize:'14px', fontWeight:'800', color:'#92400e' }}>هيئة الزكاة — غير مرتبط</div>
-            <div style={{ fontSize:'11px', color:'#b45309' }}>الجهاز لم يُفعَّل بعد (Phase 2)</div>
+            <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-main)' }}>{t('dashboard.zatca.title')}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t('dashboard.zatca.not_linked')}</div>
           </div>
         </div>
-        <p style={{ fontSize:'12px', color:'#92400e', lineHeight:'1.6' }}>
-          لإصدار فواتير إلكترونية مطابقة للمرحلة الثانية، يجب إكمال ربط الجهاز من صفحة الإعدادات.
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '14px' }}>
+          {t('dashboard.zatca.link_desc')}
         </p>
         <button onClick={() => navigate('/settings')}
-          style={{ padding:'10px 16px', background:'#b45309', color:'white', border:'none', borderRadius:'10px', fontWeight:'800', cursor:'pointer', fontFamily:'inherit', fontSize:'12px', display:'flex', alignItems:'center', gap:'6px' }}>
-          <Shield size={14}/> اذهب للإعدادات وأكمل الربط
+          style={{ padding: '8px 14px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: '800', cursor: 'pointer', fontFamily: 'inherit', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', width: '100%', transition: 'background-color 0.15s ease' }}
+          onMouseOver={e => e.currentTarget.style.backgroundColor = 'var(--primary-dark)'}
+          onMouseOut={e => e.currentTarget.style.backgroundColor = 'var(--primary)'}
+        >
+          {t('dashboard.zatca.go_to_settings')}
         </button>
       </div>
     );
@@ -372,9 +378,9 @@ function ZatcaDashboardCard({ navigate }) {
             <Shield size={17}/>
           </div>
           <div>
-            <div style={{ fontSize:'14px', fontWeight:'800', color:'var(--text-main)' }}>هيئة الزكاة — الامتثال</div>
+            <div style={{ fontSize:'14px', fontWeight:'800', color:'var(--text-main)' }}>{t('dashboard.zatca.compliance')}</div>
             <div style={{ fontSize:'11px', color:'#64748b', marginTop:'1px' }}>
-              {device.device_id ? `الجهاز: ${device.device_id}` : 'Phase 2 — يتجدد كل 15 ثانية'}
+              {device.device_id ? t('dashboard.zatca.device', { id: device.device_id }) : t('dashboard.zatca.refreshes')}
             </div>
           </div>
         </div>
@@ -383,16 +389,16 @@ function ZatcaDashboardCard({ navigate }) {
           background: hasFailed ? '#fef2f2' : (isHalted ? '#fffbeb' : '#ecfdf5'),
           color:       hasFailed ? '#b91c1c' : (isHalted ? '#92400e' : '#065f46'),
         }}>
-          {hasFailed ? '⛔ مرفوض' : isHalted ? '⏸ موقوف' : '✅ نشط'}
+          {hasFailed ? t('dashboard.zatca.rejected_badge') : isHalted ? t('dashboard.zatca.halted_badge') : t('dashboard.zatca.active_badge')}
         </span>
       </div>
 
       {/* ── Queue counters ── */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'8px' }}>
         {[
-          { label:'⏳ معلق',  val: pending,  bg:'#fffbeb', color:'#92400e'  },
-          { label:'✅ مُرسَل', val: reported, bg:'#ecfdf5', color:'#065f46' },
-          { label:'❌ مرفوض', val: rejected, bg:'#fef2f2', color:'#b91c1c'  },
+          { label: t('dashboard.zatca.pending'),  val: pending,  bg:'#fffbeb', color:'#92400e'  },
+          { label: t('dashboard.zatca.reported'), val: reported, bg:'#ecfdf5', color:'#065f46' },
+          { label: t('dashboard.zatca.rejected'), val: rejected, bg:'#fef2f2', color:'#b91c1c'  },
         ].map(s => (
           <div key={s.label} style={{ padding:'10px 8px', background:s.bg, borderRadius:'10px', textAlign:'center' }}>
             <div style={{ fontSize:'20px', fontWeight:'900', color:s.color }}>{s.val}</div>
@@ -405,7 +411,7 @@ function ZatcaDashboardCard({ navigate }) {
       {total > 0 && (
         <div>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'6px', fontSize:'11px', color:'#64748b' }}>
-            <span>معدل القبول</span>
+            <span>{t('dashboard.zatca.acceptance_rate')}</span>
             <span style={{ fontWeight:'800', color: acceptPct === 100 ? '#10b981' : acceptPct >= 95 ? '#f59e0b' : '#ef4444' }}>
               {acceptPct}%
             </span>
@@ -424,11 +430,11 @@ function ZatcaDashboardCard({ navigate }) {
       {hasFailed && (
         <div style={{ padding:'10px 12px', background:'#fef2f2', borderRadius:'10px', border:'1px solid #fecaca', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'10px' }}>
           <span style={{ fontSize:'12px', color:'#b91c1c', fontWeight:'700' }}>
-            {rejected} فاتورة مرفوضة — القائمة {isHalted ? 'موقوفة' : 'تعمل'}
+            {t('dashboard.zatca.rejected_invoices', { count: rejected, status: isHalted ? t('dashboard.zatca.halted') : t('dashboard.zatca.active') })}
           </span>
           <button onClick={handleRetry} disabled={retrying}
             style={{ padding:'7px 14px', background:'#ef4444', color:'white', border:'none', borderRadius:'8px', cursor:'pointer', fontWeight:'700', fontSize:'12px', display:'flex', alignItems:'center', gap:'6px', fontFamily:'inherit', opacity: retrying ? 0.7 : 1, flexShrink:0 }}>
-            <RefreshCw size={13}/> {retrying ? 'جاري...' : 'إعادة إرسال'}
+            <RefreshCw size={13}/> {retrying ? t('dashboard.zatca.processing') : t('dashboard.zatca.retry')}
           </button>
         </div>
       )}
@@ -437,14 +443,14 @@ function ZatcaDashboardCard({ navigate }) {
       {certExpiry && (
         <div style={{ fontSize:'11px', color:'#64748b', display:'flex', alignItems:'center', gap:'5px' }}>
           <CheckCircle2 size={12} color="#10b981"/>
-          الشهادة صالحة حتى: {new Date(certExpiry).toLocaleDateString('ar-SA')}
+          {t('dashboard.zatca.cert_valid', { date: new Date(certExpiry).toLocaleDateString('ar-SA') })}
         </div>
       )}
 
       {/* ── Deep link to settings ── */}
       <button onClick={() => navigate('/settings')}
         style={{ background:'transparent', border:'none', color:'#3b82f6', fontSize:'12px', fontWeight:'700', cursor:'pointer', fontFamily:'inherit', textAlign:'right', padding:0, display:'flex', alignItems:'center', gap:'4px' }}>
-        إعدادات ZATCA التفصيلية ←
+        {t('dashboard.zatca.detailed_settings')}
       </button>
     </div>
   );
@@ -454,15 +460,72 @@ function ZatcaDashboardCard({ navigate }) {
 function KpiCard({ title, value, trend, subtitle, icon, color, loading }) {
   const isPos = trend && trend.startsWith('+');
   return (
-    <div style={{ background:'var(--bg-card)', padding:'22px', borderRadius:'24px', border:'1px solid var(--border-subtle)', boxShadow:'0 1px 3px rgba(0,0,0,0.04)', position:'relative', overflow:'hidden' }}>
-      <div style={{ position:'absolute', bottom:0, left:0, right:0, height:'3px', background:color, opacity:0.15 }}/>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'14px' }}>
-        <div style={{ width:'44px', height:'44px', background:`${color}10`, borderRadius:'12px', display:'flex', alignItems:'center', justifyContent:'center' }}>{icon}</div>
-        {trend && <div style={{ background: isPos ? '#ecfdf5' : '#fef2f2', color: isPos ? '#10b981' : '#ef4444', padding:'4px 8px', borderRadius:'8px', fontSize:'11px', fontWeight:'800' }}>{trend}</div>}
+    <div style={{ 
+      background: 'var(--bg-card)', 
+      padding: '24px', 
+      borderRadius: '20px', 
+      border: '1px solid rgba(226, 232, 240, 0.6)', 
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      position: 'relative', 
+      textAlign: 'center',
+      transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+    }}
+    onMouseOver={e => {
+      e.currentTarget.style.transform = 'translateY(-2px)';
+      e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03)';
+    }}
+    onMouseOut={e => {
+      e.currentTarget.style.transform = 'none';
+      e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)';
+    }}>
+      <div style={{ 
+        width: '48px', 
+        height: '48px', 
+        background: `${color}15`, 
+        color: color, 
+        borderRadius: '50%', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        marginBottom: '12px' 
+      }}>
+        {icon}
       </div>
-      <div style={{ fontSize:'12px', color:'var(--text-muted)', fontWeight:'700', marginBottom:'4px' }}>{title}</div>
-      <div style={{ fontSize:'22px', fontWeight:'900', color:'var(--text-main)', opacity: loading ? 0.4 : 1 }}>{value}</div>
-      {subtitle && <div style={{ fontSize:'11px', color:'var(--text-muted)', marginTop:'4px' }}>{subtitle}</div>}
+
+      <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '800', marginBottom: '6px', textTransform: 'uppercase' }}>
+        {title}
+      </div>
+
+      <div style={{ 
+        fontSize: '26px', 
+        fontWeight: '900', 
+        color: 'var(--text-main)', 
+        fontFamily: "'Inter', sans-serif", 
+        lineHeight: 1.2,
+        opacity: loading ? 0.4 : 1 
+      }}>
+        {value}
+      </div>
+
+      {trend && (
+        <div style={{ 
+          background: isPos ? '#ecfdf5' : '#fef2f2', 
+          color: isPos ? '#10b981' : '#ef4444', 
+          padding: '4px 10px', 
+          borderRadius: '99px', 
+          fontSize: '11px', 
+          fontWeight: '900',
+          marginTop: '8px'
+        }}>
+          {trend}
+        </div>
+      )}
+
+      {subtitle && <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{subtitle}</div>}
     </div>
   );
 }

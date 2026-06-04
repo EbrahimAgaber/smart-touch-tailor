@@ -456,6 +456,28 @@ function initDatabase(userDataPath) {
       );
     `);
 
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS supplier_payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            supplier_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            payment_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+            note TEXT,
+            FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE
+        );
+    `);
+
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS customer_payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            payment_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+            note TEXT,
+            FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+        );
+    `);
+
     try { db.exec("ALTER TABLE promotions ADD COLUMN discount_type TEXT;"); } catch(e){}
     try { db.exec("ALTER TABLE promotions ADD COLUMN start_date TEXT;"); } catch(e){}
     try { db.exec("ALTER TABLE promotions ADD COLUMN end_date TEXT;"); } catch(e){}
@@ -556,6 +578,8 @@ function initDatabase(userDataPath) {
     safe(`ALTER TABLE purchase_orders ADD COLUMN vat_amount REAL DEFAULT 0`);
     safe(`ALTER TABLE expenditures ADD COLUMN status TEXT DEFAULT 'active'`);
     safe(`ALTER TABLE customers ADD COLUMN last_whatsapp_sent DATETIME`);
+    safe(`ALTER TABLE purchase_orders ADD COLUMN paid_amount REAL DEFAULT 0`);
+    safe(`ALTER TABLE purchase_orders ADD COLUMN payment_status TEXT DEFAULT 'unpaid'`);
     safe(`INSERT OR IGNORE INTO business_settings (key, value) VALUES ('costing_method', 'avco')`);
 
     const naColumns = ['na_short', 'na_building', 'na_street', 'na_secondary', 'na_district', 'na_postal', 'na_city', 'na_country', 'id_type', 'id_value'];
@@ -563,6 +587,10 @@ function initDatabase(userDataPath) {
         safe(`ALTER TABLE customers ADD COLUMN ${c} TEXT`);
         safe(`ALTER TABLE suppliers ADD COLUMN ${c} TEXT`);
     });
+
+    // Also migrate the sync tables list in migrateForSync if needed, 
+    // but those tables won't sync until added to syncTables array. 
+    // We'll leave them local for now to avoid schema drift sync issues unless explicitly requested.
 
     // ── Label Engine Schema Migration ──────────────────────────────────────
     migrateLabelEngine(db);
@@ -901,12 +929,18 @@ function getPurchaseOrders() {
 }
 
 function createPurchaseOrder(data) {
-    const { supplier_id, total_amount, items, note, vat_included } = data;
+    const { supplier_id, total_amount, items, note, vat_included, paid_amount = 0, payment_status = 'unpaid' } = data;
     return db.transaction(() => {
         const vatFlag = (vat_included === false || vat_included === 0) ? 0 : 1;
-        const info = db.prepare('INSERT INTO purchase_orders (supplier_id, total_amount, note, vat_included) VALUES (?,?,?,?)')
-            .run(supplier_id, roundMoney(total_amount), note || '', vatFlag);
+        const info = db.prepare('INSERT INTO purchase_orders (supplier_id, total_amount, note, vat_included, paid_amount, payment_status) VALUES (?,?,?,?,?,?)')
+            .run(supplier_id, roundMoney(total_amount), note || '', vatFlag, roundMoney(paid_amount), payment_status);
         const purchase_id = info.lastInsertRowid;
+        
+        if (paid_amount > 0) {
+            db.prepare('INSERT INTO supplier_payments (supplier_id, amount, note, payment_date) VALUES (?,?,?,?)')
+              .run(supplier_id, roundMoney(paid_amount), `دفعة مقدمة لطلب الشراء #${purchase_id}`, new Date().toISOString());
+        }
+
         const item_stmt = db.prepare('INSERT INTO purchase_items (purchase_id, product_id, quantity, unit_cost, is_bulk) VALUES (?,?,?,?,?)');
         for (const it of items) {
             item_stmt.run(purchase_id, it.product_id, it.quantity, roundMoney(it.unit_cost), it.is_bulk ? 1 : 0);
@@ -2123,6 +2157,110 @@ function updateZatcaDevice(data) {
     db.prepare(`UPDATE zatca_device SET ${setClause} WHERE id=?`).run(...values);
 }
 
+// ─────────────────────────────────────────────
+// SUPPLIER & CUSTOMER CREDIT (Basic)
+// ─────────────────────────────────────────────
+
+function getSupplierStatement(supplierId) {
+    const supplier = db.prepare('SELECT * FROM suppliers WHERE id = ?').get(supplierId);
+    if (!supplier) return null;
+
+    const invoices = db.prepare(`
+        SELECT id, total_amount, paid_amount, payment_status, created_at, 'invoice' as type, note 
+        FROM purchase_orders WHERE supplier_id = ? ORDER BY created_at ASC
+    `).all(supplierId);
+
+    const payments = db.prepare(`
+        SELECT id, amount, payment_date as created_at, 'payment' as type, note
+        FROM supplier_payments WHERE supplier_id = ? ORDER BY payment_date ASC
+    `).all(supplierId);
+
+    const timeline = [...invoices, ...payments].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+    let balance = 0;
+    timeline.forEach(t => {
+        if (t.type === 'invoice') balance += parseFloat(t.total_amount);
+        if (t.type === 'payment') balance -= parseFloat(t.amount);
+        t.running_balance = balance;
+    });
+
+    return { supplier, timeline, balance };
+}
+
+function recordSupplierPayment(data) {
+    const { supplier_id, amount, note } = data;
+    const result = db.prepare('INSERT INTO supplier_payments (supplier_id, amount, note) VALUES (?,?,?)').run(supplier_id, amount, note);
+    return { success: true, id: result.lastInsertRowid };
+}
+
+function getCustomerStatementBasic(customerId) {
+    const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(customerId);
+    if (!customer) return null;
+
+    // Only credit/آجل sales generate receivable debt
+    const creditSales = db.prepare(`
+        SELECT id, invoice, total_amount, timestamp, note
+        FROM sales
+        WHERE customer_id = ? AND (payment_method = 'آجل' OR payment_method = 'Credit' OR status = 'credit')
+          AND status NOT IN ('void','voided','legacy')
+        ORDER BY timestamp ASC
+    `).all(customerId);
+
+    // Returns (مرتجع) reduce the balance
+    const returns = db.prepare(`
+        SELECT id, invoice, total_amount, timestamp, note
+        FROM sales
+        WHERE customer_id = ? AND status = 'return'
+        ORDER BY timestamp ASC
+    `).all(customerId);
+
+    // Manual payment records
+    const payments = db.prepare(`
+        SELECT id, amount, payment_date as timestamp, note
+        FROM customer_payments WHERE customer_id = ? ORDER BY payment_date ASC
+    `).all(customerId);
+
+    // Build unified timeline
+    const rawTimeline = [
+        ...creditSales.map(r => ({ ...r, type: 'invoice' })),
+        ...returns.map(r => ({ ...r, type: 'return' })),
+        ...payments.map(r => ({ ...r, type: 'payment' })),
+    ].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+    let balance = 0;
+    const entries = rawTimeline.map(t => {
+        let debit = 0, credit = 0;
+        if (t.type === 'invoice') {
+            debit = parseFloat(t.total_amount) || 0;
+            balance += debit;
+        } else if (t.type === 'return') {
+            credit = Math.abs(parseFloat(t.total_amount) || 0);
+            balance -= credit;
+        } else if (t.type === 'payment') {
+            credit = parseFloat(t.amount) || 0;
+            balance -= credit;
+        }
+        return {
+            id: t.id,
+            type: t.type,
+            date: t.timestamp,
+            invoice_number: t.invoice || null,
+            note: t.note || null,
+            debit,
+            credit,
+            running_balance: balance,
+        };
+    });
+
+    return { entries, balance };
+}
+
+function recordCustomerPaymentBasic(data) {
+    const { customer_id, amount, note } = data;
+    const result = db.prepare('INSERT INTO customer_payments (customer_id, amount, note) VALUES (?,?,?)').run(customer_id, amount, note);
+    return { success: true, id: result.lastInsertRowid };
+}
+
 async function getReceiptQR(signedXml) {
     const match = signedXml.match(/<cbc:EmbeddedDocumentBinaryObject mimeCode="text\/plain">([\s\S]+?)<\/cbc:EmbeddedDocumentBinaryObject>/);
     if (!match) return null;
@@ -2156,6 +2294,9 @@ module.exports = {
     getStaff, addStaff, updateStaff, deleteStaff, updateStaffPermissions, verifyStaffPin,
     // Suppliers
     getSuppliers, addSupplier, updateSupplier, deleteSupplier,
+    getSupplierStatement, recordSupplierPayment,
+    // Customers (Basic Credit Tracking)
+    getCustomerStatementBasic, recordCustomerPaymentBasic,
     // Tables
     getTables, addTable, updateTable, deleteTable, updateHeldOrderStatus,
     // Accounting

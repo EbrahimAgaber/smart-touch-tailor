@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '../components/ToastManager';
 import AppLayout from '../components/AppLayout';
 import { useLicenseStore } from '../store/useLicenseStore';
@@ -50,6 +51,7 @@ const TABS = [
 ];
 
 export default function Settings() {
+  const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const navigate = useNavigate();
   const canAccess = useLicenseStore(s => s.canAccess);
@@ -296,8 +298,8 @@ export default function Settings() {
   );
 
   return (
-    <AppLayout title="إعدادات المنشأة">
-      <div dir="rtl" style={{ display:'flex', flexDirection:'column', height:'100%', gap:0 }}>
+    <AppLayout title={t('settings.title', 'إعدادات المنشأة')}>
+      <div dir={i18n.dir()} style={{ display:'flex', flexDirection:'column', height:'100%', gap:0 }}>
 
         {/* ── ZATCA cert expired blocking overlay ── */}
         {certExpiredModal && (
@@ -427,7 +429,7 @@ export default function Settings() {
                     borderRight: isActive ? '3px solid #2563eb' : '3px solid transparent',
                   }}>
                   <Icon size={16} style={{ flexShrink:0, opacity: isActive ? 1 : 0.65 }}/>
-                  <span style={{ flex:1 }}>{tab.label}</span>
+                  <span style={{ flex:1 }}>{t(`settings.tabs.${tab.id}`, tab.label)}</span>
                   {badge && (
                     <span style={{
                       fontSize:'10px', fontWeight:'700', padding:'2px 6px',
@@ -449,30 +451,30 @@ export default function Settings() {
               ══════════════════════════════════════════ */}
               {activeTab === 'identity' && (
                 <div style={colGap}>
-                  <TabHeader icon={<Building2 size={18}/>} title="هوية المنشأة"
-                    desc="البيانات الأساسية تظهر في جميع الفواتير والوثائق الرسمية." />
+                  <TabHeader icon={<Building2 size={18}/>} title={t('settings.tabs.identity')}
+                    desc={t('settings.identity.desc')} />
 
                   {/* Business basics */}
-                  <Card title="البيانات الأساسية" icon={<Building2 size={15}/>}>
-                    <Field label="نوع النشاط التجاري">
+                  <Card title={t('settings.identity.basics.title')} icon={<Building2 size={15}/>}>
+                    <Field label={t('settings.identity.basics.business_type')}>
                       <select value={form.business_type} onChange={e => u('business_type', e.target.value)} style={sel}>
                         {BUSINESS_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                       </select>
                     </Field>
                     <div style={grid2}>
-                      <IF label="اسم المنشأة (عربي) *" value={form.business_name_ar} onChange={v => u('business_name_ar',v)} placeholder="مثال: متجر الرواد" err={vatErrors.business_name_ar}/>
-                      <IF label="اسم المنشأة (إنجليزي)" value={form.business_name_en} onChange={v => u('business_name_en',v)} placeholder="Al-Ruwwad Store"/>
-                      <IF label="اسم الفرع / الموقع" value={form.branch_name} onChange={v => u('branch_name',v)} placeholder="فرع الرياض - العليا"/>
-                      <IF label="رقم الهاتف" value={form.phone} onChange={v => u('phone',v)} placeholder="+966 11 XXX XXXX"/>
-                      <IF label="البريد الإلكتروني" value={form.email} onChange={v => u('email',v)} placeholder="info@store.com"/>
-                      <IF label="الرقم الضريبي (VAT) *" value={form.vat_number} onChange={v => u('vat_number',v)} placeholder="300XXXXXXXXXX13" err={vatErrors.vat_number}/>
-                      <IF label="رقم السجل التجاري (CRN) *" value={form.crn} onChange={v => u('crn',v)} placeholder="1010XXXXXX" err={vatErrors.crn}/>
+                      <IF label={t('settings.identity.basics.name_ar')} value={form.business_name_ar} onChange={v => u('business_name_ar',v)} placeholder={t('settings.identity.basics.name_ar_placeholder')} err={vatErrors.business_name_ar}/>
+                      <IF label={t('settings.identity.basics.name_en')} value={form.business_name_en} onChange={v => u('business_name_en',v)} placeholder={t('settings.identity.basics.name_en_placeholder')}/>
+                      <IF label={t('settings.identity.basics.branch')} value={form.branch_name} onChange={v => u('branch_name',v)} placeholder={t('settings.identity.basics.branch_placeholder')}/>
+                      <IF label={t('settings.identity.basics.phone')} value={form.phone} onChange={v => u('phone',v)} placeholder={t('settings.identity.basics.phone_placeholder')}/>
+                      <IF label={t('settings.identity.basics.email')} value={form.email} onChange={v => u('email',v)} placeholder={t('settings.identity.basics.email_placeholder')}/>
+                      <IF label={t('settings.identity.basics.vat')} value={form.vat_number} onChange={v => u('vat_number',v)} placeholder="300XXXXXXXXXX13" err={vatErrors.vat_number}/>
+                      <IF label={t('settings.identity.basics.crn')} value={form.crn} onChange={v => u('crn',v)} placeholder="1010XXXXXX" err={vatErrors.crn}/>
                     </div>
-                    <IF label="العنوان الكامل" value={form.address} onChange={v => u('address',v)} placeholder="الرياض، حي العليا، شارع العروبة"/>
+                    <IF label={t('settings.identity.basics.address')} value={form.address} onChange={v => u('address',v)} placeholder={t('settings.identity.basics.address_placeholder')}/>
                   </Card>
 
                   {/* Logo */}
-                  <Card title="شعار المنشأة" icon={<ImageIcon size={15}/>}>
+                  <Card title={t('settings.identity.logo.title')} icon={<ImageIcon size={15}/>}>
                     <div style={{ display:'flex', alignItems:'center', gap:'20px' }}>
                       <div style={{ width:'80px', height:'80px', borderRadius:'14px', background:'#f8fafc', border:'1.5px dashed #cbd5e1', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', flexShrink:0 }}>
                         {form.business_logo
@@ -481,14 +483,14 @@ export default function Settings() {
                       </div>
                       <div style={{ flex:1 }}>
                         <p style={{ fontSize:'12px', color:'#64748b', marginBottom:'10px', lineHeight:'1.6' }}>
-                          يظهر الشعار في الفاتورة وعلى شاشة البيع. يُفضل PNG بخلفية شفافة.
+                          {t('settings.identity.logo.desc')}
                         </p>
                         <button onClick={handleLogoUpload} disabled={uploading} style={{ ...btnBlue, fontSize:'12px', padding:'8px 16px', display:'flex', alignItems:'center', gap:'6px', opacity: uploading ? 0.6 : 1 }}>
-                          <Upload size={14}/> {uploading ? 'جاري التحميل...' : 'اختر صورة'}
+                          <Upload size={14}/> {uploading ? t('settings.identity.logo.uploading') : t('settings.identity.logo.upload_btn')}
                         </button>
                         {form.business_logo && (
                           <button onClick={() => u('business_logo','')} style={{ marginTop:'6px', background:'transparent', border:'none', color:'#ef4444', cursor:'pointer', fontSize:'11px', fontWeight:'700', fontFamily:'inherit' }}>
-                            × حذف الشعار
+                            {t('settings.identity.logo.delete_btn')}
                           </button>
                         )}
                       </div>
@@ -496,42 +498,42 @@ export default function Settings() {
                   </Card>
 
                   {/* National address */}
-                  <Card title="العنوان الوطني" icon={<MapPin size={15}/>}
-                    hint="يظهر في فواتير B2B — احصل عليه من naqaa.gov.sa">
+                  <Card title={t('settings.identity.national_address.title')} icon={<MapPin size={15}/>}
+                    hint={t('settings.identity.national_address.hint')}>
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'12px' }}>
-                      <IF label="العنوان المختصر" value={form.address_short} onChange={v => u('address_short',v)} placeholder="TTPA8255"/>
-                      <IF label="رقم المبنى" value={form.address_building} onChange={v => u('address_building',v)} placeholder="8255" err={vatErrors.address_building}/>
-                      <IF label="الرمز البريدي" value={form.address_postal} onChange={v => u('address_postal',v)} placeholder="29763" err={vatErrors.address_postal}/>
-                      <IF label="اسم الشارع" value={form.address_street} onChange={v => u('address_street',v)} placeholder="شارع الملك عبدالعزيز"/>
-                      <IF label="الاسم الإضافي للشارع" value={form.address_additional_street} onChange={v => u('address_additional_street',v)} placeholder="طريق الملك عبدالعزيز"/>
-                      <IF label="الرقم الفرعي" value={form.address_secondary} onChange={v => u('address_secondary',v)} placeholder="2660"/>
-                      <IF label="الحي / المنطقة" value={form.address_district} onChange={v => u('address_district',v)} placeholder="حي الحمراء"/>
-                      <IF label="المدينة *" value={form.address_city} onChange={v => u('address_city',v)} placeholder="الرياض"/>
-                      <IF label="رقم القطعة" value={form.address_plot_id} onChange={v => u('address_plot_id',v)} placeholder="4321"/>
+                      <IF label={t('settings.identity.national_address.short')} value={form.address_short} onChange={v => u('address_short',v)} placeholder="TTPA8255"/>
+                      <IF label={t('settings.identity.national_address.building')} value={form.address_building} onChange={v => u('address_building',v)} placeholder="8255" err={vatErrors.address_building}/>
+                      <IF label={t('settings.identity.national_address.postal')} value={form.address_postal} onChange={v => u('address_postal',v)} placeholder="29763" err={vatErrors.address_postal}/>
+                      <IF label={t('settings.identity.national_address.street')} value={form.address_street} onChange={v => u('address_street',v)} placeholder="شارع الملك عبدالعزيز"/>
+                      <IF label={t('settings.identity.national_address.additional_street')} value={form.address_additional_street} onChange={v => u('address_additional_street',v)} placeholder="طريق الملك عبدالعزيز"/>
+                      <IF label={t('settings.identity.national_address.secondary')} value={form.address_secondary} onChange={v => u('address_secondary',v)} placeholder="2660"/>
+                      <IF label={t('settings.identity.national_address.district')} value={form.address_district} onChange={v => u('address_district',v)} placeholder="حي الحمراء"/>
+                      <IF label={t('settings.identity.national_address.city')} value={form.address_city} onChange={v => u('address_city',v)} placeholder="الرياض"/>
+                      <IF label={t('settings.identity.national_address.plot_id')} value={form.address_plot_id} onChange={v => u('address_plot_id',v)} placeholder="4321"/>
                     </div>
                   </Card>
 
                   {/* Bank account */}
-                  <Card title="الحساب البنكي" icon={<CreditCard size={15}/>}
-                    hint="تظهر هذه البيانات أسفل فواتير A4 لتسهيل التحويل البنكي.">
+                  <Card title={t('settings.identity.bank.title')} icon={<CreditCard size={15}/>}
+                    hint={t('settings.identity.bank.hint')}>
                     <div style={grid2}>
-                      <IF label="اسم البنك" value={form.bank_name} onChange={v => u('bank_name',v)} placeholder="بنك الراجحي"/>
-                      <IF label="اسم المستفيد" value={form.bank_beneficiary} onChange={v => u('bank_beneficiary',v)} placeholder="شركة الرواد التجارية"/>
-                      <IF label="رقم الحساب" value={form.bank_account_number} onChange={v => u('bank_account_number',v)} placeholder="1234567890"/>
-                      <IF label="رقم IBAN" value={form.bank_iban} onChange={v => u('bank_iban',v)} placeholder="SA12 3456 7890..."/>
+                      <IF label={t('settings.identity.bank.name')} value={form.bank_name} onChange={v => u('bank_name',v)} placeholder="بنك الراجحي"/>
+                      <IF label={t('settings.identity.bank.beneficiary')} value={form.bank_beneficiary} onChange={v => u('bank_beneficiary',v)} placeholder="شركة الرواد التجارية"/>
+                      <IF label={t('settings.identity.bank.account')} value={form.bank_account_number} onChange={v => u('bank_account_number',v)} placeholder="1234567890"/>
+                      <IF label={t('settings.identity.bank.iban')} value={form.bank_iban} onChange={v => u('bank_iban',v)} placeholder="SA12 3456 7890..."/>
                     </div>
                   </Card>
 
                   {/* Social */}
-                  <Card title="قنوات التواصل" icon={<Smartphone size={15}/>}>
+                  <Card title={t('settings.identity.social.title')} icon={<Smartphone size={15}/>}>
                     <div style={grid2}>
-                      <IF label="رقم واتساب" value={form.whatsapp} onChange={v => u('whatsapp',v)} placeholder="9665XXXXXXXX"/>
-                      <IF label="حساب إنستقرام" value={form.instagram} onChange={v => u('instagram',v)} placeholder="@username"/>
-                      <IF label="الموقع الإلكتروني" value={form.website} onChange={v => u('website',v)} placeholder="www.store.com"/>
+                      <IF label={t('settings.identity.social.whatsapp')} value={form.whatsapp} onChange={v => u('whatsapp',v)} placeholder="9665XXXXXXXX"/>
+                      <IF label={t('settings.identity.social.instagram')} value={form.instagram} onChange={v => u('instagram',v)} placeholder="@username"/>
+                      <IF label={t('settings.identity.social.website')} value={form.website} onChange={v => u('website',v)} placeholder="www.store.com"/>
                     </div>
-                    <Field label="قالب رسالة الواتساب (اختياري)">
+                    <Field label={t('settings.identity.social.whatsapp_template')}>
                       <textarea value={form.whatsapp_template} onChange={e => u('whatsapp_template',e.target.value)}
-                        style={{ ...inp, minHeight:'56px' }} placeholder="شكراً لتسوقكم من متجرنا. إليكم تفاصيل طلبكم:"/>
+                        style={{ ...inp, minHeight:'56px' }} placeholder={t('settings.identity.social.whatsapp_placeholder')}/>
                     </Field>
                   </Card>
                 </div>
@@ -542,15 +544,15 @@ export default function Settings() {
               ══════════════════════════════════════════ */}
               {activeTab === 'zatca' && (
                 <div style={colGap}>
-                  <TabHeader icon={<Shield size={18}/>} title="هيئة الزكاة والضريبة والجمارك"
-                    desc="إدارة ربط الجهاز، بيئة التشغيل، وحالة الشهادات والإرسال." />
+                  <TabHeader icon={<Shield size={18}/>} title={t('settings.tabs.zatca')}
+                    desc={t('settings.zatca.desc')} />
 
                   {/* Queue status card — always shown */}
                   <ZatcaQueueCard />
 
                   {/* ── Environment — pill buttons per design proposal ── */}
-                  <Card title="بيئة التشغيل" icon={<Server size={15}/>}>
-                    <Field label="اختر البيئة">
+                  <Card title={t('settings.zatca.env_title')} icon={<Server size={15}/>}>
+                    <Field label={t('settings.zatca.choose_env')}>
                       <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
                         {ZATCA_ENVS.map(env => {
                           const active = form.zatca_env === env.value;
@@ -558,7 +560,7 @@ export default function Settings() {
                             <button key={env.value}
                               onClick={() => {
                                 if (env.value === 'core' && form.zatca_env !== 'core' && !form.simulationTestsPassed) {
-                                  setEnvSwitchError('يجب اجتياز اختبارات المحاكاة أولاً قبل التبديل إلى بيئة الإنتاج.');
+                                  setEnvSwitchError(t('settings.zatca.core_error'));
                                   return;
                                 }
                                 setEnvSwitchError('');
@@ -598,10 +600,10 @@ export default function Settings() {
                         padding:'16px', marginTop:'8px'
                       }}>
                         <p style={{ color:'#92400e', fontWeight:'900', fontSize:'14px', margin:0 }}>
-                          ⚠ البيئة التجريبية (Sandbox) — الفواتير لن تُرسل إلى ZATCA الفعلي
+                          {t('settings.zatca.sandbox_warning')}
                         </p>
                         <p style={{ color:'#b45309', fontSize:'12px', marginTop:'6px', marginBottom:0 }}>
-                          استخدم هذه البيئة للاختبار فقط. قبل الإطلاق الفعلي، غيّر الإعداد إلى "إنتاج".
+                          {t('settings.zatca.sandbox_desc')}
                         </p>
                       </div>
                     )}
@@ -611,15 +613,15 @@ export default function Settings() {
                       </div>
                     )}
                     <div style={{ padding:'10px 12px', background:'#eff6ff', borderRadius:'10px', border:'1px solid #bfdbfe', fontSize:'12px', color:'#1e40af' }}>
-                      💡 بيئة الإنتاج تتطلب رقم ضريبي مسجل. استخدم بيئة المطورين للاختبار.
+                      {t('settings.zatca.production_hint')}
                     </div>
                   </Card>
 
                   {/* W-4: Simulation tests — only visible in simulation env */}
                   {form.zatca_env === 'simulation' && (
-                    <Card title="اختبارات المحاكاة" icon={<Shield size={15} color="#f59e0b"/>}>
+                    <Card title={t('settings.zatca.simulation.title')} icon={<Shield size={15} color="#f59e0b"/>}>
                       <div style={{ fontSize:'13px', color:'#64748b', lineHeight:'1.7' }}>
-                        تُرسَل 3 فواتير تمثيلية (B2C، B2B، إشعار دائن) إلى بيئة المحاكاة للتحقق من صحة الإعدادات قبل الانتقال للإنتاج.
+                        {t('settings.zatca.simulation.desc')}
                       </div>
                       <button
                         onClick={async () => {
@@ -632,9 +634,9 @@ export default function Settings() {
                               const updated = { ...form, simulationTestsPassed: true };
                               setForm(updated);
                               await window.api.saveSettings(updated);
-                              toast('✅ جميع اختبارات المحاكاة نجحت! يمكنك الانتقال إلى الإنتاج.', 'success');
+                              toast(t('settings.zatca.simulation.success_toast'), 'success');
                             } else {
-                              toast('⚠️ بعض الاختبارات فشلت. راجع النتائج أدناه.', 'error');
+                              toast(t('settings.zatca.simulation.error_toast'), 'error');
                             }
                           } catch (e) {
                             setSimTestResults({ success: false, error: e.message });
@@ -645,7 +647,7 @@ export default function Settings() {
                         disabled={simTestStatus === 'running'}
                         style={{ padding:'10px 20px', background:'#f59e0b', color:'#fff', border:'none', borderRadius:'10px', fontWeight:'800', fontSize:'13px', cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:'8px', opacity: simTestStatus==='running' ? 0.6 : 1 }}
                       >
-                        {simTestStatus === 'running' ? '⏳ جاري الاختبار...' : '🔬 تشغيل اختبارات المحاكاة'}
+                        {simTestStatus === 'running' ? t('settings.zatca.simulation.running_btn') : t('settings.zatca.simulation.run_btn')}
                       </button>
 
                       {/* Results */}
@@ -668,7 +670,7 @@ export default function Settings() {
                           ))}
                           {simTestResults.allPassed && (
                             <div style={{ padding:'10px', background:'#f0fdf4', borderRadius:'10px', fontSize:'12px', color:'#15803d', fontWeight:'700' }}>
-                              ✅ جميع الاختبارات نجحت — يمكنك الآن التبديل إلى بيئة الإنتاج.
+                              {t('settings.zatca.simulation.all_passed')}
                             </div>
                           )}
                         </div>
@@ -678,15 +680,15 @@ export default function Settings() {
 
                   {/* Device status / onboarding */}
                   {zatcaDevice?.production_csid ? (
-                    <Card title="حالة الجهاز" icon={<BadgeCheck size={15}/>}>
+                    <Card title={t('settings.zatca.device_status.title')} icon={<BadgeCheck size={15}/>}>
                       <div style={{ padding:'14px', background:'#f0fdf4', borderRadius:'12px', border:'1px solid #bbf7d0', display:'flex', flexDirection:'column', gap:'10px' }}>
                         <div style={{ display:'flex', alignItems:'center', gap:'8px', color:'#15803d', fontWeight:'800', fontSize:'14px' }}>
-                          <CheckCircle2 size={20}/> الجهاز متصل وموثق (ZATCA Phase 2)
+                          <CheckCircle2 size={20}/> {t('settings.zatca.device_status.connected')}
                         </div>
                         <div style={{ fontSize:'12px', color:'#166534', background:'#dcfce7', padding:'8px 12px', borderRadius:'8px', lineHeight:'1.7' }}>
-                          <strong>معرف الجهاز (CSID):</strong> {zatcaDevice.device_id}<br/>
-                          <strong>رقم التسلسل الحالي (ICV):</strong> {zatcaDevice.current_icv}<br/>
-                          <strong>آخر مزامنة:</strong> {new Date(zatcaDevice.updated_at).toLocaleString('ar-SA')}
+                          <strong>{t('settings.zatca.device_status.csid')}</strong> {zatcaDevice.device_id}<br/>
+                          <strong>{t('settings.zatca.device_status.icv')}</strong> {zatcaDevice.current_icv}<br/>
+                          <strong>{t('settings.zatca.device_status.last_sync')}</strong> {new Date(zatcaDevice.updated_at).toLocaleString('ar-SA')}
                         </div>
                         {/* FIX 5: Certificate expiry countdown badge */}
                         {(() => {
@@ -699,40 +701,40 @@ export default function Settings() {
                           const border= daysLeft < 10 ? '#fca5a5' : daysLeft < 30 ? '#fde68a' : '#bbf7d0';
                           const icon  = daysLeft < 10 ? '🔴' : daysLeft < 30 ? '⚠️' : '✅';
                           const label = daysLeft <= 0
-                            ? 'الشهادة منتهية الصلاحية!'
+                            ? t('settings.zatca.device_status.cert_expired')
                             : daysLeft < 30
-                            ? `تنتهي خلال ${daysLeft} يوم`
-                            : `صالحة حتى ${expiryDate.toLocaleDateString('ar-SA')}`;
+                            ? t('settings.zatca.device_status.cert_expires_in').replace('{{daysLeft}}', daysLeft)
+                            : t('settings.zatca.device_status.cert_valid_until').replace('{{date}}', expiryDate.toLocaleDateString('ar-SA'));
                           return (
                             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', padding:'8px 12px', borderRadius:'10px', background: bg, border: `1px solid ${border}` }}>
-                              <span style={{ fontSize:'12px', fontWeight:700, color }}>{icon} شهادة الجهاز: {label}</span>
+                              <span style={{ fontSize:'12px', fontWeight:700, color }}>{icon} {t('settings.zatca.device_status.cert_label')} {label}</span>
                               <a
                                 href="https://zatca.gov.sa"
                                 onClick={e => { e.preventDefault(); window.api?.openExternal?.('https://zatca.gov.sa'); }}
                                 style={{ fontSize:'11px', color, fontWeight:700, textDecoration:'underline', cursor:'pointer' }}
                               >
-                                تجديد الشهادة
+                                {t('settings.zatca.device_status.renew_cert')}
                               </a>
                             </div>
                           );
                         })()}
                         <p style={{ fontSize:'11px', color:'#166534' }}>
-                          جميع الفواتير يتم توقيعها وإرسالها تلقائياً عبر خدمة المزامنة الخلفية.
+                          {t('settings.zatca.device_status.auto_sync_desc')}
                         </p>
                       </div>
                     </Card>
                   ) : (
-                    <Card title="ربط الجهاز (Onboarding)" icon={<Key size={15}/>}>
+                    <Card title={t('settings.zatca.onboarding.title')} icon={<Key size={15}/>}>
                       <div style={{ padding:'10px 12px', background:'#fffbeb', borderRadius:'10px', border:'1px solid #fde68a', fontSize:'12px', color:'#92400e', lineHeight:'1.6' }}>
-                        ⚠️ الجهاز غير مرتبط بمنصة فاتورة حتى الآن. لإصدار فواتير مطابقة للمرحلة الثانية، اتبع الخطوات:
+                        {t('settings.zatca.onboarding.warning')}
                       </div>
 
                       {/* Step guide */}
                       <div style={{ display:'flex', flexDirection:'column', gap:'6px', padding:'4px 0' }}>
                         {[
-                          { n:1, title:'سجّل الدخول على portal.zatca.gov.sa', sub:'باستخدام الهوية الرقمية' },
-                          { n:2, title:'اذهب إلى "الأجهزة" وأضف جهازاً جديداً', sub:'أدخل اسم الجهاز والرقم الضريبي' },
-                          { n:3, title:'انسخ كود OTP وأدخله أدناه', sub:'الكود صالح لمدة 15 دقيقة' },
+                          { n:1, title: t('settings.zatca.onboarding.step1'), sub: t('settings.zatca.onboarding.step1_sub') },
+                          { n:2, title: t('settings.zatca.onboarding.step2'), sub: t('settings.zatca.onboarding.step2_sub') },
+                          { n:3, title: t('settings.zatca.onboarding.step3'), sub: t('settings.zatca.onboarding.step3_sub') },
                         ].map((s, i, arr) => (
                           <div key={s.n}>
                             <div style={{ display:'flex', gap:'12px', alignItems:'flex-start' }}>
@@ -747,15 +749,15 @@ export default function Settings() {
                         ))}
                       </div>
 
-                      <IF label="رمز الربط (OTP)" value={zatcaOtp} onChange={resetOnboardingOnChange} placeholder="أدخل كود التفعيل هنا (مثال: 123456)"/>
+                      <IF label={t('settings.zatca.onboarding.otp_label')} value={zatcaOtp} onChange={resetOnboardingOnChange} placeholder={t('settings.zatca.onboarding.otp_placeholder')}/>
                       <button onClick={handleOnboardZatca}
                         disabled={onboardingStatus === 'loading' || !zatcaOtp}
                         style={{ ...btnGreen, width:'100%', justifyContent:'center', padding:'12px', fontSize:'13px', opacity: (onboardingStatus==='loading' || !zatcaOtp) ? 0.6 : 1 }}>
-                        {onboardingStatus === 'loading' ? 'جاري الاتصال وإنشاء المفاتيح...' : '🔗 تفعيل وربط الجهاز'}
+                        {onboardingStatus === 'loading' ? t('settings.zatca.onboarding.loading') : t('settings.zatca.onboarding.btn')}
                       </button>
                       {onboardingStatus === 'error' && (
                         <div style={{ padding:'10px', background:'#fef2f2', borderRadius:'10px', fontSize:'11px', color:'#b91c1c' }}>
-                          فشل الربط: {onboardingError}
+                          {t('settings.zatca.onboarding.error')} {onboardingError}
                         </div>
                       )}
                       {onboardingStatus === 'success' && (
@@ -773,19 +775,19 @@ export default function Settings() {
               ══════════════════════════════════════════ */}
               {activeTab === 'invoice' && (
                 <div style={colGap}>
-                  <TabHeader icon={<Receipt size={18}/>} title="الفواتير والطباعة"
-                    desc="إعدادات الطابعة، تخصيص الفاتورة، والطباعة التلقائية." />
+                  <TabHeader icon={<Receipt size={18}/>} title={t('settings.tabs.invoice')}
+                    desc={t('settings.invoice.desc')} />
 
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 240px', gap:'20px', alignItems:'start' }}>
                     <div style={colGap}>
-                      <Card title="إعدادات الطابعة" icon={<Receipt size={15}/>}>
-                        <Field label="اختيار الطابعة الافتراضية">
+                      <Card title={t('settings.invoice.printer_settings')} icon={<Receipt size={15}/>}>
+                        <Field label={t('settings.invoice.default_printer')}>
                           <select value={form.receipt_printer} onChange={e => u('receipt_printer',e.target.value)} style={sel}>
-                            <option value="">طابعة النظام الافتراضية</option>
-                            {printers.map(p => <option key={p.name} value={p.name}>{p.name} {p.isDefault ? '(الافتراضية)' : ''}</option>)}
+                            <option value="">{t('settings.invoice.system_default')}</option>
+                            {printers.map(p => <option key={p.name} value={p.name}>{p.name} {p.isDefault ? t('settings.invoice.default_suffix') : ''}</option>)}
                           </select>
                         </Field>
-                        <Field label="عرض ورق الطابعة">
+                        <Field label={t('settings.invoice.paper_width')}>
                           <div style={{ display:'flex', gap:'8px' }}>
                             {['80', '58', 'A4'].map(w => (
                               <button key={w} onClick={() => u('receipt_width', w)}
@@ -799,15 +801,15 @@ export default function Settings() {
                             ))}
                           </div>
                         </Field>
-                        <Field label="طباعة تلقائية عند الدفع">
+                        <Field label={t('settings.invoice.auto_print')}>
                           <select value={form.auto_print} onChange={e => u('auto_print',e.target.value)} style={sel}>
-                            <option value="false">لا — اسألني أولاً</option>
-                            <option value="true">نعم — طباعة فورية</option>
+                            <option value="false">{t('settings.invoice.auto_print_no')}</option>
+                            <option value="true">{t('settings.invoice.auto_print_yes')}</option>
                           </select>
                         </Field>
                       </Card>
 
-                      <Card title="ملصقات المنتجات" icon={<Receipt size={15}/>}>
+                      <Card title={t('settings.invoice.labels')} icon={<Receipt size={15}/>}>
                         <LabelPrintSettings
                           value={form.label_config}
                           onChange={v => u('label_config', v)}
@@ -816,19 +818,19 @@ export default function Settings() {
                         />
                       </Card>
 
-                      <Card title="تخصيص الفاتورة" icon={<FileText size={15}/>}>
+                      <Card title={t('settings.invoice.customization')} icon={<FileText size={15}/>}>
                         <div style={grid2}>
-                          <Field label="بادئة رقم الفاتورة">
-                            <input value={form.invoice_prefix} onChange={e => u('invoice_prefix',e.target.value)} style={inp} placeholder="INV-"/>
+                          <Field label={t('settings.invoice.prefix')}>
+                            <input value={form.invoice_prefix} onChange={e => u('invoice_prefix',e.target.value)} style={inp} placeholder={t('settings.invoice.prefix_placeholder')}/>
                           </Field>
                         </div>
-                        <Field label="نص الترويسة (أعلى الفاتورة)">
+                        <Field label={t('settings.invoice.header')}>
                           <textarea value={form.receipt_header} onChange={e => u('receipt_header',e.target.value)}
-                            style={{ ...inp, minHeight:'60px', resize:'vertical' }} placeholder="أهلاً بكم في متجرنا"/>
+                            style={{ ...inp, minHeight:'60px', resize:'vertical' }} placeholder={t('settings.invoice.header_placeholder')}/>
                         </Field>
-                        <Field label="نص التذييل (شروط الاسترجاع)">
+                        <Field label={t('settings.invoice.footer')}>
                           <textarea value={form.receipt_footer} onChange={e => u('receipt_footer',e.target.value)}
-                            style={{ ...inp, minHeight:'60px', resize:'vertical' }} placeholder="لا يُقبل الاسترجاع بعد 7 أيام • شكراً لزيارتكم"/>
+                            style={{ ...inp, minHeight:'60px', resize:'vertical' }} placeholder={t('settings.invoice.footer_placeholder')}/>
                         </Field>
                       </Card>
                     </div>
@@ -836,7 +838,7 @@ export default function Settings() {
                     {/* Live receipt preview */}
                     <div>
                       <div style={{ fontSize:'11px', color:'#94a3b8', marginBottom:'10px', textAlign:'center', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.05em' }}>
-                        معاينة الفاتورة
+                        {t('settings.invoice.preview.title')}
                       </div>
                       <div style={{
                         margin:'0 auto',
@@ -852,20 +854,20 @@ export default function Settings() {
                             <img src={form.business_logo} alt="logo" style={{ height:'28px', objectFit:'contain' }}/>
                           </div>
                         )}
-                        <div style={{ textAlign:'center', fontWeight:'bold', fontSize:'11px', marginBottom:'2px' }}>{form.business_name_ar || 'اسم المنشأة'}</div>
+                        <div style={{ textAlign:'center', fontWeight:'bold', fontSize:'11px', marginBottom:'2px' }}>{form.business_name_ar || t('settings.invoice.preview.business_name')}</div>
                         {form.receipt_header && <div style={{ textAlign:'center', fontSize:'9px', color:'#64748b', marginBottom:'4px' }}>{form.receipt_header}</div>}
                         <div style={{ borderTop:'1px dashed #cbd5e1', paddingTop:'6px', marginTop:'4px' }}>
-                          <div style={{ display:'flex', justifyContent:'space-between' }}><span>رقم:</span><span>{form.invoice_prefix}0042</span></div>
-                          <div style={{ display:'flex', justifyContent:'space-between' }}><span>التاريخ:</span><span>١٤٤٦/٠٣/١٤</span></div>
+                          <div style={{ display:'flex', justifyContent:'space-between' }}><span>{t('settings.invoice.preview.no')}</span><span>{form.invoice_prefix}0042</span></div>
+                          <div style={{ display:'flex', justifyContent:'space-between' }}><span>{t('settings.invoice.preview.date')}</span><span>١٤٤٦/٠٣/١٤</span></div>
                         </div>
                         <div style={{ borderTop:'1px dashed #cbd5e1', paddingTop:'6px', marginTop:'6px' }}>
-                          <div style={{ display:'flex', justifyContent:'space-between' }}><span>البند 1</span><span>50.00</span></div>
-                          <div style={{ display:'flex', justifyContent:'space-between' }}><span>البند 2</span><span>65.00</span></div>
+                          <div style={{ display:'flex', justifyContent:'space-between' }}><span>{t('settings.invoice.preview.item1')}</span><span>50.00</span></div>
+                          <div style={{ display:'flex', justifyContent:'space-between' }}><span>{t('settings.invoice.preview.item2')}</span><span>65.00</span></div>
                         </div>
                         <div style={{ borderTop:'1px dashed #cbd5e1', paddingTop:'6px', marginTop:'6px' }}>
-                          <div style={{ display:'flex', justifyContent:'space-between', fontWeight:'bold' }}><span>المجموع</span><span>115.00</span></div>
-                          <div style={{ display:'flex', justifyContent:'space-between', fontSize:'9px', color:'#64748b' }}><span>ض.ق.م ({(parseFloat(form.vat_rate||0)*100).toFixed(0)}%)</span><span>{(115 * parseFloat(form.vat_rate||0)).toFixed(2)}</span></div>
-                          <div style={{ display:'flex', justifyContent:'space-between', fontWeight:'bold', marginTop:'2px' }}><span>الإجمالي</span><span>{(115 * (1 + parseFloat(form.vat_rate||0))).toFixed(2)}</span></div>
+                          <div style={{ display:'flex', justifyContent:'space-between', fontWeight:'bold' }}><span>{t('settings.invoice.preview.subtotal')}</span><span>115.00</span></div>
+                          <div style={{ display:'flex', justifyContent:'space-between', fontSize:'9px', color:'#64748b' }}><span>{t('settings.invoice.preview.vat')} ({(parseFloat(form.vat_rate||0)*100).toFixed(0)}%)</span><span>{(115 * parseFloat(form.vat_rate||0)).toFixed(2)}</span></div>
+                          <div style={{ display:'flex', justifyContent:'space-between', fontWeight:'bold', marginTop:'2px' }}><span>{t('settings.invoice.preview.total')}</span><span>{(115 * (1 + parseFloat(form.vat_rate||0))).toFixed(2)}</span></div>
                         </div>
                         {form.receipt_footer && <div style={{ textAlign:'center', fontSize:'8px', color:'#94a3b8', borderTop:'1px dashed #cbd5e1', paddingTop:'6px', marginTop:'6px', lineHeight:'1.5' }}>{form.receipt_footer}</div>}
                       </div>
@@ -879,55 +881,55 @@ export default function Settings() {
               ══════════════════════════════════════════ */}
               {activeTab === 'tax' && (
                 <div style={colGap}>
-                  <TabHeader icon={<Globe size={18}/>} title="الضريبة والعملات"
-                    desc="إعدادات الدولة، نسبة الضريبة، والعملات." />
+                  <TabHeader icon={<Globe size={18}/>} title={t('settings.tabs.tax')}
+                    desc={t('settings.tax.desc')} />
 
-                  <Card title="الدولة والضريبة" icon={<Globe size={15}/>}>
-                    <Field label="الدولة">
+                  <Card title={t('settings.tax.country_tax_title')} icon={<Globe size={15}/>}>
+                    <Field label={t('settings.tax.country_label')}>
                       <select value={form.country} onChange={e => handleCountryChange(e.target.value)} style={sel}>
                         {COUNTRIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                       </select>
                     </Field>
                     <div style={{ display:'flex', gap:'16px', padding:'14px', background:'var(--bg-app)', borderRadius:'12px', border:'1px solid var(--border-subtle)' }}>
                       <div>
-                        <div style={{ fontSize:'11px', color:'#94a3b8', marginBottom:'2px' }}>نسبة الضريبة المطبقة</div>
+                        <div style={{ fontSize:'11px', color:'#94a3b8', marginBottom:'2px' }}>{t('settings.tax.applied_tax')}</div>
                         <div style={{ fontSize:'26px', fontWeight:'900', color:'#3b82f6' }}>{(parseFloat(form.vat_rate||0)*100).toFixed(0)}%</div>
                       </div>
                       <div style={{ width:'1px', background:'var(--border-subtle)' }}/>
                       <div>
-                        <div style={{ fontSize:'11px', color:'#94a3b8', marginBottom:'2px' }}>العملة</div>
+                        <div style={{ fontSize:'11px', color:'#94a3b8', marginBottom:'2px' }}>{t('settings.tax.currency_label')}</div>
                         <div style={{ fontSize:'18px', fontWeight:'800', color:'var(--text-main)' }}>{form.currency}</div>
                       </div>
                     </div>
-                    <Field label="نسبة الضريبة (يدوياً)">
+                    <Field label={t('settings.tax.manual_tax')}>
                       <input type="number" min="0" max="100" step="0.5"
                         value={(parseFloat(form.vat_rate||0)*100).toFixed(1)}
                         onChange={e => u('vat_rate', (parseFloat(e.target.value)||0)/100)}
                         style={{ ...inp, width:'120px' }}/>
                     </Field>
                     <div style={{ padding:'10px 12px', background:'#fffbeb', borderRadius:'10px', border:'1px solid #fde68a', fontSize:'11px', color:'#92400e' }}>
-                      ⚠️ تغيير الضريبة يؤثر على الفواتير الجديدة فقط. لن تتغير البيانات السابقة.
+                      {t('settings.tax.tax_warning')}
                     </div>
                   </Card>
 
-                  <Card title="العملات المتعددة" icon={<Globe size={15}/>}>
+                  <Card title={t('settings.tax.multi_currency_title')} icon={<Globe size={15}/>}>
                     <div style={grid2}>
-                      <IF label="العملة الثانوية (اختياري)" value={form.secondary_currency} onChange={v => u('secondary_currency',v)} placeholder="USD"/>
-                      <IF label="سعر الصرف (1 SAR = ?)" value={form.exchange_rate} onChange={v => u('exchange_rate',v)} placeholder="0.27"/>
+                      <IF label={t('settings.tax.secondary_currency')} value={form.secondary_currency} onChange={v => u('secondary_currency',v)} placeholder="USD"/>
+                      <IF label={t('settings.tax.exchange_rate')} value={form.exchange_rate} onChange={v => u('exchange_rate',v)} placeholder="0.27"/>
                     </div>
                   </Card>
 
-                  <Card title="برنامج الولاء" icon={<Shield size={15}/>}>
+                  <Card title={t('settings.tax.loyalty_title')} icon={<Shield size={15}/>}>
                     <div style={grid2}>
-                      <Field label="نقاط مكتسبة لكل SAR مدفوع">
+                      <Field label={t('settings.tax.points_earned')}>
                         <input type="number" value={form.loyalty_rate} onChange={e => u('loyalty_rate',e.target.value)} style={inp} placeholder="10"/>
                       </Field>
-                      <Field label="قيمة النقطة عند الاستبدال (SAR)">
+                      <Field label={t('settings.tax.point_value')}>
                         <input type="number" step="0.01" value={form.loyalty_redeem_rate} onChange={e => u('loyalty_redeem_rate',e.target.value)} style={inp} placeholder="0.10"/>
                       </Field>
                     </div>
                     <div style={{ padding:'10px 12px', background:'#ecfdf5', borderRadius:'10px', fontSize:'12px', color:'#065f46' }}>
-                      💡 كل 10 ريال = {form.loyalty_rate} نقطة • كل نقطة = {form.loyalty_redeem_rate} ريال خصم
+                      {t('settings.tax.loyalty_hint').replace('{{rate}}', form.loyalty_rate).replace('{{redeem_rate}}', form.loyalty_redeem_rate)}
                     </div>
                   </Card>
                 </div>
@@ -938,28 +940,44 @@ export default function Settings() {
               ══════════════════════════════════════════ */}
               {activeTab === 'system' && (
                 <div style={colGap}>
-                  <TabHeader icon={<Server size={18}/>} title="النظام"
-                    desc="إعدادات الشبكة، الأمان، النسخ الاحتياطي، والتحديثات." />
+                  <TabHeader icon={<Server size={18}/>} title={t('settings.tabs.system')}
+                    desc={t('settings.tabs.system')} />
+
+                  <Card title={t('settings.system.language_card')} icon={<Globe size={15}/>}>
+                    <Field label={t('settings.system.language_label')}>
+                      <select 
+                        value={i18n.language} 
+                        onChange={(e) => i18n.changeLanguage(e.target.value)} 
+                        style={sel}
+                      >
+                        <option value="ar">{t('settings.system.arabic')}</option>
+                        <option value="en">{t('settings.system.english')}</option>
+                      </select>
+                      <p style={{ fontSize:'11px', color:'#64748b', marginTop:'4px' }}>
+                        {t('settings.system.language_desc')}
+                      </p>
+                    </Field>
+                  </Card>
 
                   {canAccess('settings.network') && (
-                    <Card title="الشبكة والمزامنة" icon={<Wifi size={15}/>}>
-                      <Field label="وضع الشبكة">
+                    <Card title={t('settings.system.network_sync')} icon={<Wifi size={15}/>}>
+                      <Field label={t('settings.system.network_mode')}>
                         <select value={form.network_mode} onChange={e => u('network_mode', e.target.value)} style={sel}>
-                          <option value="standalone">جهاز مستقل (Standalone)</option>
-                          <option value="master">جهاز رئيسي / سيرفر (Master Node)</option>
-                          <option value="slave">جهاز فرعي (Client/Cashier Node)</option>
+                          <option value="standalone">{t('settings.system.standalone')}</option>
+                          <option value="master">{t('settings.system.master')}</option>
+                          <option value="slave">{t('settings.system.slave')}</option>
                         </select>
                       </Field>
                       {form.network_mode === 'slave' && (
-                        <IF label="عنوان IP للجهاز الرئيسي" value={form.master_ip} onChange={v => u('master_ip',v)} placeholder="192.168.1.15"/>
+                        <IF label={t('settings.system.master_ip')} value={form.master_ip} onChange={v => u('master_ip',v)} placeholder="192.168.1.15"/>
                       )}
                       {syncStatus && (
                         <div style={{ padding:'12px', background: syncStatus.status==='sync_error' ? '#fef2f2' : '#eff6ff', borderRadius:'10px', fontSize:'12px', color: syncStatus.status==='sync_error' ? '#b91c1c' : '#1e40af' }}>
-                          <div style={{ fontWeight:'bold', marginBottom:'4px' }}>الحالة: {syncStatus.status}</div>
-                          {syncStatus.lastSync && <div>آخر مزامنة: {new Date(syncStatus.lastSync).toLocaleTimeString()}</div>}
+                          <div style={{ fontWeight:'bold', marginBottom:'4px' }}>{t('settings.system.status')} {syncStatus.status}</div>
+                          {syncStatus.lastSync && <div>{t('settings.system.last_sync')} {new Date(syncStatus.lastSync).toLocaleTimeString()}</div>}
                           {form.network_mode === 'slave' && (
                             <button onClick={() => window.api.forceSync()} style={{ marginTop:'8px', padding:'6px 12px', background:'#3b82f6', color:'white', border:'none', borderRadius:'6px', cursor:'pointer', fontFamily:'inherit' }}>
-                              فرض المزامنة الآن
+                              {t('settings.system.force_sync')}
                             </button>
                           )}
                         </div>
@@ -967,63 +985,63 @@ export default function Settings() {
                     </Card>
                   )}
 
-                  <Card title="أمان البيانات والقيود" icon={<Shield size={15}/>}>
-                    <Field label="قفل تعديل المصروفات (بالأيام)">
+                  <Card title={t('settings.system.security')} icon={<Shield size={15}/>}>
+                    <Field label={t('settings.system.expense_lock')}>
                       <input type="number" value={form.expense_lock_days} onChange={e => u('expense_lock_days',e.target.value)} style={{ ...inp, width:'120px' }} placeholder="30"/>
-                      <p style={{ fontSize:'11px', color:'#64748b', marginTop:'4px' }}>يمنع تعديل أو حذف أي مصروف مر عليه أكثر من هذه المدة.</p>
+                      <p style={{ fontSize:'11px', color:'#64748b', marginTop:'4px' }}>{t('settings.system.expense_lock_desc')}</p>
                     </Field>
                   </Card>
 
-                  <Card title="إدارة المنتجات" icon={<Package size={15}/>}>
+                  <Card title={t('settings.system.product_mgmt')} icon={<Package size={15}/>}>
                     <p style={{ fontSize:'12px', color:'#64748b', lineHeight:1.6 }}>
-                      لاستيراد المنتجات من Excel/CSV أو إضافة منتجات يدوياً، انتقل إلى صفحة إدارة المنتجات.
+                      {t('settings.system.product_mgmt_desc')}
                     </p>
                     <button onClick={() => navigate('/menu-admin')}
                       style={{ ...btnOutlineBlue, display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', width:'100%' }}>
-                      🏷️ الذهاب لإدارة المنتجات
+                      {t('settings.system.go_to_products')}
                     </button>
                   </Card>
 
-                  <Card title="النسخ الاحتياطي والأمان" icon={<Database size={15}/>}>
+                  <Card title={t('settings.system.backup')} icon={<Database size={15}/>}>
                     <p style={{ fontSize:'12px', color:'#64748b', lineHeight:1.6 }}>
-                      يقوم النظام بحفظ نسخ تلقائية. يمكنك تصديرها يدوياً لحفظها على قرص خارجي.
+                      {t('settings.system.backup_desc')}
                     </p>
                     <div style={{ display:'flex', gap:'10px' }}>
                       <button onClick={handleExportBackup} style={{ ...btnOutlineBlue, flex:1, justifyContent:'center' }}>
-                        💾 تصدير كملف
+                        {t('settings.system.export_btn')}
                       </button>
                       <button onClick={handleRestoreBackup} style={{ ...btnOutlineDanger, flex:1, justifyContent:'center' }}>
-                        🔄 استعادة نسخة
+                        {t('settings.system.restore_btn')}
                       </button>
                     </div>
                   </Card>
 
                   {/* ── License & Add-on Key Card ──────────────────────────── */}
-                  <Card title="الترخيص والإضافات" icon={<Key size={15}/>}>
+                  <Card title={t('settings.system.license')} icon={<Key size={15}/>}>
                     {/* Current license status */}
                     <div style={{ padding:'12px 14px', background: licValid ? '#f0fdf4' : '#fef2f2', borderRadius:'12px', border:`1px solid ${licValid ? '#bbf7d0' : '#fecaca'}`, display:'flex', flexDirection:'column', gap:'8px' }}>
                       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                         <span style={{ fontSize:'12px', fontWeight:'700', color: licValid ? '#15803d' : '#b91c1c' }}>
-                          {licValid ? '✅ ترخيص فعّال' : '❌ لا يوجد ترخيص صالح'}
+                          {licValid ? t('settings.system.license_valid') : t('settings.system.license_invalid')}
                         </span>
                         {licKeyType === 'addon' && (
-                          <span style={{ fontSize:'10px', fontWeight:'800', padding:'2px 8px', borderRadius:'99px', background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe' }}>مفتاح إضافة</span>
+                          <span style={{ fontSize:'10px', fontWeight:'800', padding:'2px 8px', borderRadius:'99px', background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe' }}>{t('settings.system.addon_badge')}</span>
                         )}
                       </div>
                       {licValid && (
                         <div style={{ fontSize:'12px', color:'var(--text-muted)', display:'flex', flexDirection:'column', gap:'4px' }}>
-                          <div><strong>الباقة:</strong> {licTierName} • {licBilling}</div>
+                          <div><strong>{t('settings.system.plan')}</strong> {licTierName} • {licBilling}</div>
                           {licDaysLeft !== null && licDaysLeft !== Infinity && (
-                            <div><strong>الصلاحية:</strong> {licDaysLeft} يوم متبقي</div>
+                            <div><strong>{t('settings.system.validity')}</strong> {licDaysLeft} {t('settings.system.days_left')}</div>
                           )}
-                          {licDaysLeft === Infinity && <div><strong>الصلاحية:</strong> مدى الحياة</div>}
+                          {licDaysLeft === Infinity && <div><strong>{t('settings.system.validity')}</strong> {t('settings.system.lifetime')}</div>}
                           {licAddons && licAddons.length > 0 && (
                             <div>
-                              <strong>الإضافات المفعّلة:</strong>{' '}
+                              <strong>{t('settings.system.active_addons')}</strong>{' '}
                               {licAddons.map(a => ({
-                                restaurant: '🍽️ مطعم/KDS',
-                                finance:    '📊 محاسبة',
-                                sync:       '🔄 مزامنة',
+                                restaurant: `🍽️ ${t('settings.system.restaurant')}`,
+                                finance:    `📊 ${t('settings.system.finance')}`,
+                                sync:       `🔄 ${t('settings.system.sync')}`,
                               }[a] || a)).join(' • ')}
                             </div>
                           )}
@@ -1033,15 +1051,15 @@ export default function Settings() {
 
                     {/* Add-on key input */}
                     <div style={{ padding:'12px 14px', background:'#fffbeb', borderRadius:'12px', border:'1px solid #fde68a', fontSize:'12px', color:'#92400e', lineHeight:'1.6' }}>
-                      💡 مفتاح الإضافة يمنح ميزات إضافية (مطعم، محاسبة، مزامنة) بدون تغيير الباقة الأساسية.
+                      {t('settings.system.addon_hint')}
                     </div>
 
-                    <Field label="مفتاح الإضافة (Add-on Key)">
+                    <Field label={t('settings.system.addon_key_label')}>
                       <input
                         type="text"
                         value={addonKey}
                         onChange={e => { setAddonKey(e.target.value.toUpperCase()); setAddonKeyStatus('idle'); setAddonKeyError(''); }}
-                        placeholder="A1SRFN...  (19 حرف، يبدأ بـ A)"
+                        placeholder={t('settings.system.addon_key_placeholder')}
                         dir="ltr"
                         style={{ ...inp, fontFamily:'monospace', letterSpacing:'0.06em', fontWeight:'700',
                           borderColor: addonKeyStatus === 'error' ? '#fca5a5' : addonKeyStatus === 'success' ? '#bbf7d0' : undefined }}
@@ -1053,7 +1071,7 @@ export default function Settings() {
                       )}
                       {addonKeyStatus === 'success' && addonKeyResult && (
                         <span style={{ fontSize:'11px', color:'#15803d', fontWeight:'700' }}>
-                          ✅ تم التفعيل — الإضافات النشطة: {(addonKeyResult.activeAddons || []).map(a => ({restaurant:'مطعم',finance:'محاسبة',sync:'مزامنة'}[a]||a)).join(', ')}
+                          {t('settings.system.addon_success')} {(addonKeyResult.activeAddons || []).map(a => ({restaurant: t('settings.system.restaurant'), finance: t('settings.system.finance'), sync: t('settings.system.sync')}[a]||a)).join(', ')}
                         </span>
                       )}
                     </Field>
@@ -1068,30 +1086,30 @@ export default function Settings() {
                         opacity: (!addonKey.trim() || addonKeyStatus === 'loading') ? 0.6 : 1
                       }}
                     >
-                      {addonKeyStatus === 'loading' ? '⏳ جاري التحقق...' :
-                       addonKeyStatus === 'success' ? <><CheckCircle2 size={16}/> تم التفعيل!</> :
-                       <><Key size={15}/> تفعيل مفتاح الإضافة</>}
+                      {addonKeyStatus === 'loading' ? t('settings.system.addon_verifying') :
+                       addonKeyStatus === 'success' ? <><CheckCircle2 size={16}/> {t('settings.system.addon_activated')}</> :
+                       <><Key size={15}/> {t('settings.system.addon_activate_btn')}</>}
                     </button>
                   </Card>
 
-                  <Card title="التحديثات والإصدار" icon={<Package size={15}/>}>
+                  <Card title={t('settings.system.updates')} icon={<Package size={15}/>}>
                     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                      <span style={{ fontSize:'13px', color:'var(--text-muted)' }}>الإصدار الحالي:</span>
+                      <span style={{ fontSize:'13px', color:'var(--text-muted)' }}>{t('settings.system.current_version')}</span>
                       <span style={{ fontSize:'15px', fontWeight:'800', color:'#3b82f6' }}>v{version}</span>
                     </div>
 
                     {updateStatus.status === 'idle' && (
                       <button onClick={() => window.api.checkForUpdates()}
                         style={{ ...btnOutlineBlue, width:'100%', justifyContent:'center' }}>
-                        🔍 التحقق من وجود تحديثات
+                        {t('settings.system.check_updates')}
                       </button>
                     )}
                     {updateStatus.status === 'checking' && (
-                      <div style={{ padding:'10px', textAlign:'center', fontSize:'12px', color:'var(--text-muted)' }}>جاري البحث...</div>
+                      <div style={{ padding:'10px', textAlign:'center', fontSize:'12px', color:'var(--text-muted)' }}>{t('settings.system.checking')}</div>
                     )}
                     {updateStatus.status === 'downloading' && (
                       <div style={{ padding:'10px', background:'#eff6ff', borderRadius:'10px', fontSize:'12px', color:'#1e40af' }}>
-                        جاري التحميل: {Math.floor(updateStatus.progress?.percent || 0)}%
+                        {t('settings.system.downloading')} {Math.floor(updateStatus.progress?.percent || 0)}%
                         <div style={{ width:'100%', height:'4px', background:'#dbeafe', borderRadius:'2px', marginTop:'8px', overflow:'hidden' }}>
                           <div style={{ width:`${updateStatus.progress?.percent || 0}%`, height:'100%', background:'#3b82f6' }}/>
                         </div>
@@ -1099,17 +1117,17 @@ export default function Settings() {
                     )}
                     {updateStatus.status === 'ready' && (
                       <button onClick={() => window.api.installUpdate()} style={{ ...btnGreen, width:'100%', justifyContent:'center' }}>
-                        ✨ تحديث متاح — اضغط لإعادة التشغيل والتثبيت
+                        {t('settings.system.update_ready')}
                       </button>
                     )}
                     {updateStatus.status === 'not-available' && (
                       <div style={{ padding:'10px', background:'#f0fdf4', borderRadius:'10px', fontSize:'12px', color:'#15803d', textAlign:'center' }}>
-                        ✅ النظام محدث لأحدث إصدار
+                        {t('settings.system.up_to_date')}
                       </div>
                     )}
                     {updateStatus.status === 'error' && (
                       <div style={{ padding:'10px', background:'#fef2f2', borderRadius:'10px', fontSize:'11px', color:'#b91c1c' }}>
-                        فشل التحقق: {updateStatus.error}
+                        {t('settings.system.check_failed')} {updateStatus.error}
                       </div>
                     )}
                   </Card>
@@ -1121,21 +1139,21 @@ export default function Settings() {
               ══════════════════════════════════════════ */}
               {activeTab === 'ui' && (
                 <div style={colGap}>
-                  <TabHeader icon={<Palette size={18}/>} title="واجهة المستخدم"
-                    desc="المظهر العام، صيغة التاريخ، وتفضيلات العرض." />
+                  <TabHeader icon={<Palette size={18}/>} title={t('settings.tabs.ui')}
+                    desc={t('settings.ui.desc')} />
 
-                  <Card title="المظهر والعرض" icon={<Palette size={15}/>}>
+                  <Card title={t('settings.ui.appearance_card')} icon={<Palette size={15}/>}>
                     <div style={grid2}>
-                      <Field label="الوضع الليلي (Dark Mode)">
+                      <Field label={t('settings.ui.dark_mode')}>
                         <select value={form.dark_mode} onChange={e => u('dark_mode',e.target.value)} style={sel}>
-                          <option value="false">إيقاف (الوضع الفاتح)</option>
-                          <option value="true">تفعيل (الوضع الداكن)</option>
+                          <option value="false">{t('settings.ui.light')}</option>
+                          <option value="true">{t('settings.ui.dark')}</option>
                         </select>
                       </Field>
-                      <Field label="صيغة التاريخ الافتراضية">
+                      <Field label={t('settings.ui.date_format')}>
                         <select value={form.date_format} onChange={e => u('date_format',e.target.value)} style={sel}>
-                          <option value="hijri">هجري (أم القرى)</option>
-                          <option value="gregorian">ميلادي</option>
+                          <option value="hijri">{t('settings.ui.hijri')}</option>
+                          <option value="gregorian">{t('settings.ui.gregorian')}</option>
                         </select>
                       </Field>
                     </div>
@@ -1155,10 +1173,10 @@ export default function Settings() {
               flexShrink:0
             }}>
               <span style={{ fontSize:'12px', color:'#94a3b8' }}>
-                {saved ? '✅ تم الحفظ بنجاح' : 'سيتم تطبيق التغييرات فور الحفظ'}
+                {saved ? t('settings.save_bar.success_msg') : t('settings.save_bar.pending_msg')}
               </span>
               <button onClick={save} style={{ ...btnBlue, padding:'11px 28px', fontSize:'14px', fontWeight:'800', display:'flex', alignItems:'center', gap:'8px' }}>
-                {saved ? <><CheckCircle2 size={16}/> تم الحفظ!</> : <><Save size={16}/> حفظ التغييرات</>}
+                {saved ? <><CheckCircle2 size={16}/> {t('settings.save_bar.saved_btn')}</> : <><Save size={16}/> {t('settings.save_bar.save_btn')}</>}
               </button>
             </div>
           </div>
@@ -1171,6 +1189,7 @@ export default function Settings() {
 
 // ── ZatcaQueueCard ────────────────────────────────────────────────────────
 function ZatcaQueueCard() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState(undefined); // undefined = loading, null = error/unavailable
   useEffect(() => {
     const poll = async () => {
@@ -1189,12 +1208,12 @@ function ZatcaQueueCard() {
   }, []);
 
   if (status === undefined) return (
-    <Card title="حالة قائمة الإرسال" icon={<Shield size={15}/>}>
+    <Card title={t('settings.zatca_queue.title')} icon={<Shield size={15}/>}>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'10px' }}>
         {[0,1,2].map(i => (
           <div key={i} style={{ padding:'10px', background:'var(--bg-app)', borderRadius:'10px', textAlign:'center', opacity:0.4 }}>
             <div style={{ fontSize:'20px', fontWeight:'900', color:'var(--text-muted)' }}>—</div>
-            <div style={{ fontSize:'11px', color:'var(--text-muted)', marginTop:'2px' }}>جاري التحميل</div>
+            <div style={{ fontSize:'11px', color:'var(--text-muted)', marginTop:'2px' }}>{t('settings.zatca_queue.loading')}</div>
           </div>
         ))}
       </div>
@@ -1206,12 +1225,12 @@ function ZatcaQueueCard() {
   const hasFailed = (status.rejectedCount || 0) > 0;
 
   return (
-    <Card title="حالة قائمة الإرسال" icon={<Shield size={15} color={hasFailed ? '#ef4444' : '#10b981'}/>}>
+    <Card title={t('settings.zatca_queue.title')} icon={<Shield size={15} color={hasFailed ? '#ef4444' : '#10b981'}/>}>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'10px' }}>
         {[
-          { label:'⏳ معلق', val: status.pendingCount || 0,  bg:'#fffbeb', color:'#92400e'  },
-          { label:'✅ مُرسَل', val: status.reportedCount || 0, bg:'#ecfdf5', color:'#065f46' },
-          { label:'❌ مرفوض', val: status.rejectedCount || 0, bg:'#fef2f2', color:'#b91c1c' },
+          { label: t('settings.zatca_queue.pending'), val: status.pendingCount || 0,  bg:'#fffbeb', color:'#92400e'  },
+          { label: t('settings.zatca_queue.reported'), val: status.reportedCount || 0, bg:'#ecfdf5', color:'#065f46' },
+          { label: t('settings.zatca_queue.rejected'), val: status.rejectedCount || 0, bg:'#fef2f2', color:'#b91c1c' },
         ].map(s => (
           <div key={s.label} style={{ padding:'10px 12px', background:s.bg, borderRadius:'10px', textAlign:'center' }}>
             <div style={{ fontSize:'20px', fontWeight:'900', color:s.color }}>{s.val}</div>
@@ -1222,12 +1241,12 @@ function ZatcaQueueCard() {
       {hasFailed && (
         <button onClick={() => window.api.retryZatcaQueue?.()}
           style={{ ...btnDanger, width:'100%', justifyContent:'center' }}>
-          <RefreshCw size={14}/> إعادة الإرسال الآن
+          <RefreshCw size={14}/> {t('settings.zatca_queue.retry_btn')}
         </button>
       )}
       {status.isHalted && (
         <div style={{ fontSize:'11px', color:'#b91c1c', padding:'8px 12px', background:'#fef2f2', borderRadius:'8px' }}>
-          ⛔ القائمة موقوفة بسبب رفض سابق — راجع الفواتير المرفوضة وأعد الإرسال.
+          {t('settings.zatca_queue.halted_error')}
         </div>
       )}
     </Card>

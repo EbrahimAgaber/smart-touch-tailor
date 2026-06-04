@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import AppLayout from '../components/AppLayout';
 import {
   Search, UserPlus, Phone, Mail, MapPin, Award,
-  X, Save, Edit3, ChevronDown, ChevronUp, ShoppingBag, Star
+  X, Save, Edit3, ChevronDown, ChevronUp, ShoppingBag, Star, FileText, PlusCircle
 } from 'lucide-react';
 
 const BLANK = { 
@@ -12,17 +13,11 @@ const BLANK = {
   na_district: '', na_postal: '', na_city: '', na_country: 'المملكة العربية السعودية'
 };
 
-const ID_TYPES = [
-  { value: 'CRN', label: 'السجل التجاري (CRN)' },
-  { value: 'PAS', label: 'رقم الجواز (PAS)' },
-  { value: 'MOM', label: 'رخصة البلدية (MOM)' },
-  { value: 'MLS', label: 'رخصة العمل (MLS)' },
-  { value: 'SAG', label: 'رخصة الاستثمار (SAG)' },
-  { value: 'GCC', label: 'هوية مجلس التعاون (GCC)' },
-  { value: 'OTH', label: 'أخرى (OTH)' },
-];
+// ID_TYPES labels are translated at render time via t()
+const ID_TYPE_KEYS = ['CRN','PAS','MOM','MLS','SAG','GCC','OTH'];
 
 export default function Customers() {
+  const { t } = useTranslation();
   const [customers, setCustomers] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -34,6 +29,15 @@ export default function Customers() {
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [expandedCard, setExpandedCard] = useState(null);
+
+  // Statement modal state
+  const [stmtCustomer, setStmtCustomer] = useState(null);
+  const [stmtData, setStmtData]         = useState(null);
+  const [stmtLoading, setStmtLoading]   = useState(false);
+  const [stmtPayAmt, setStmtPayAmt]     = useState('');
+  const [stmtPayNote, setStmtPayNote]   = useState('');
+  const [stmtPayLoading, setStmtPayLoading] = useState(false);
+  const [stmtPayError, setStmtPayError]  = useState('');
 
   useEffect(() => { fetchCustomers(); }, [search]);
 
@@ -66,6 +70,36 @@ export default function Customers() {
     setShowModal(true);
   };
 
+  const openStatement = async (c) => {
+    setStmtCustomer(c);
+    setStmtLoading(true);
+    setStmtData(null);
+    setStmtPayAmt('');
+    setStmtPayNote('');
+    setStmtPayError('');
+    try {
+      const data = await window.api.getCustomerStatementBasic(c.id);
+      setStmtData(data || { entries: [], balance: 0 });
+    } catch(e) { setStmtData({ entries: [], balance: 0 }); }
+    setStmtLoading(false);
+  };
+
+  const handleRecordPayment = async () => {
+    const amount = parseFloat(stmtPayAmt);
+    if (!amount || amount <= 0) { setStmtPayError('أدخل مبلغاً صحيحاً'); return; }
+    setStmtPayLoading(true);
+    setStmtPayError('');
+    try {
+      await window.api.recordCustomerPaymentBasic({ customer_id: stmtCustomer.id, amount, note: stmtPayNote });
+      setStmtPayAmt('');
+      setStmtPayNote('');
+      const data = await window.api.getCustomerStatementBasic(stmtCustomer.id);
+      setStmtData(data || { entries: [], balance: 0 });
+      fetchCustomers();
+    } catch(e) { setStmtPayError(e.message || 'فشل التسجيل'); }
+    setStmtPayLoading(false);
+  };
+
   const openHistory = async (c) => {
     setHistoryCustomer(c);
     setHistoryLoading(true);
@@ -79,7 +113,7 @@ export default function Customers() {
   const handleSave = async (e) => {
     e.preventDefault();
     setFormError('');
-    if (!form.name.trim()) return setFormError('اسم العميل مطلوب');
+    if (!form.name.trim()) return setFormError(t('customers.modal.name_required'));
     try {
       if (editingId) {
         await window.api.updateCustomer({ ...form, id: editingId });
@@ -91,34 +125,34 @@ export default function Customers() {
       setForm(BLANK);
       fetchCustomers();
     } catch (err) {
-      setFormError('حدث خطأ أثناء الحفظ: ' + (err.message || ''));
+      setFormError(t('customers.modal.save_error') + (err.message || ''));
     }
   };
 
   const tierColor = (tier) => {
-    if (tier === 'gold')   return { bg: '#fef3c7', color: '#d97706', label: '🥇 ذهبي' };
-    if (tier === 'silver') return { bg: '#f1f5f9', color: '#64748b', label: '🥈 فضي' };
-    return                        { bg: '#fef9f0', color: '#b45309', label: '🥉 برونزي' };
+    if (tier === 'gold')   return { bg: '#fef3c7', color: '#d97706', label: t('customers.tiers.gold') };
+    if (tier === 'silver') return { bg: '#f1f5f9', color:'var(--text-muted)', label: t('customers.tiers.silver') };
+    return                        { bg: '#fef9f0', color: '#b45309', label: t('customers.tiers.bronze') };
   };
 
   const totalPoints = customers.reduce((s, c) => s + (c.loyalty_points || 0), 0);
   const totalSpent  = customers.reduce((s, c) => s + (c.total_spent   || 0), 0);
 
   return (
-    <AppLayout title="مركز العملاء (CRM)">
+    <AppLayout title={t('customers.title')}>
       <div style={{ display:'flex', flexDirection:'column', gap:'24px', flex:1, minHeight:0 }}>
 
         {/* STATS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {[
-            { label:'إجمالي العملاء',     value: customers.length,             color:'#3b82f6', icon:'👥' },
-            { label:'نقاط الولاء الكلية', value: totalPoints.toLocaleString(), color:'#8b5cf6', icon:'⭐' },
-            { label:'إجمالي المشتريات',   value:`SAR ${totalSpent.toFixed(0)}`,color:'#10b981', icon:'🛍️' },
+            { label:t('customers.stats.total'),         value: customers.length,             color:'#3b82f6', icon:'👥' },
+            { label:t('customers.stats.loyalty_points'),value: totalPoints.toLocaleString(), color:'#8b5cf6', icon:'⭐' },
+            { label:t('customers.stats.total_spent'),   value:`SAR ${totalSpent.toFixed(0)}`,color:'#10b981', icon:'🛍️' },
           ].map(s => (
-            <div key={s.label} style={{ background:'white', padding:'20px', borderRadius:'20px', border:'1px solid #f1f5f9', display:'flex', alignItems:'center', gap:'16px', boxShadow:'0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div key={s.label} className="hover-lift" style={{ background:'var(--bg-card)', border:'1px solid #f1f5f9', display:'flex', alignItems:'center', gap:'16px', boxShadow:'0 1px 3px rgba(0,0,0,0.04)' }}>
               <div style={{ fontSize:'32px' }}>{s.icon}</div>
               <div>
-                <div style={{ fontSize:'12px', color:'#94a3b8', fontWeight:'700' }}>{s.label}</div>
+                <div style={{ fontSize:'12px', color:'var(--text-muted)', fontWeight:'700' }}>{s.label}</div>
                 <div style={{ fontSize:'22px', fontWeight:'900', color: s.color }}>{s.value}</div>
               </div>
             </div>
@@ -128,53 +162,53 @@ export default function Customers() {
         {/* CONTROLS */}
         <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center bg-white p-4 sm:p-5 rounded-2xl border border-subtle gap-4 shadow-sm">
           <div className="relative flex-1 max-w-md">
-            <Search size={18} style={{ position:'absolute', right:'14px', top:'50%', transform:'translateY(-50%)', color:'#94a3b8' }} />
+            <Search size={18} style={{ position:'absolute', right:'14px', top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)' }} />
             <input
               type="text" value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="ابحث بالاسم أو الجوال أو البريد..."
+              placeholder={t('customers.controls.search_placeholder')}
               style={{ width:'100%', padding:'11px 44px 11px 16px', borderRadius:'12px', border:'1px solid #e2e8f0', outline:'none', fontSize:'14px', fontFamily:'inherit' }}
             />
           </div>
           <button onClick={openAdd} style={primaryBtnStyle}>
-            <UserPlus size={18} /> إضافة عميل جديد
+            <UserPlus size={18} /> {t('customers.controls.add_btn')}
           </button>
         </div>
 
         {/* CUSTOMER TABLE */}
-        <div style={{ background:'white', borderRadius:'20px', border:'1px solid #f1f5f9', overflowY:'auto', boxShadow:'0 1px 3px rgba(0,0,0,0.04)', flex:1, minHeight:0 }}>
+        <div className="hover-lift" style={{ background:'var(--bg-card)', border:'1px solid #f1f5f9', overflowY:'auto', boxShadow:'0 1px 3px rgba(0,0,0,0.04)', flex:1, minHeight:0 }}>
           <table style={{ width:'100%', borderCollapse:'collapse', textAlign:'right' }}>
-            <thead style={{ background:'#f8fafc', borderBottom:'1px solid #f1f5f9' }}>
+            <thead style={{ background:'var(--bg-card)', borderBottom:'1px solid #f1f5f9' }}>
               <tr>
-                <th style={{ padding:'14px 18px', fontSize:'12px', color:'#94a3b8', fontWeight:'700' }}>العميل</th>
-                <th style={{ padding:'14px 18px', fontSize:'12px', color:'#94a3b8', fontWeight:'700' }}>الجوال</th>
-                <th style={{ padding:'14px 18px', fontSize:'12px', color:'#94a3b8', fontWeight:'700' }} className="max-md:hidden">نقاط الولاء</th>
-                <th style={{ padding:'14px 18px', fontSize:'12px', color:'#94a3b8', fontWeight:'700' }} className="max-lg:hidden">المستوى</th>
-                <th style={{ padding:'14px 18px', fontSize:'12px', color:'#94a3b8', fontWeight:'700' }} className="max-md:hidden">إجمالي الإنفاق</th>
-                <th style={{ padding:'14px 18px', fontSize:'12px', color:'#94a3b8', fontWeight:'700' }} className="max-xl:hidden">تاريخ التسجيل</th>
-                <th style={{ padding:'14px 18px', fontSize:'12px', color:'#94a3b8', fontWeight:'700' }}>إجراءات</th>
+                <th style={{ padding:'16px 20px', fontSize:'12px', color:'var(--text-muted)', fontWeight:'700' }}>{t('customers.table.customer')}</th>
+                <th style={{ padding:'16px 20px', fontSize:'12px', color:'var(--text-muted)', fontWeight:'700' }}>{t('customers.table.phone')}</th>
+                <th style={{ padding:'16px 20px', fontSize:'12px', color:'var(--text-muted)', fontWeight:'700' }} className="max-md:hidden">{t('customers.table.loyalty_points')}</th>
+                <th style={{ padding:'16px 20px', fontSize:'12px', color:'var(--text-muted)', fontWeight:'700' }} className="max-lg:hidden">{t('customers.table.tier')}</th>
+                <th style={{ padding:'16px 20px', fontSize:'12px', color:'var(--text-muted)', fontWeight:'700' }} className="max-md:hidden">{t('customers.table.total_spent')}</th>
+                <th style={{ padding:'16px 20px', fontSize:'12px', color:'var(--text-muted)', fontWeight:'700' }} className="max-xl:hidden">{t('customers.table.registered')}</th>
+                <th style={{ padding:'16px 20px', fontSize:'12px', color:'var(--text-muted)', fontWeight:'700' }}>{t('customers.table.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} style={{ padding:'60px', textAlign:'center', color:'#94a3b8' }}>جاري التحميل...</td></tr>
+                <tr><td colSpan={7} style={{ padding:'60px', textAlign:'center', color:'var(--text-muted)' }}>{t('customers.table.loading')}</td></tr>
               ) : customers.length === 0 ? (
-                <tr><td colSpan={7} style={{ padding:'60px', textAlign:'center', color:'#94a3b8' }}>
+                <tr><td colSpan={7} style={{ padding:'60px', textAlign:'center', color:'var(--text-muted)' }}>
                   <div style={{ fontSize:'40px', marginBottom:'12px', opacity:.4 }}>👥</div>
-                  لا يوجد عملاء{search ? ' مطابقون للبحث' : ' حتى الآن'}
+                  {search ? t('customers.table.no_results') : t('customers.table.no_customers')}
                 </td></tr>
               ) : customers.map(c => {
                 const tier = tierColor(c.tier);
                 return (
-                  <tr key={c.id} style={{ borderBottom:'1px solid #f8fafc' }}>
+                  <tr key={c.id} className="hover-lift" style={{ borderBottom:'1px solid #f8fafc' }}>
                     <td style={tdStyle}>
                       <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
                         <div style={{ width:'38px', height:'38px', borderRadius:'50%', background:'#eff6ff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'800', color:'#3b82f6', fontSize:'16px', border:'2px solid #dbeafe', flexShrink:0 }}>
                           {c.name.charAt(0)}
                         </div>
                         <div>
-                          <div style={{ fontWeight:'700', color:'#0f172a' }}>{c.name}</div>
-                          {c.email && <div style={{ fontSize:'11px', color:'#94a3b8' }}>{c.email}</div>}
+                          <div style={{ fontWeight:'700', color:'var(--text-main)' }}>{c.name}</div>
+                          {c.email && <div style={{ fontSize:'11px', color:'var(--text-muted)' }}>{c.email}</div>}
                         </div>
                       </div>
                     </td>
@@ -182,7 +216,7 @@ export default function Customers() {
                       <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
                         {c.phone || <span style={{ color:'#cbd5e1' }}>—</span>}
                         {c.phone && (
-                          <button onClick={() => window.api?.openExternal?.(`https://wa.me/${c.phone.replace(/\D/g,'')}`)} style={{ background:'transparent', border:'none', cursor:'pointer', color:'#10b981', display:'flex', alignItems:'center', padding:'2px' }} title="مراسلة عبر واتساب">
+                          <button onClick={() => window.api?.openExternal?.(`https://wa.me/${c.phone.replace(/\D/g,'')}`)} style={{ background:'transparent', border:'none', cursor:'pointer', color:'#10b981', display:'flex', alignItems:'center', padding:'2px' }} title={t('customers.table.whatsapp_title')}>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/>
                             </svg>
@@ -198,16 +232,19 @@ export default function Customers() {
                     <td style={tdStyle} className="max-lg:hidden">
                       <span style={{ background: tier.bg, color: tier.color, padding:'4px 10px', borderRadius:'99px', fontSize:'11px', fontWeight:'700' }}>{tier.label}</span>
                     </td>
-                    <td style={{ ...tdStyle, fontWeight:'700', color:'#10b981' }} className="max-md:hidden">SAR {(c.total_spent || 0).toFixed(0)}</td>
-                    <td style={{ ...tdStyle, color:'#94a3b8', fontSize:'12px' }} className="max-xl:hidden">
+                    <td style={{ ...tdStyle, fontWeight:'700', color:'#10b981', fontFamily: "'Inter', sans-serif" }} className="max-md:hidden">SAR {(c.total_spent || 0).toFixed(0)}</td>
+                    <td style={{ ...tdStyle, color:'var(--text-muted)', fontSize:'12px' }} className="max-xl:hidden">
                       {c.created_at ? new Date(c.created_at).toLocaleDateString('ar-SA') : '—'}
                     </td>
                     <td style={tdStyle}>
                       <div style={{ display:'flex', gap:'6px' }}>
-                        <button onClick={() => openHistory(c)} style={iconBtn('#3b82f6','#eff6ff')} title="سجل الشراء">
+                        <button onClick={() => openStatement(c)} style={iconBtn('#8b5cf6','#f5f3ff')} title="كشف حساب">
+                          <FileText size={15} />
+                        </button>
+                        <button onClick={() => openHistory(c)} style={iconBtn('#3b82f6','#eff6ff')} title={t('customers.table.purchase_history_title')}>
                           <ShoppingBag size={15} />
                         </button>
-                        <button onClick={() => openEdit(c)} style={iconBtn('#f59e0b','#fef3c7')} title="تعديل">
+                        <button onClick={() => openEdit(c)} style={iconBtn('#f59e0b','#fef3c7')} title={t('customers.table.edit_title')}>
                           <Edit3 size={15} />
                         </button>
                       </div>
@@ -220,13 +257,140 @@ export default function Customers() {
         </div>
       </div>
 
+      {/* ── CUSTOMER STATEMENT MODAL ────────────────── */}
+      {stmtCustomer && (
+        <div style={overlayStyle} onClick={e => e.target === e.currentTarget && setStmtCustomer(null)}>
+          <div style={{ background:'var(--bg-card)', borderRadius:'24px', maxWidth:'660px', width:'95%', maxHeight:'90vh', display:'flex', flexDirection:'column', overflow:'hidden' }} dir="rtl">
+
+            {/* Header */}
+            <div style={{ padding:'20px 28px', borderBottom:'1px solid #f1f5f9', display:'flex', justifyContent:'space-between', alignItems:'center', background:'linear-gradient(135deg,#f5f3ff,#ede9fe30)' }}>
+              <div>
+                <h3 style={{ fontWeight:'900', fontSize:'18px', margin:0, color:'var(--text-main)', display:'flex', alignItems:'center', gap:'8px' }}>
+                  <FileText size={18} color="#8b5cf6" /> كشف حساب — {stmtCustomer.name}
+                </h3>
+                {stmtCustomer.phone && <div style={{ fontSize:'12px', color:'var(--text-muted)', marginTop:'4px' }}>📞 {stmtCustomer.phone}</div>}
+              </div>
+              <button onClick={() => setStmtCustomer(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)' }}><X size={22} /></button>
+            </div>
+
+            {/* Balance banner */}
+            {stmtData && (
+              <div style={{ padding:'12px 28px', background: stmtData.balance > 0 ? '#fef2f2' : '#ecfdf5', borderBottom:'1px solid #f1f5f9', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ fontWeight:'700', fontSize:'13px', color: stmtData.balance > 0 ? '#dc2626' : '#10b981' }}>
+                  {stmtData.balance > 0 ? '💳 الرصيد المستحق (دين)' : '✅ لا يوجد رصيد مستحق'}
+                </span>
+                <span style={{ fontWeight:'900', fontSize:'22px', color: stmtData.balance > 0 ? '#dc2626' : '#10b981', fontFamily:"'Inter',sans-serif" }}>
+                  SAR {parseFloat(stmtData.balance || 0).toFixed(2)}
+                </span>
+              </div>
+            )}
+
+            {/* Timeline table */}
+            <div style={{ flex:1, overflowY:'auto', padding:'12px 28px' }}>
+              {stmtLoading ? (
+                <div style={{ textAlign:'center', padding:'40px', color:'var(--text-muted)' }}>⏳ جاري التحميل...</div>
+              ) : !stmtData || stmtData.entries.length === 0 ? (
+                <div style={{ textAlign:'center', padding:'50px', color:'var(--text-muted)' }}>
+                  <div style={{ fontSize:'36px', marginBottom:'10px', opacity:.4 }}>📋</div>
+                  لا توجد حركات مسجّلة
+                </div>
+              ) : (
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'13px' }}>
+                  <thead>
+                    <tr style={{ borderBottom:'2px solid #f1f5f9' }}>
+                      <th style={{ padding:'8px 10px', textAlign:'right', color:'var(--text-muted)', fontWeight:'700', fontSize:'11px' }}>التاريخ</th>
+                      <th style={{ padding:'8px 10px', textAlign:'right', color:'var(--text-muted)', fontWeight:'700', fontSize:'11px' }}>البيان</th>
+                      <th style={{ padding:'8px 10px', textAlign:'center', color:'#dc2626', fontWeight:'700', fontSize:'11px' }}>مدين (SAR)</th>
+                      <th style={{ padding:'8px 10px', textAlign:'center', color:'#10b981', fontWeight:'700', fontSize:'11px' }}>دائن (SAR)</th>
+                      <th style={{ padding:'8px 10px', textAlign:'center', color:'var(--text-muted)', fontWeight:'700', fontSize:'11px' }}>الرصيد</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stmtData.entries.map((row, i) => (
+                      <tr key={i} style={{ borderBottom:'1px solid #f8fafc', background: i % 2 === 0 ? 'transparent' : '#fafbfc' }}>
+                        <td style={{ padding:'10px', color:'var(--text-muted)', fontSize:'12px', whiteSpace:'nowrap' }}>
+                          {row.date ? new Date(row.date).toLocaleDateString('ar-SA') : '—'}
+                        </td>
+                        <td style={{ padding:'10px', color:'var(--text-main)', fontWeight:'600' }}>
+                          {row.type === 'payment' ? (
+                            <span style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                              <span style={{ background:'#ecfdf5', color:'#10b981', borderRadius:'6px', padding:'2px 8px', fontSize:'10px', fontWeight:'800' }}>دفعة</span>
+                              {row.note || 'تحصيل دفعة'}
+                            </span>
+                          ) : (
+                            <span style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                              <span style={{ background:'#fef2f2', color:'#dc2626', borderRadius:'6px', padding:'2px 8px', fontSize:'10px', fontWeight:'800' }}>فاتورة</span>
+                              {row.invoice_number || row.reference || `#${row.id}`}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding:'10px', textAlign:'center', fontWeight:'700', color:'#dc2626', fontFamily:"'Inter',sans-serif" }}>
+                          {row.debit > 0 ? parseFloat(row.debit).toFixed(2) : '—'}
+                        </td>
+                        <td style={{ padding:'10px', textAlign:'center', fontWeight:'700', color:'#10b981', fontFamily:"'Inter',sans-serif" }}>
+                          {row.credit > 0 ? parseFloat(row.credit).toFixed(2) : '—'}
+                        </td>
+                        <td style={{ padding:'10px', textAlign:'center', fontWeight:'800', color: parseFloat(row.running_balance||0) > 0.005 ? '#dc2626' : '#10b981', fontFamily:"'Inter',sans-serif" }}>
+                          {parseFloat(row.running_balance || 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Receive Payment form */}
+            <div style={{ padding:'14px 28px 18px', borderTop:'1px solid #f1f5f9', background:'#f8fafc' }}>
+              <div style={{ fontSize:'13px', fontWeight:'800', color:'#8b5cf6', marginBottom:'10px', display:'flex', alignItems:'center', gap:'6px' }}>
+                <PlusCircle size={15} /> تحصيل دفعة
+              </div>
+              {stmtPayError && (
+                <div style={{ padding:'8px 12px', background:'#fef2f2', border:'1px solid #fecaca', borderRadius:'8px', color:'#dc2626', fontSize:'12px', fontWeight:'700', marginBottom:'8px' }}>
+                  ⚠️ {stmtPayError}
+                </div>
+              )}
+              <div style={{ display:'flex', gap:'8px', alignItems:'flex-end' }}>
+                <div style={{ flex:'0 0 130px' }}>
+                  <label style={{ display:'block', fontSize:'11px', fontWeight:'700', color:'var(--text-muted)', marginBottom:'4px' }}>المبلغ (ر.س)</label>
+                  <input
+                    type="number" min="0" step="0.01"
+                    value={stmtPayAmt}
+                    onChange={e => setStmtPayAmt(e.target.value)}
+                    placeholder="0.00"
+                    style={{ width:'100%', padding:'10px 12px', borderRadius:'10px', border:'1px solid #e2e8f0', fontSize:'15px', fontWeight:'700', fontFamily:"'Inter',sans-serif", outline:'none', boxSizing:'border-box' }}
+                  />
+                </div>
+                <div style={{ flex:1 }}>
+                  <label style={{ display:'block', fontSize:'11px', fontWeight:'700', color:'var(--text-muted)', marginBottom:'4px' }}>ملاحظة (اختياري)</label>
+                  <input
+                    type="text"
+                    value={stmtPayNote}
+                    onChange={e => setStmtPayNote(e.target.value)}
+                    placeholder="مثل: دفعة نقدية، تحويل بنكي..."
+                    style={{ width:'100%', padding:'10px 12px', borderRadius:'10px', border:'1px solid #e2e8f0', fontSize:'13px', fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                  />
+                </div>
+                <button
+                  onClick={handleRecordPayment}
+                  disabled={stmtPayLoading || !stmtPayAmt}
+                  style={{ padding:'10px 20px', flexShrink:0, background: stmtPayLoading || !stmtPayAmt ? '#e2e8f0' : 'linear-gradient(135deg,#8b5cf6,#7c3aed)', color: stmtPayLoading || !stmtPayAmt ? '#94a3b8' : 'white', border:'none', borderRadius:'10px', fontWeight:'800', fontSize:'13px', cursor: stmtPayLoading || !stmtPayAmt ? 'not-allowed' : 'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:'6px' }}>
+                  <Save size={14} /> {stmtPayLoading ? '...' : 'تسجيل'}
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {/* ── ADD / EDIT MODAL ─────────────────────── */}
       {showModal && (
         <div style={overlayStyle}>
-          <div style={{ background:'white', borderRadius:'24px', maxWidth:'560px', width:'95%', maxHeight:'90vh', display:'flex', flexDirection:'column', overflow:'hidden' }} dir="rtl">
+          <div style={{ background:'var(--bg-card)', borderRadius:'24px', maxWidth:'560px', width:'95%', maxHeight:'90vh', display:'flex', flexDirection:'column', overflow:'hidden' }} dir="rtl">
             <div style={{ padding:'24px 32px', display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'1px solid #f1f5f9', flexShrink: 0 }}>
-              <h2 style={{ fontWeight:'900', fontSize:'20px', margin:0 }}>{editingId ? 'تعديل بيانات العميل' : 'إضافة عميل جديد'}</h2>
-              <button onClick={() => setShowModal(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8' }}><X size={22} /></button>
+              <h2 style={{ fontWeight:'900', fontSize:'20px', margin:0 }}>{editingId ? t('customers.modal.edit_title') : t('customers.modal.add_title')}</h2>
+              <button onClick={() => setShowModal(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)' }}><X size={22} /></button>
             </div>
             
             <form onSubmit={handleSave} style={{ display:'flex', flexDirection:'column', overflow:'hidden', flex: 1 }}>
@@ -236,50 +400,50 @@ export default function Customers() {
                     ⚠️ {formError}
                   </div>
                 )}
-                <CField label="اسم العميل *" value={form.name} onChange={v => setForm({...form, name: v})} placeholder="مثال: سلطان الزهراني" required />
+                <CField label={t('customers.modal.name_label')} value={form.name} onChange={v => setForm({...form, name: v})} placeholder={t('customers.modal.name_placeholder')} required />
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px' }}>
-                  <CField label="رقم الجوال" value={form.phone} onChange={v => setForm({...form, phone: v})} placeholder="05XXXXXXXX" />
-                  <CField label="الرقم الضريبي (B2B)" value={form.tax_id} onChange={v => setForm({...form, tax_id: v})} placeholder="رقم تسجيل الضريبة" />
+                  <CField label={t('customers.modal.phone_label')} value={form.phone} onChange={v => setForm({...form, phone: v})} placeholder="05XXXXXXXX" />
+                  <CField label={t('customers.modal.tax_id_label')} value={form.tax_id} onChange={v => setForm({...form, tax_id: v})} placeholder={t('customers.modal.tax_id_placeholder')} />
                 </div>
                 
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px' }}>
                   <div>
-                    <label style={cLabel}>معرف آخر</label>
+                    <label style={cLabel}>{t('customers.modal.other_id_label')}</label>
                     <select value={form.id_type} onChange={e => setForm({...form, id_type: e.target.value})} style={cInput}>
-                      {ID_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                      {ID_TYPE_KEYS.map(k => <option key={k} value={k}>{t(`customers.id_types.${k}`)}</option>)}
                     </select>
                   </div>
-                  <CField label="رقم المعرف" value={form.id_value} onChange={v => setForm({...form, id_value: v})} placeholder="رقم المعرف..." />
+                  <CField label={t('customers.modal.id_value_label')} value={form.id_value} onChange={v => setForm({...form, id_value: v})} placeholder={t('customers.modal.id_value_placeholder')} />
                 </div>
                 
-                <CField label="البريد الإلكتروني" type="email" value={form.email} onChange={v => setForm({...form, email: v})} placeholder="example@email.com" />
+                <CField label={t('customers.modal.email_label')} type="email" value={form.email} onChange={v => setForm({...form, email: v})} placeholder="example@email.com" />
                 <div>
-                  <label style={cLabel}>العنوان الكلاسيكي</label>
+                  <label style={cLabel}>{t('customers.modal.address_label')}</label>
                   <textarea value={form.address} onChange={e => setForm({...form, address: e.target.value})}
-                    style={{ ...cInput, minHeight:'70px', resize:'vertical' }} placeholder="المدينة، الحي..." />
+                    style={{ ...cInput, minHeight:'70px', resize:'vertical' }} placeholder={t('customers.modal.address_placeholder')} />
                 </div>
 
                 {/* National Address section */}
                 <div style={{ borderTop:'1px dashed #e2e8f0', paddingTop:'16px', marginTop:'4px' }}>
                   <div style={{ fontSize:'12px', fontWeight:'800', color:'#3b82f6', marginBottom:'12px', display:'flex', alignItems:'center', gap:'6px' }}>
-                    📍 العنوان الوطني (يستخدم للفواتير الضريبية B2B)
+                    {t('customers.modal.na_title')}
                   </div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' }}>
-                    <CField label="العنوان المختصر" value={form.na_short} onChange={v => setForm({...form, na_short: v})} placeholder="مثال: TTPA8255" />
-                    <CField label="رقم المبنى" value={form.na_building} onChange={v => setForm({...form, na_building: v})} placeholder="8255" />
-                    <CField label="اسم الشارع" value={form.na_street} onChange={v => setForm({...form, na_street: v})} placeholder="الحارث بن عمير" />
-                    <CField label="الرقم الفرعي" value={form.na_secondary} onChange={v => setForm({...form, na_secondary: v})} placeholder="2660" />
-                    <CField label="الحي" value={form.na_district} onChange={v => setForm({...form, na_district: v})} placeholder="حي الحمراء" />
-                    <CField label="الرمز البريدي" value={form.na_postal} onChange={v => setForm({...form, na_postal: v})} placeholder="29763" />
-                    <CField label="المدينة" value={form.na_city} onChange={v => setForm({...form, na_city: v})} placeholder="الرياض" />
-                    <CField label="الدولة" value={form.na_country} onChange={v => setForm({...form, na_country: v})} placeholder="المملكة العربية السعودية" />
+                    <CField label={t('customers.modal.na_short')} value={form.na_short} onChange={v => setForm({...form, na_short: v})} placeholder="TTPA8255" />
+                    <CField label={t('customers.modal.na_building')} value={form.na_building} onChange={v => setForm({...form, na_building: v})} placeholder="8255" />
+                    <CField label={t('customers.modal.na_street')} value={form.na_street} onChange={v => setForm({...form, na_street: v})} placeholder="الحارث بن عمير" />
+                    <CField label={t('customers.modal.na_secondary')} value={form.na_secondary} onChange={v => setForm({...form, na_secondary: v})} placeholder="2660" />
+                    <CField label={t('customers.modal.na_district')} value={form.na_district} onChange={v => setForm({...form, na_district: v})} placeholder="حي الحمراء" />
+                    <CField label={t('customers.modal.na_postal')} value={form.na_postal} onChange={v => setForm({...form, na_postal: v})} placeholder="29763" />
+                    <CField label={t('customers.modal.na_city')} value={form.na_city} onChange={v => setForm({...form, na_city: v})} placeholder="الرياض" />
+                    <CField label={t('customers.modal.na_country')} value={form.na_country} onChange={v => setForm({...form, na_country: v})} placeholder="المملكة العربية السعودية" />
                   </div>
                 </div>
 
               </div>
-              <div style={{ padding:'16px 32px', borderTop:'1px solid #f1f5f9', background:'#f8fafc', flexShrink: 0 }}>
+              <div style={{ padding:'16px 32px', borderTop:'1px solid #f1f5f9', background:'var(--bg-card)', flexShrink: 0 }}>
                 <button type="submit" style={{ width:'100%', padding:'14px', background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'white', border:'none', borderRadius:'14px', fontWeight:'800', fontSize:'15px', cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>
-                  <Save size={17} /> {editingId ? 'حفظ التعديلات' : 'إضافة العميل'}
+                  <Save size={17} /> {editingId ? t('customers.modal.update_btn') : t('customers.modal.save_btn')}
                 </button>
               </div>
             </form>
@@ -290,36 +454,36 @@ export default function Customers() {
       {/* ── PURCHASE HISTORY MODAL ───────────────── */}
       {historyCustomer && (
         <div style={overlayStyle} onClick={e => e.target === e.currentTarget && setHistoryCustomer(null)}>
-          <div style={{ background:'white', borderRadius:'24px', maxWidth:'620px', width:'95%', maxHeight:'85vh', display:'flex', flexDirection:'column', overflow:'hidden' }} dir="rtl">
-            <div style={{ padding:'24px', borderBottom:'1px solid #f1f5f9', display:'flex', justifyContent:'space-between', alignItems:'center', background:'#f8fafc' }}>
+          <div style={{ background:'var(--bg-card)', borderRadius:'24px', maxWidth:'620px', width:'95%', maxHeight:'85vh', display:'flex', flexDirection:'column', overflow:'hidden' }} dir="rtl">
+            <div style={{ padding:'24px', borderBottom:'1px solid #f1f5f9', display:'flex', justifyContent:'space-between', alignItems:'center', background:'var(--bg-card)' }}>
               <div>
-                <h3 style={{ fontWeight:'800', fontSize:'18px' }}>سجل مشتريات: {historyCustomer.name}</h3>
-                <div style={{ fontSize:'12px', color:'#94a3b8', marginTop:'4px' }}>إجمالي الإنفاق: SAR {(historyCustomer.total_spent||0).toFixed(2)} • النقاط: {historyCustomer.loyalty_points}</div>
+                <h3 style={{ fontWeight:'800', fontSize:'18px' }}>{t('customers.history.title', { name: historyCustomer.name })}</h3>
+                <div style={{ fontSize:'12px', color:'var(--text-muted)', marginTop:'4px' }}>{t('customers.history.subtitle', { spent: (historyCustomer.total_spent||0).toFixed(2), points: historyCustomer.loyalty_points })}</div>
               </div>
-              <button onClick={() => setHistoryCustomer(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8' }}><X size={22} /></button>
+              <button onClick={() => setHistoryCustomer(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)' }}><X size={22} /></button>
             </div>
             <div style={{ flex:1, overflowY:'auto', padding:'20px' }}>
               {historyLoading ? (
-                <div style={{ textAlign:'center', padding:'40px', color:'#94a3b8' }}>جاري التحميل...</div>
+                <div style={{ textAlign:'center', padding:'40px', color:'var(--text-muted)' }}>{t('customers.history.loading')}</div>
               ) : history.length === 0 ? (
-                <div style={{ textAlign:'center', padding:'60px', color:'#94a3b8' }}>
+                <div style={{ textAlign:'center', padding:'60px', color:'var(--text-muted)' }}>
                   <div style={{ fontSize:'40px', marginBottom:'12px', opacity:.4 }}>🛒</div>
-                  لا توجد مشتريات مسجلة لهذا العميل
+                  {t('customers.history.no_purchases')}
                 </div>
               ) : history.map((sale, i) => (
                 <div key={i} style={{ border:'1px solid #f1f5f9', borderRadius:'14px', marginBottom:'12px', overflow:'hidden' }}>
-                  <div style={{ padding:'14px 16px', background:'#f8fafc', display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer' }}
+                  <div style={{ padding:'14px 16px', background:'var(--bg-card)', display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer' }}
                     onClick={() => setExpandedCard(expandedCard === i ? null : i)}>
                     <div>
                       <div style={{ fontWeight:'700', fontSize:'14px', color:'#3b82f6', fontFamily:'monospace' }}>#{sale.invoice}</div>
-                      <div style={{ fontSize:'12px', color:'#94a3b8', marginTop:'2px' }}>
+                      <div style={{ fontSize:'12px', color:'var(--text-muted)', marginTop:'2px' }}>
                         {sale.sale_date ? new Date(sale.sale_date).toLocaleDateString('ar-SA') : '—'} • {sale.payment}
                       </div>
                     </div>
                     <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
-                      <span style={{ fontWeight:'800', color:'#10b981' }}>SAR {parseFloat(sale.total||0).toFixed(2)}</span>
+                      <span style={{ fontWeight:'800', color:'#10b981' , fontFamily: "'Inter', sans-serif"}}>SAR {parseFloat(sale.total||0).toFixed(2)}</span>
                       <span style={{ background: sale.status==='void' ? '#fef2f2' : '#ecfdf5', color: sale.status==='void' ? '#ef4444' : '#10b981', padding:'3px 8px', borderRadius:'99px', fontSize:'11px', fontWeight:'700' }}>
-                        {sale.status==='void' ? 'ملغى' : 'مكتمل'}
+                        {sale.status==='void' ? t('customers.history.void') : t('customers.history.completed')}
                       </span>
                       {expandedCard === i ? <ChevronUp size={16} color="#94a3b8" /> : <ChevronDown size={16} color="#94a3b8" />}
                     </div>
@@ -328,8 +492,8 @@ export default function Customers() {
                     <div style={{ padding:'12px 16px' }}>
                       {(sale.items || []).map((it, j) => (
                         <div key={j} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px dashed #f1f5f9', fontSize:'13px' }}>
-                          <span style={{ color:'#475569' }}>{it.Name} × {it.Qty}</span>
-                          <span style={{ fontWeight:'700' }}>SAR {(it.Price * it.Qty).toFixed(2)}</span>
+                          <span style={{ color:'var(--text-muted)' }}>{it.Name} × {it.Qty}</span>
+                          <span style={{ fontWeight:'700' , fontFamily: "'Inter', sans-serif"}}>SAR {(it.Price * it.Qty).toFixed(2)}</span>
                         </div>
                       ))}
                     </div>
@@ -354,9 +518,9 @@ function CField({ label, value, onChange, type='text', placeholder='', required=
   );
 }
 
-const tdStyle = { padding:'14px 18px', fontSize:'13px', color:'#334155' };
+const tdStyle = { padding:'16px 20px', fontSize:'13px', color:'var(--text-main)' };
 const primaryBtnStyle = { background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'white', border:'none', padding:'11px 22px', borderRadius:'12px', fontWeight:'700', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px', fontSize:'14px', fontFamily:'inherit' };
 const overlayStyle = { position:'fixed', inset:0, background:'rgba(15,23,42,0.5)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 };
 const iconBtn = (color, bg) => ({ padding:'7px', background: bg, border:'none', color, borderRadius:'9px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' });
-const cLabel = { display:'block', fontSize:'13px', fontWeight:'700', color:'#64748b', marginBottom:'6px' };
-const cInput = { width:'100%', padding:'12px 14px', borderRadius:'12px', border:'1px solid #e2e8f0', fontSize:'14px', outline:'none', fontFamily:'inherit', background:'#fcfdfe', boxSizing:'border-box' };
+const cLabel = { display:'block', fontSize:'13px', fontWeight:'700', color:'var(--text-muted)', marginBottom:'6px' };
+const cInput = { width:'100%', padding:'16px 20px', borderRadius:'12px', border:'1px solid #e2e8f0', fontSize:'14px', outline:'none', fontFamily:'inherit', background:'var(--bg-card)', boxSizing:'border-box' };

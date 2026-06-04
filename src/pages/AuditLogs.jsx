@@ -56,7 +56,7 @@ function DiffView({ oldValue, newValue, fieldName }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {changedKeys.map(key => (
           <div key={key} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 28px 1fr', gap: '6px', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', textAlign: 'left' }}>{key}</span>
+            <span style={{ fontSize: '11px', fontWeight: '700', color:'var(--text-muted)', textAlign: 'left' }}>{key}</span>
             <ValueBadge value={String(oldParsed[key] ?? '')} type="old" />
             <ArrowRight size={12} color="#94a3b8" style={{ justifySelf: 'center' }} />
             <ValueBadge value={String(newParsed[key] ?? '')} type="new" />
@@ -91,7 +91,7 @@ function ValueBadge({ value, type, label }) {
       overflow: 'hidden'
     }}>
       {label && (
-        <div style={{ fontSize: '9px', fontWeight: '800', color: '#94a3b8', letterSpacing: '0.5px', marginBottom: '2px', textTransform: 'uppercase' }}>
+        <div style={{ fontSize: '9px', fontWeight: '800', color:'var(--text-muted)', letterSpacing: '0.5px', marginBottom: '2px', textTransform: 'uppercase' }}>
           {label}
         </div>
       )}
@@ -133,10 +133,10 @@ function LogRow({ log }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Clock size={13} color="#94a3b8" />
             <div>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: '#334155' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color:'var(--text-main)' }}>
                 {new Date(log.timestamp).toLocaleDateString('ar-SA')}
               </div>
-              <div style={{ fontSize: '10px', color: '#94a3b8' }}>
+              <div style={{ fontSize: '10px', color:'var(--text-muted)' }}>
                 {new Date(log.timestamp).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}
               </div>
             </div>
@@ -150,11 +150,11 @@ function LogRow({ log }) {
               <User size={13} color="#3b82f6" />
             </div>
             <div>
-              <div style={{ fontSize: '12px', fontWeight: '800', color: '#1e293b' }}>
+              <div style={{ fontSize: '12px', fontWeight: '800', color:'var(--text-main)' }}>
                 {log.user_name || log.user_name_from_staff || `#${log.user_id || '?'}`}
               </div>
               {log.entity_type && (
-                <div style={{ fontSize: '10px', color: '#94a3b8' }}>{log.entity_type}</div>
+                <div style={{ fontSize: '10px', color:'var(--text-muted)' }}>{log.entity_type}</div>
               )}
             </div>
           </div>
@@ -162,7 +162,7 @@ function LogRow({ log }) {
 
         {/* Action badge */}
         <td style={td}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '20px', background: meta.bg, border: `1px solid ${meta.border}` }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius:'20px', background: meta.bg, border: `1px solid ${meta.border}` }}>
             <span style={{ fontSize: '12px' }}>{meta.icon}</span>
             <span style={{ fontSize: '11px', fontWeight: '800', color: meta.text }}>{log.action}</span>
           </div>
@@ -180,11 +180,11 @@ function LogRow({ log }) {
             {log.field_name && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Tag size={10} color="#94a3b8" />
-                <span style={{ fontSize: '11px', color: '#64748b' }}>{log.field_name}</span>
+                <span style={{ fontSize: '11px', color:'var(--text-muted)' }}>{log.field_name}</span>
               </div>
             )}
             {!log.entity_reference && !log.field_name && log.details && (
-              <span style={{ fontSize: '11px', color: '#64748b', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '11px', color:'var(--text-muted)', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {log.details}
               </span>
             )}
@@ -203,7 +203,7 @@ function LogRow({ log }) {
         {/* Expand toggle */}
         <td style={{ ...td, width: 40, textAlign: 'center' }}>
           {hasDetails && (
-            <div style={{ color: '#94a3b8' }}>
+            <div style={{ color:'var(--text-muted)' }}>
               {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
             </div>
           )}
@@ -228,9 +228,9 @@ function LogRow({ log }) {
 
               {/* Details text */}
               {log.details && (
-                <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: '800', color: '#94a3b8', marginBottom: '6px', letterSpacing: '0.5px' }}>التفاصيل</div>
-                  <div style={{ fontSize: '12px', color: '#475569', lineHeight: '1.6', direction: 'ltr', textAlign: 'left', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                <div style={{ background:'var(--bg-card)', border: '1px solid #e2e8f0', borderRadius: '10px', padding:'16px 20px' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '800', color:'var(--text-muted)', marginBottom: '6px', letterSpacing: '0.5px' }}>التفاصيل</div>
+                  <div style={{ fontSize: '12px', color:'var(--text-muted)', lineHeight: '1.6', direction: 'ltr', textAlign: 'left', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                     {log.details}
                   </div>
                 </div>
@@ -238,10 +238,10 @@ function LogRow({ log }) {
 
               {/* Before / After diff panel */}
               {hasDiff && (
-                <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px 16px' }}>
+                <div style={{ background:'var(--bg-card)', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px 16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
                     <div style={{ width: 4, height: 16, background: '#3b82f6', borderRadius: 2 }} />
-                    <span style={{ fontSize: '11px', fontWeight: '800', color: '#334155', letterSpacing: '0.3px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '800', color:'var(--text-main)', letterSpacing: '0.3px' }}>
                       قبل / بعد التغيير
                     </span>
                   </div>
@@ -262,10 +262,10 @@ function LogRow({ log }) {
 
 function MetaChip({ icon, label, value }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 10px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-      <span style={{ color: '#94a3b8' }}>{icon}</span>
-      <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700' }}>{label}:</span>
-      <span style={{ fontSize: '11px', color: '#334155', fontWeight: '800' }}>{value}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 10px', background:'var(--bg-card)', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+      <span style={{ color:'var(--text-muted)' }}>{icon}</span>
+      <span style={{ fontSize: '10px', color:'var(--text-muted)', fontWeight: '700' }}>{label}:</span>
+      <span style={{ fontSize: '11px', color:'var(--text-main)', fontWeight: '800' }}>{value}</span>
     </div>
   );
 }
@@ -359,7 +359,7 @@ export default function AuditLogs() {
 
         {/* ── Toolbar ── */}
         <div style={{
-          background: 'white',
+          background:'var(--bg-card)',
           padding: '16px 20px',
           borderRadius: '18px',
           boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
@@ -371,12 +371,12 @@ export default function AuditLogs() {
           {/* Row 1: search + refresh */}
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <div style={{ position: 'relative', flex: 1 }}>
-              <Search size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <Search size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color:'var(--text-muted)' }} />
               <input
                 value={searchTerm}
                 onChange={e => { setSearchTerm(e.target.value); setPage(0); }}
                 placeholder="بحث في الإجراءات، الموظفين، القيم..."
-                style={{ width: '100%', padding: '10px 40px 10px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '13px', fontWeight: '600', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '10px 40px 10px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background:'var(--bg-card)', fontSize: '13px', fontWeight: '600', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
               />
             </div>
             <button onClick={fetchLogs} title="تحديث" style={{ ...iconBtn }}>
@@ -399,7 +399,7 @@ export default function AuditLogs() {
                   onClick={() => { setActionFilter(g.value); setPage(0); }}
                   style={{
                     padding: '5px 12px',
-                    borderRadius: '20px',
+                    borderRadius:'20px',
                     fontSize: '11px',
                     fontWeight: '700',
                     border: actionFilter === g.value ? '2px solid #3b82f6' : '1.5px solid #e2e8f0',
@@ -418,7 +418,7 @@ export default function AuditLogs() {
             {/* Date range */}
             <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(0); }}
               style={dateInput} />
-            <span style={{ color: '#94a3b8', fontSize: '12px' }}>—</span>
+            <span style={{ color:'var(--text-muted)', fontSize: '12px' }}>—</span>
             <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(0); }}
               style={dateInput} />
 
@@ -434,11 +434,11 @@ export default function AuditLogs() {
               >
                 <div style={{
                   position: 'absolute', top: 2, left: hasDiffOnly ? 16 : 2,
-                  width: 14, height: 14, borderRadius: '50%', background: 'white',
+                  width: 14, height: 14, borderRadius: '50%', background:'var(--bg-card)',
                   transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
                 }} />
               </div>
-              <span style={{ fontSize: '11px', fontWeight: '700', color: '#475569' }}>DIFF فقط</span>
+              <span style={{ fontSize: '11px', fontWeight: '700', color:'var(--text-muted)' }}>DIFF فقط</span>
             </label>
           </div>
 
@@ -453,7 +453,7 @@ export default function AuditLogs() {
               <button disabled={page === 0} onClick={() => setPage(p => p - 1)} style={{ ...pageBtn, opacity: page === 0 ? 0.4 : 1 }}>
                 <ChevronRight size={14} />
               </button>
-              <span style={{ fontSize: '12px', fontWeight: '800', color: '#64748b', minWidth: 60, textAlign: 'center' }}>
+              <span style={{ fontSize: '12px', fontWeight: '800', color:'var(--text-muted)', minWidth: 60, textAlign: 'center' }}>
                 صفحة {page + 1}
               </span>
               <button disabled={filtered.length <= (page + 1) * LIMIT} onClick={() => setPage(p => p + 1)} style={{ ...pageBtn, opacity: filtered.length <= (page + 1) * LIMIT ? 0.4 : 1 }}>
@@ -465,8 +465,8 @@ export default function AuditLogs() {
 
         {/* ── Table ── */}
         <div style={{
-          background: 'white',
-          borderRadius: '20px',
+          background:'var(--bg-card)',
+          borderRadius:'20px',
           boxShadow: '0 8px 24px rgba(0,0,0,0.05)',
           border: '1px solid #f1f5f9',
           overflow: 'hidden',
@@ -489,7 +489,7 @@ export default function AuditLogs() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '60px', color:'var(--text-muted)' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                         <div style={{ width: 36, height: 36, border: '3px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                         <span style={{ fontSize: '13px', fontWeight: '700' }}>جارٍ التحميل...</span>
@@ -498,10 +498,10 @@ export default function AuditLogs() {
                   </tr>
                 ) : pageData.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '60px', color:'var(--text-muted)' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                         <Shield size={48} style={{ opacity: 0.1 }} />
-                        <h3 style={{ fontWeight: '800', color: '#475569', margin: 0 }}>لا توجد سجلات مطابقة</h3>
+                        <h3 style={{ fontWeight: '800', color:'var(--text-muted)', margin: 0 }}>لا توجد سجلات مطابقة</h3>
                         {hasActiveFilters && (
                           <button onClick={clearFilters} style={{ ...pageBtn, background: '#eff6ff', border: '1.5px solid #bfdbfe', color: '#3b82f6' }}>
                             مسح الفلاتر
@@ -532,7 +532,7 @@ const th = {
   padding: '14px 20px',
   fontSize: '11px',
   fontWeight: '800',
-  color: '#64748b',
+  color:'var(--text-muted)',
   textTransform: 'uppercase',
   letterSpacing: '0.5px',
   whiteSpace: 'nowrap'
@@ -546,20 +546,20 @@ const td = {
 
 const pageBtn = {
   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-  padding: '6px 12px', background: 'white', border: '1.5px solid #e2e8f0',
-  borderRadius: '8px', fontWeight: '700', fontSize: '12px', color: '#475569',
+  padding: '6px 12px', background:'var(--bg-card)', border: '1.5px solid #e2e8f0',
+  borderRadius: '8px', fontWeight: '700', fontSize: '12px', color:'var(--text-muted)',
   cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s'
 };
 
 const iconBtn = {
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  width: 36, height: 36, background: 'white', border: '1.5px solid #e2e8f0',
-  borderRadius: '10px', color: '#475569', cursor: 'pointer', flexShrink: 0
+  width: 36, height: 36, background:'var(--bg-card)', border: '1.5px solid #e2e8f0',
+  borderRadius: '10px', color:'var(--text-muted)', cursor: 'pointer', flexShrink: 0
 };
 
 const dateInput = {
   padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px',
-  fontSize: '12px', fontWeight: '600', color: '#334155', background: '#f8fafc',
+  fontSize: '12px', fontWeight: '600', color:'var(--text-main)', background:'var(--bg-card)',
   outline: 'none', fontFamily: 'inherit'
 };
 
@@ -567,7 +567,7 @@ function StatBadge({ label, value, color }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
       <div style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
-      <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '600' }}>{label}:</span>
+      <span style={{ fontSize: '11px', color:'var(--text-muted)', fontWeight: '600' }}>{label}:</span>
       <span style={{ fontSize: '12px', color, fontWeight: '800' }}>{value}</span>
     </div>
   );

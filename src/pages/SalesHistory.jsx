@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import AppLayout from '../components/AppLayout';
 import { Download, RefreshCw, Search, RotateCcw, ChevronDown, ChevronUp, FileText, ShoppingBag, Printer } from 'lucide-react';
 import QRCode from '../utils/qr-gen';
@@ -8,24 +9,25 @@ import ExportButton from '../components/ExportButton';
 const today = () => new Date().toISOString().split('T')[0];
 const monthStart = () => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
 
-const statusLabel = (s) => {
-  if (s === 'void')   return { label:'ملغى',    bg:'#fef2f2', col:'#ef4444' };
-  if (s === 'credit') return { label:'آجل',     bg:'#fef3c7', col:'#d97706' };
-  return                     { label:'مكتمل',  bg:'#ecfdf5', col:'#10b981' };
+const statusLabel = (s, t) => {
+  if (s === 'void')   return { label:t('history.status.void'),    bg:'#fee2e2', col:'#991b1b' };
+  if (s === 'credit') return { label:t('history.status.credit'),     bg:'#fef3c7', col:'#92400e' };
+  return                     { label:t('history.status.paid'),  bg:'#dcfce7', col:'#15803d' };
 };
 
 // [W-5] Map ZATCA clearance_status to badge props
-const zatcaClearanceBadge = (s, isB2B) => {
-  if (s === 'cleared')  return { label:'Cleared ✓',   bg:'#dcfce7', col:'#15803d' };
-  if (s === 'reported') return { label:'Reported ✓', bg:'#dbeafe', col:'#1d4ed8' };
-  if (s === 'rejected') return { label:'❌ مرفوض',     bg:'#fee2e2', col:'#b91c1c' };
+const zatcaClearanceBadge = (s, isB2B, t) => {
+  if (s === 'cleared')  return { label:t('history.status.cleared'),   bg:'#dcfce7', col:'#15803d' };
+  if (s === 'reported') return { label:t('history.status.reported'), bg:'#dbeafe', col:'#1d4ed8' };
+  if (s === 'rejected') return { label:t('history.status.rejected'),     bg:'#fee2e2', col:'#b91c1c' };
   // Pending: only show badge if B2B (B2C pending is less critical)
-  if (isB2B)            return { label:'⏳ Pending',    bg:'#fef9c3', col:'#854d0e' };
+  if (isB2B)            return { label:t('history.status.pending'),    bg:'#fef9c3', col:'#854d0e' };
   return null;
 };
 
 export default function SalesHistory() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('sales');
   const [quotes, setQuotes] = useState([]);
   
@@ -39,7 +41,7 @@ export default function SalesHistory() {
   const [voidReason, setVoidReason] = useState('');
   const [returnModal, setReturnModal] = useState(null);
   const [returnQtys, setReturnQtys] = useState({});
-  const [returnReason, setReturnReason] = useState('ارجاع للعميل');
+  const [returnReason, setReturnReason] = useState(t('history.modals.return_reason_default'));
   const [debitModal, setDebitModal] = useState(null);
   const [debitAmount, setDebitAmount] = useState('');
   const [debitReason, setDebitReason] = useState('');
@@ -78,11 +80,11 @@ export default function SalesHistory() {
   const handleVoid = async () => {
     if (!voidModal) return;
     try {
-      await window.api.voidSale({ invoiceId: voidModal, reason: voidReason || 'طلب المدير' });
+      await window.api.voidSale({ invoiceId: voidModal, reason: voidReason || t('history.modals.void_reason_default') });
       setVoidModal(null);
       setVoidReason('');
       fetchSales();
-    } catch (e) { alert('خطأ: ' + e.message); }
+    } catch (e) { alert(t('history.alerts.void_error') + e.message); }
   };
 
   const openReturn = (sale) => {
@@ -92,8 +94,8 @@ export default function SalesHistory() {
       const initQtys = {};
       items.forEach((it, i) => initQtys[i] = 0);
       setReturnQtys(initQtys);
-      setReturnReason('ارجاع للعميل');
-    } catch { alert('لا يمكن قراءة أصناف الفاتورة'); }
+      setReturnReason(t('history.modals.return_reason_default'));
+    } catch { alert(t('history.alerts.read_error')); }
   };
 
   const handleReturn = async () => {
@@ -1223,18 +1225,18 @@ export default function SalesHistory() {
 
 
   return (
-    <AppLayout title="سجل المبيعات والفواتير">
+    <AppLayout title={t('history.title')}>
       <div style={{ display:'flex', flexDirection:'column', gap:'24px' }}>
 
         {/* Tabs */}
         <div style={{ display:'flex', gap:'12px', borderBottom:'2px solid #e2e8f0', paddingBottom:'2px' }}>
           <button onClick={() => setActiveTab('sales')}
             style={{ padding:'12px 24px', background:'none', border:'none', borderBottom: activeTab === 'sales' ? '3px solid #3b82f6' : '3px solid transparent', color: activeTab === 'sales' ? '#3b82f6' : '#64748b', fontWeight:'800', fontSize:'15px', cursor:'pointer', fontFamily:'inherit', transition:'all 0.2s', display:'flex', alignItems:'center', gap:'8px' }}>
-            <FileText size={18}/> المبيعات
+            <FileText size={18}/> {t('history.tabs.sales')}
           </button>
           <button onClick={() => setActiveTab('quotes')}
             style={{ padding:'12px 24px', background:'none', border:'none', borderBottom: activeTab === 'quotes' ? '3px solid #3b82f6' : '3px solid transparent', color: activeTab === 'quotes' ? '#3b82f6' : '#64748b', fontWeight:'800', fontSize:'15px', cursor:'pointer', fontFamily:'inherit', transition:'all 0.2s', display:'flex', alignItems:'center', gap:'8px' }}>
-            <ShoppingBag size={18}/> عروض الأسعار
+            <ShoppingBag size={18}/> {t('history.tabs.quotes')}
             {quotes.length > 0 && <span style={{ background:'#3b82f6', color:'white', borderRadius:'99px', padding:'2px 8px', fontSize:'11px' }}>{quotes.length}</span>}
           </button>
         </div>
@@ -1244,10 +1246,10 @@ export default function SalesHistory() {
             {/* Summary cards */}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:'16px' }}>
           {[
-            { label:'إجمالي المبيعات',    val:`SAR ${totalRevenue.toFixed(2)}`, icon:'💰', col:'#3b82f6' },
-            { label:'ضريبة القيمة المضافة', val:`SAR ${totalVAT.toFixed(2)}`,     icon:'🧾', col:'#8b5cf6' },
-            { label:'عدد الفواتير',       val: sales.filter(s=>s.status!=='void').length, icon:'📋', col:'#10b981' },
-            { label:'فواتير ملغاة',       val: voidCount,                         icon:'❌', col:'#ef4444' },
+            { label:t('history.summary.total_sales'),    val:`SAR ${totalRevenue.toFixed(2)}`, icon:'💰', col:'#3b82f6' },
+            { label:t('history.summary.vat'), val:`SAR ${totalVAT.toFixed(2)}`,     icon:'🧾', col:'#8b5cf6' },
+            { label:t('history.summary.invoice_count'),       val: sales.filter(s=>s.status!=='void').length, icon:'📋', col:'#10b981' },
+            { label:t('history.summary.void_count'),       val: voidCount,                         icon:'❌', col:'#ef4444' },
           ].map(c => (
             <div key={c.label} style={{ background:'white', padding:'18px', borderRadius:'18px', border:'1px solid #f1f5f9', boxShadow:'0 1px 3px rgba(0,0,0,0.04)' }}>
               <div style={{ fontSize:'24px', marginBottom:'8px' }}>{c.icon}</div>
@@ -1260,67 +1262,67 @@ export default function SalesHistory() {
         {/* Filters */}
         <div style={{ display:'flex', gap:'12px', flexWrap:'wrap', alignItems:'flex-end', background:'white', padding:'16px 20px', borderRadius:'18px', border:'1px solid #f1f5f9' }}>
           <div>
-            <label style={lbl}>من</label>
+            <label style={lbl}>{t('history.filters.from')}</label>
             <input type="date" value={range.startDate} onChange={e => setRange(r => ({ ...r, startDate: e.target.value }))} style={dateInp} />
           </div>
           <div>
-            <label style={lbl}>إلى</label>
+            <label style={lbl}>{t('history.filters.to')}</label>
             <input type="date" value={range.endDate} onChange={e => setRange(r => ({ ...r, endDate: e.target.value }))} style={dateInp} />
           </div>
           <div style={{ position:'relative' }}>
             <Search size={15} style={{ position:'absolute', right:'12px', top:'50%', transform:'translateY(-50%)', color:'#94a3b8' }} />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="رقم الفاتورة..."
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('history.filters.search_placeholder')}
               style={{ ...dateInp, paddingRight:'34px' }} />
           </div>
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={dateInp}>
-            <option value="all">كل الحالات</option>
-            <option value="paid">مكتمل</option>
-            <option value="credit">آجل</option>
-            <option value="void">ملغى</option>
+            <option value="all">{t('history.status.all')}</option>
+            <option value="paid">{t('history.status.paid')}</option>
+            <option value="credit">{t('history.status.credit')}</option>
+            <option value="void">{t('history.status.void')}</option>
           </select>
           <button onClick={() => fetchSales()} className="btn btn-primary" style={{ padding:'11px 20px' }}>
-            <RefreshCw size={15}/> تطبيق
+            <RefreshCw size={15}/> {t('history.filters.apply')}
           </button>
           <button onClick={exportCSV} style={{ padding:'11px 16px', background:'#f0fdf4', border:'1px solid #a7f3d0', borderRadius:'12px', color:'#059669', cursor:'pointer', fontWeight:'700', fontFamily:'inherit', fontSize:'13px', display:'flex', alignItems:'center', gap:'6px' }}>
-            <Download size={14}/> تصدير CSV
+            <Download size={14}/> {t('history.filters.export_csv')}
           </button>
           <ExportButton
             format="pdf"
-            label="تصدير PDF"
-            title={`تقرير المبيعات — ${range.startDate} إلى ${range.endDate}`}
+            label={t('history.filters.export_pdf')}
+            title={`${t('history.filters.pdf_title')} — ${range.startDate} ${t('history.filters.to')} ${range.endDate}`}
             subtitle={`${range.startDate} — ${range.endDate}`}
-            headers={['رقم الفاتورة','التاريخ','العميل','طريقة الدفع','الإجمالي (ريال)','الضريبة (ريال)','الحالة']}
+            headers={[t('history.filters.headers_invoice'), t('history.filters.headers_date'), t('history.filters.headers_customer'), t('history.filters.headers_payment'), t('history.filters.headers_total'), t('history.filters.headers_tax'), t('history.filters.headers_status')]}
             rows={sales.map(s => [
               s.invoice,
               (s.sale_date||'').split('T')[0],
-              s.customer_name||'عميل عام',
+              s.customer_name||t('history.table.general_customer'),
               s.payment||'—',
               parseFloat(s.total||0).toFixed(2),
               parseFloat(s.tax||(s.total*vatRate/(1+vatRate))||0).toFixed(2),
-              s.status==='void'?'ملغية':s.status==='credit'?'مرتجع':'مدفوعة'
+              s.status==='void'?t('history.status.void'):s.status==='credit'?t('history.status.credit'):t('history.status.paid')
             ])}
             summaryRows={[
-              {label:'عدد الفواتير', value: sales.filter(s=>s.status!=='void').length},
-              {label:'إجمالي المبيعات (ريال)', value: totalRevenue.toFixed(2)},
-              {label:'إجمالي الضريبة (ريال)', value: totalVAT.toFixed(2)},
+              {label:t('history.summary.invoice_count'), value: sales.filter(s=>s.status!=='void').length},
+              {label:t('history.summary.total_sales'), value: totalRevenue.toFixed(2)},
+              {label:t('history.summary.vat'), value: totalVAT.toFixed(2)},
             ]}
-            filename={`مبيعات-${range.startDate}-${range.endDate}.pdf`}
+            filename={`sales-${range.startDate}-${range.endDate}.pdf`}
           />
           <ExportButton
             format="excel"
-            label="تصدير Excel"
-            title={`تقرير المبيعات`}
-            headers={['رقم الفاتورة','التاريخ','العميل','طريقة الدفع','الإجمالي','الضريبة','الحالة']}
+            label={t('history.filters.export_excel')}
+            title={t('history.filters.pdf_title')}
+            headers={[t('history.filters.headers_invoice'), t('history.filters.headers_date'), t('history.filters.headers_customer'), t('history.filters.headers_payment'), t('history.filters.headers_total'), t('history.filters.headers_tax'), t('history.filters.headers_status')]}
             rows={sales.map(s => [
               s.invoice,
               (s.sale_date||'').split('T')[0],
-              s.customer_name||'عميل عام',
+              s.customer_name||t('history.table.general_customer'),
               s.payment||'—',
               parseFloat(s.total||0).toFixed(2),
               parseFloat(s.tax||(s.total*vatRate/(1+vatRate))||0).toFixed(2),
-              s.status==='void'?'ملغية':s.status==='credit'?'مرتجع':'مدفوعة'
+              s.status==='void'?t('history.status.void'):s.status==='credit'?t('history.status.credit'):t('history.status.paid')
             ])}
-            filename={`مبيعات-${range.startDate}-${range.endDate}.xlsx`}
+            filename={`sales-${range.startDate}-${range.endDate}.xlsx`}
           />
         </div>
 
@@ -1329,51 +1331,51 @@ export default function SalesHistory() {
           <table style={{ width:'100%', borderCollapse:'collapse', textAlign:'right' }}>
             <thead style={{ background:'#f8fafc', borderBottom:'1px solid #f1f5f9' }}>
               <tr>
-                {['','رقم الفاتورة','التاريخ','العميل','نوع الدفع','الإجمالي','الضريبة','الحالة','إجراءات'].map(h => (
-                  <th key={h} style={{ padding:'13px 14px', fontSize:'11px', color:'#94a3b8', fontWeight:'700' }}>{h}</th>
+                {['', t('history.table.invoice_no'), t('history.table.date'), t('history.table.customer'), t('history.table.payment'), t('history.table.total'), t('history.table.tax'), t('history.table.status'), t('history.table.actions')].map(h => (
+                  <th key={h} style={{ padding:'16px 20px', fontSize:'11px', color:'#94a3b8', fontWeight:'800', textTransform:'uppercase' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr><td colSpan={9} style={{ padding:'60px', textAlign:'center', color:'#94a3b8' }}>
-                  <RefreshCw size={20} style={{ animation:'spin 1s linear infinite' }}/> جاري التحميل...
+                  <RefreshCw size={20} style={{ animation:'spin 1s linear infinite' }}/> {t('history.table.loading')}
                 </td></tr>
               ) : sales.length === 0 ? (
                 <tr><td colSpan={9} style={{ padding:'60px', textAlign:'center', color:'#94a3b8' }}>
                   <div style={{ fontSize:'40px', marginBottom:'12px', opacity:.3 }}>📋</div>
-                  لا توجد فواتير في هذه الفترة
+                  {t('history.table.no_sales')}
                 </td></tr>
               ) : sales.map((s, i) => {
-                const st = statusLabel(s.status);
+                const st = statusLabel(s.status, t);
                 const vatAmt = parseFloat(s.tax || s.total * vatRate / (1 + vatRate));
                 const items = (() => { try { return JSON.parse(s.items_json || '[]'); } catch { return []; } })();
                 return [
                   <tr key={s.invoice} style={{ borderBottom:'1px solid #f8fafc', background: s.status==='void' ? '#fefefe' : 'transparent', opacity: s.status==='void' ? .6 : 1 }}>
-                    <td style={{ padding:'12px 14px' }}>
+                    <td style={{ padding:'16px 20px' }}>
                       <button onClick={() => setExpanded(expanded===i ? null : i)}
-                        style={{ background:'transparent', border:'none', cursor:'pointer', color:'#94a3b8', display:'flex' }}>
+                        style={{ background:'transparent', border:'none', cursor:'pointer', color:'#94a3b8', display:'flex', transition:'transform 0.15s ease' }}>
                         {expanded===i ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
                       </button>
                     </td>
-                    <td style={{ padding:'12px 14px', fontFamily:'monospace', fontSize:'13px', color:'#3b82f6', fontWeight:'700' }}>
+                    <td style={{ padding:'16px 20px', fontFamily:"'Inter', monospace", fontSize:'13px', color:'#3b82f6', fontWeight:'700' }}>
                       #{s.invoice}
                     </td>
-                    <td style={{ padding:'12px 14px', fontSize:'12px', color:'#64748b' }}>
+                    <td style={{ padding:'16px 20px', fontSize:'12px', color:'#64748b' }}>
                       {s.sale_date ? new Date(s.sale_date).toLocaleString('ar-SA', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '—'}
                     </td>
-                    <td style={{ padding:'12px 14px', fontSize:'13px' }}>{s.customer_name || 'عميل عام'}</td>
-                    <td style={{ padding:'12px 14px', fontSize:'12px', color:'#64748b' }}>{s.payment || '—'}</td>
-                    <td style={{ padding:'12px 14px', fontWeight:'700', fontSize:'14px' }}>SAR {parseFloat(s.total||0).toFixed(2)}</td>
-                    <td style={{ padding:'12px 14px', fontSize:'12px', color:'#8b5cf6' }}>SAR {vatAmt.toFixed(2)}</td>
-                    <td style={{ padding:'12px 14px' }}>
+                    <td style={{ padding:'16px 20px', fontSize:'13px', fontWeight:'600' }}>{s.customer_name || t('history.table.general_customer')}</td>
+                    <td style={{ padding:'16px 20px', fontSize:'12px', color:'#64748b' }}>{s.payment || '—'}</td>
+                    <td style={{ padding:'16px 20px', fontWeight:'800', fontSize:'14px', fontFamily:"'Inter', sans-serif" }}>SAR {parseFloat(s.total||0).toFixed(2)}</td>
+                    <td style={{ padding:'16px 20px', fontSize:'12px', color:'#8b5cf6', fontWeight:'700', fontFamily:"'Inter', sans-serif" }}>SAR {vatAmt.toFixed(2)}</td>
+                    <td style={{ padding:'16px 20px' }}>
                       <div style={{ display:'flex', flexDirection:'column', gap:'4px', alignItems:'flex-start' }}>
-                        <span style={{ background:st.bg, color:st.col, padding:'4px 10px', borderRadius:'99px', fontSize:'11px', fontWeight:'700' }}>{st.label}</span>
+                        <span style={{ background:st.bg, color:st.col, padding:'4px 10px', borderRadius:'99px', fontSize:'11px', fontWeight:'800' }}>{st.label}</span>
                         {/* [W-5] ZATCA clearance badge */}
                         {(() => {
                           const isB2B = !!(s.customer_tax_id);
-                          const cb = zatcaClearanceBadge(s.zatca_clearance_status, isB2B);
-                          return cb ? <span style={{ background:cb.bg, color:cb.col, padding:'3px 8px', borderRadius:'99px', fontSize:'10px', fontWeight:'700' }}>{cb.label}</span> : null;
+                          const cb = zatcaClearanceBadge(s.zatca_clearance_status, isB2B, t);
+                          return cb ? <span style={{ background:cb.bg, color:cb.col, padding:'3px 8px', borderRadius:'99px', fontSize:'10px', fontWeight:'800' }}>{cb.label}</span> : null;
                         })()}
                       </div>
                     </td>
@@ -1388,20 +1390,20 @@ export default function SalesHistory() {
                             {/* [W-5] For B2B invoices pending clearance, disable print/share and show Arabic tooltip */}
                             {!!(s.customer_tax_id) && s.zatca_clearance_status !== 'cleared' ? (
                               <span
-                                title="يجب انتظار الموافقة من هيئة الزكاة قبل تسليم الفاتورة"
+                                title={t('history.actions.pending_zatca_title')}
                                 style={{ padding:'6px 10px', background:'#f1f5f9', border:'1px solid #e2e8f0', color:'#94a3b8', borderRadius:'8px', fontSize:'11px', fontWeight:'700', cursor:'not-allowed', userSelect:'none' }}
                               >
-                                ⏳ بانتظار الموافقة
+                                {t('history.actions.pending_zatca_badge')}
                               </span>
                             ) : (
                               <>
-                                <button onClick={() => printReceipt(s, 'A4')} title="طباعة A4"
+                                <button onClick={() => printReceipt(s, 'A4')} title="A4"
                                   style={{ padding:'6px 10px', background:'#0f172a', border:'none', color:'#fff', borderRadius:'8px', cursor:'pointer', fontWeight:'700', fontSize:'11px', fontFamily:'inherit', display:'flex', alignItems:'center', gap:'4px' }}>
-                                  <Printer size={13}/> A4
+                                  <Printer size={13}/> {t('history.actions.print_a4')}
                                 </button>
-                                <button onClick={() => printReceipt(s, '80')} title="طباعة حراري 80مم"
+                                <button onClick={() => printReceipt(s, '80')} title="80mm"
                                   style={{ padding:'6px 10px', background:'#2563eb', border:'none', color:'#fff', borderRadius:'8px', cursor:'pointer', fontWeight:'700', fontSize:'11px', fontFamily:'inherit', display:'flex', alignItems:'center', gap:'4px' }}>
-                                  <Printer size={13}/> حراري
+                                  <Printer size={13}/> {t('history.actions.print_thermal')}
                                 </button>
                               </>
                             )}
@@ -1409,26 +1411,26 @@ export default function SalesHistory() {
                         )}
                         {s.status === 'credit' && (
                           <>
-                            <button onClick={() => printCreditNote(s, 'A4')} title="طباعة الإشعار الدائن A4"
+                            <button onClick={() => printCreditNote(s, 'A4')} title="A4"
                               style={{ padding:'6px 10px', background:'#92400e', border:'none', color:'#fff', borderRadius:'8px', cursor:'pointer', fontWeight:'700', fontSize:'11px', fontFamily:'inherit', display:'flex', alignItems:'center', gap:'4px' }}>
-                              <Printer size={13}/> A4 إشعار
+                              <Printer size={13}/> {t('history.actions.print_cn_a4')}
                             </button>
-                            <button onClick={() => printCreditNote(s, '80')} title="طباعة الإشعار الدائن حراري"
+                            <button onClick={() => printCreditNote(s, '80')} title="80mm"
                               style={{ padding:'6px 10px', background:'#d97706', border:'none', color:'#fff', borderRadius:'8px', cursor:'pointer', fontWeight:'700', fontSize:'11px', fontFamily:'inherit', display:'flex', alignItems:'center', gap:'4px' }}>
-                              <Printer size={13}/> حراري إشعار
+                              <Printer size={13}/> {t('history.actions.print_cn_thermal')}
                             </button>
                           </>
                         )}
                         {s.status !== 'void' && s.status !== 'credit' && parseFloat(s.total) > 0 && (
-                          <button onClick={() => openReturn(s)} title="إرجاع (إشعار دائن)"
+                          <button onClick={() => openReturn(s)} title="Return"
                             style={{ padding:'6px 8px', background:'#fef3c7', border:'none', color:'#d97706', borderRadius:'8px', cursor:'pointer', fontFamily:'inherit', fontSize:'12px', fontWeight:'700' }}>
-                            إرجاع
+                            {t('history.actions.return')}
                           </button>
                         )}
                         {s.customer_tax_id && s.status !== 'void' && (
                           <button onClick={() => setDebitModal({ invoice: s.invoice, customer_tax_id: s.customer_tax_id })}
                             style={{ padding:'6px 12px', background:'#fef3c7', color:'#92400e', border:'1px solid #fde68a', borderRadius:'8px', fontSize:'11px', fontWeight:'700', cursor:'pointer' }}>
-                            📄 إشعار مدين
+                            {t('history.actions.debit_note')}
                           </button>
                         )}
                         {/* ZATCA COMPLIANCE: void button hidden — cancellation is only allowed via credit note (إرجاع) per ZATCA e-invoicing rules */}
@@ -1441,7 +1443,7 @@ export default function SalesHistory() {
                       <td colSpan={9} style={{ padding:'14px 32px' }}>
                         <div style={{ display:'flex', gap:'40px', flexWrap:'wrap' }}>
                           <div style={{ flex:2 }}>
-                            <div style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', marginBottom:'8px' }}>الأصناف</div>
+                            <div style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', marginBottom:'8px' }}>{t('history.table.items')}</div>
                             {items.map((it, j) => (
                               <div key={j} style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', borderBottom:'1px dashed #f1f5f9', fontSize:'13px' }}>
                                 <span>{it.Name} × {it.Qty}</span>
@@ -1450,11 +1452,11 @@ export default function SalesHistory() {
                             ))}
                           </div>
                           <div style={{ minWidth:'180px' }}>
-                            <div style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', marginBottom:'8px' }}>ملخص</div>
+                            <div style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', marginBottom:'8px' }}>{t('history.table.summary')}</div>
                             <div style={{ fontSize:'12px', display:'flex', flexDirection:'column', gap:'4px' }}>
-                              <div style={{ display:'flex', justifyContent:'space-between', gap:'20px' }}><span style={{ color:'#94a3b8' }}>الصافي:</span><span>SAR {(parseFloat(s.total)-vatAmt).toFixed(2)}</span></div>
-                              <div style={{ display:'flex', justifyContent:'space-between', gap:'20px' }}><span style={{ color:'#94a3b8' }}>الضريبة:</span><span>SAR {vatAmt.toFixed(2)}</span></div>
-                              {parseFloat(s.discount||0)>0 && <div style={{ display:'flex', justifyContent:'space-between', gap:'20px' }}><span style={{ color:'#94a3b8' }}>الخصم:</span><span style={{ color:'#10b981' }}>- SAR {parseFloat(s.discount).toFixed(2)}</span></div>}
+                              <div style={{ display:'flex', justifyContent:'space-between', gap:'20px' }}><span style={{ color:'#94a3b8' }}>{t('history.table.net')}</span><span>SAR {(parseFloat(s.total)-vatAmt).toFixed(2)}</span></div>
+                              <div style={{ display:'flex', justifyContent:'space-between', gap:'20px' }}><span style={{ color:'#94a3b8' }}>{t('history.table.tax')}</span><span>SAR {vatAmt.toFixed(2)}</span></div>
+                              {parseFloat(s.discount||0)>0 && <div style={{ display:'flex', justifyContent:'space-between', gap:'20px' }}><span style={{ color:'#94a3b8' }}>{t('history.table.discount')}</span><span style={{ color:'#10b981' }}>- SAR {parseFloat(s.discount).toFixed(2)}</span></div>}
                               {s.note && <div style={{ marginTop:'4px', color:'#64748b' }}>📝 {s.note}</div>}
                               {s.uuid && <div style={{ marginTop:'6px', fontFamily:'monospace', fontSize:'10px', color:'#cbd5e1', wordBreak:'break-all' }}>UUID: {s.uuid}</div>}
                             </div>
@@ -1477,18 +1479,18 @@ export default function SalesHistory() {
             <table style={{ width:'100%', borderCollapse:'collapse', textAlign:'right' }}>
               <thead style={{ background:'#f8fafc', borderBottom:'1px solid #f1f5f9' }}>
                 <tr>
-                  <th style={{ padding:'13px 14px', fontSize:'11px', color:'#94a3b8', fontWeight:'700' }}>العنوان</th>
-                  <th style={{ padding:'13px 14px', fontSize:'11px', color:'#94a3b8', fontWeight:'700' }}>التاريخ</th>
-                  <th style={{ padding:'13px 14px', fontSize:'11px', color:'#94a3b8', fontWeight:'700' }}>ملاحظات</th>
-                  <th style={{ padding:'13px 14px', fontSize:'11px', color:'#94a3b8', fontWeight:'700' }}>الإجمالي التقديري</th>
-                  <th style={{ padding:'13px 14px', fontSize:'11px', color:'#94a3b8', fontWeight:'700' }}>الإجراءات</th>
+                  <th style={{ padding:'13px 14px', fontSize:'11px', color:'#94a3b8', fontWeight:'700' }}>{t('history.table.title')}</th>
+                  <th style={{ padding:'13px 14px', fontSize:'11px', color:'#94a3b8', fontWeight:'700' }}>{t('history.table.date')}</th>
+                  <th style={{ padding:'13px 14px', fontSize:'11px', color:'#94a3b8', fontWeight:'700' }}>{t('history.table.notes')}</th>
+                  <th style={{ padding:'13px 14px', fontSize:'11px', color:'#94a3b8', fontWeight:'700' }}>{t('history.table.est_total')}</th>
+                  <th style={{ padding:'13px 14px', fontSize:'11px', color:'#94a3b8', fontWeight:'700' }}>{t('history.table.actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={5} style={{ padding:'60px', textAlign:'center', color:'#94a3b8' }}>جاري التحميل...</td></tr>
+                  <tr><td colSpan={5} style={{ padding:'60px', textAlign:'center', color:'#94a3b8' }}>{t('history.table.loading')}</td></tr>
                 ) : quotes.length === 0 ? (
-                  <tr><td colSpan={5} style={{ padding:'60px', textAlign:'center', color:'#94a3b8' }}>لا توجد عروض أسعار محفوظة</td></tr>
+                  <tr><td colSpan={5} style={{ padding:'60px', textAlign:'center', color:'#94a3b8' }}>{t('history.table.no_quotes')}</td></tr>
                 ) : quotes.map((q) => {
                   const estTotal = q.items.reduce((sum, item) => sum + (parseFloat(item.Price) * parseFloat(item.Qty)), 0);
                   return (
@@ -1501,20 +1503,20 @@ export default function SalesHistory() {
                         <div style={{ display:'flex', gap:'8px' }}>
                           <button onClick={() => navigate('/pos', { state: { resumeHeld: q } })}
                             style={{ padding:'6px 12px', background:'#eff6ff', color:'#2563eb', border:'none', borderRadius:'8px', cursor:'pointer', fontWeight:'700', fontSize:'12px', fontFamily:'inherit' }}>
-                            تحويل إلى فاتورة مبيعات
+                            {t('history.actions.to_invoice')}
                           </button>
                           <button onClick={() => printQuote(q)}
                             style={{ padding:'6px 12px', background:'#f8fafc', color:'#64748b', border:'1px solid #e2e8f0', borderRadius:'8px', cursor:'pointer', fontWeight:'700', fontSize:'12px', fontFamily:'inherit' }}>
-                            🖨️ طباعة العرض
+                            🖨️ {t('history.actions.print_quote')}
                           </button>
                           <button onClick={async () => {
-                            if(confirm('هل أنت متأكد من حذف عرض السعر؟')) {
+                            if(confirm(t('history.alerts.confirm_delete_quote'))) {
                               await window.api.deleteHeldOrder(q.id);
                               fetchSales();
                             }
                           }}
                             style={{ padding:'6px 12px', background:'#fef2f2', color:'#ef4444', border:'none', borderRadius:'8px', cursor:'pointer', fontWeight:'700', fontSize:'12px', fontFamily:'inherit' }}>
-                            حذف
+                            {t('history.actions.delete')}
                           </button>
                         </div>
                       </td>
@@ -1533,15 +1535,15 @@ export default function SalesHistory() {
         <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.45)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }} onClick={e => e.target===e.currentTarget && setVoidModal(null)}>
           <div style={{ background:'white', borderRadius:'22px', padding:'32px', maxWidth:'420px', width:'95%', textAlign:'center' }} dir="rtl">
             <div style={{ fontSize:'48px', marginBottom:'16px' }}>⚠️</div>
-            <h3 style={{ fontWeight:'800', marginBottom:'8px' }}>إلغاء الفاتورة #{voidModal}</h3>
+            <h3 style={{ fontWeight:'800', marginBottom:'8px' }}>{t('history.modals.void_title')} #{voidModal}</h3>
             <p style={{ color:'#ef4444', fontSize:'13px', marginBottom:'20px', fontWeight:'700' }}>
               ملاحظة: الإلغاء يعكس القيود بالكامل. للإرجاع النظامي بهيئة الزكاة والدخل، الرجاء استخدام خيار (إشعار دائن/إرجاع).
             </p>
-            <input value={voidReason} onChange={e => setVoidReason(e.target.value)} placeholder="سبب الإلغاء الشامل..."
+            <input value={voidReason} onChange={e => setVoidReason(e.target.value)} placeholder={t('history.modals.void_reason_ph')}
               style={{ width:'100%', padding:'12px', borderRadius:'12px', border:'1px solid #e2e8f0', fontSize:'14px', fontFamily:'inherit', outline:'none', marginBottom:'16px', textAlign:'right', boxSizing:'border-box' }} />
             <div style={{ display:'flex', gap:'12px', justifyContent:'center' }}>
-              <button onClick={() => setVoidModal(null)} style={{ padding:'12px 24px', background:'#f1f5f9', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'700', fontFamily:'inherit' }}>رجوع</button>
-              <button onClick={handleVoid} style={{ padding:'12px 24px', background:'#ef4444', color:'white', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'700', fontFamily:'inherit' }}>إلغاء الفاتورة</button>
+              <button onClick={() => setVoidModal(null)} style={{ padding:'12px 24px', background:'#f1f5f9', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'700', fontFamily:'inherit' }}>{t('history.modals.cancel')}</button>
+              <button onClick={handleVoid} style={{ padding:'12px 24px', background:'#ef4444', color:'white', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'700', fontFamily:'inherit' }}>{t('history.modals.void_confirm')}</button>
             </div>
           </div>
         </div>
@@ -1551,12 +1553,12 @@ export default function SalesHistory() {
       {returnModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.45)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }} onClick={e => e.target===e.currentTarget && setReturnModal(null)}>
           <div style={{ background:'white', borderRadius:'22px', padding:'32px', maxWidth:'500px', width:'95%', maxHeight:'85vh', overflowY:'auto' }} dir="rtl">
-            <h3 style={{ fontWeight:'800', marginBottom:'6px', fontSize:'18px' }}>إشعار دائن (إرجاع)</h3>
-            <p style={{ color:'#64748b', fontSize:'12px', marginBottom:'24px' }}>فاتورة أصلية: #{returnModal.invoice}</p>
+            <h3 style={{ fontWeight:'800', marginBottom:'6px', fontSize:'18px' }}>{t('history.modals.return_title')}</h3>
+            <p style={{ color:'#64748b', fontSize:'12px', marginBottom:'24px' }}>{t('history.modals.return_subtitle')} #{returnModal.invoice}</p>
             
             <div style={{ marginBottom:'20px', display:'flex', flexDirection:'column', gap:'10px' }}>
               <div style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', paddingBottom:'4px', borderBottom:'1px solid #f1f5f9', display:'flex' }}>
-                <span style={{ flex:2 }}>المنتج</span>
+                <span style={{ flex:2 }}>{t('history.table.items')}</span>
                 <span style={{ flex:1, textAlign:'center' }}>الكمية المشتراة</span>
                 <span style={{ flex:1, textAlign:'center' }}>كمية الإرجاع</span>
               </div>
@@ -1577,12 +1579,12 @@ export default function SalesHistory() {
               ))}
             </div>
 
-            <input value={returnReason} onChange={e => setReturnReason(e.target.value)} placeholder="سبب الإرجاع..."
+            <input value={returnReason} onChange={e => setReturnReason(e.target.value)} placeholder={t('history.modals.return_reason_ph')}
               style={{ width:'100%', padding:'12px', borderRadius:'12px', border:'1px solid #e2e8f0', fontSize:'14px', fontFamily:'inherit', outline:'none', marginBottom:'24px', textAlign:'right', boxSizing:'border-box' }} />
             
             <div style={{ display:'flex', gap:'12px', justifyContent:'center' }}>
-              <button onClick={() => setReturnModal(null)} style={{ flex:1, padding:'12px', background:'#f1f5f9', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'700', fontFamily:'inherit' }}>إلغاء</button>
-              <button onClick={handleReturn} style={{ flex:2, padding:'12px', background:'#d97706', color:'white', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'700', fontFamily:'inherit' }}>إصدار الإشعار الدائن</button>
+              <button onClick={() => setReturnModal(null)} style={{ flex:1, padding:'12px', background:'#f1f5f9', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'700', fontFamily:'inherit' }}>{t('history.modals.cancel')}</button>
+              <button onClick={handleReturn} style={{ flex:2, padding:'12px', background:'#d97706', color:'white', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'700', fontFamily:'inherit' }}>{t('history.modals.return_confirm')}</button>
             </div>
           </div>
         </div>
@@ -1592,20 +1594,20 @@ export default function SalesHistory() {
       {debitModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }} dir="rtl">
           <div style={{ background:'white', borderRadius:'20px', padding:'32px', width:'420px', maxWidth:'90vw' }}>
-            <h3 style={{ fontWeight:'900', fontSize:'18px', marginBottom:'20px' }}>📄 إشعار مدين — {debitModal.invoice}</h3>
+            <h3 style={{ fontWeight:'900', fontSize:'18px', marginBottom:'20px' }}>{t('history.modals.debit_title')} — {debitModal.invoice}</h3>
             <div style={{ display:'flex', flexDirection:'column', gap:'14px' }}>
               <div>
                 <label style={{ fontSize:'12px', fontWeight:'700', color:'#475569', display:'block', marginBottom:'6px' }}>المبلغ (SAR شامل الضريبة)</label>
-                <input type="number" value={debitAmount} onChange={e => setDebitAmount(e.target.value)} placeholder="0.00" style={{ width:'100%', padding:'12px', borderRadius:'10px', border:'1px solid #e2e8f0', fontSize:'15px', boxSizing:'border-box' }} />
+                <input type="number" value={debitAmount} onChange={e => setDebitAmount(e.target.value)} placeholder={t('history.modals.debit_amount_ph')} style={{ width:'100%', padding:'12px', borderRadius:'10px', border:'1px solid #e2e8f0', fontSize:'15px', boxSizing:'border-box' }} />
               </div>
               <div>
-                <label style={{ fontSize:'12px', fontWeight:'700', color:'#475569', display:'block', marginBottom:'6px' }}>السبب</label>
+                <label style={{ fontSize:'12px', fontWeight:'700', color:'#475569', display:'block', marginBottom:'6px' }}>{t('history.modals.debit_reason')}</label>
                 <input value={debitReason} onChange={e => setDebitReason(e.target.value)} placeholder="مثال: رسوم إضافية..." style={{ width:'100%', padding:'12px', borderRadius:'10px', border:'1px solid #e2e8f0', fontSize:'13px', boxSizing:'border-box' }} />
               </div>
             </div>
             <div style={{ display:'flex', gap:'10px', marginTop:'24px' }}>
-              <button onClick={handleDebitNote} style={{ flex:2, padding:'12px', background:'#f59e0b', color:'white', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'800', fontSize:'13px' }}>إصدار الإشعار</button>
-              <button onClick={() => { setDebitModal(null); setDebitAmount(''); setDebitReason(''); }} style={{ flex:1, padding:'12px', background:'#f1f5f9', color:'#64748b', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'700' }}>إلغاء</button>
+              <button onClick={handleDebitNote} style={{ flex:2, padding:'12px', background:'#f59e0b', color:'white', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'800', fontSize:'13px' }}>{t('history.modals.debit_confirm')}</button>
+              <button onClick={() => { setDebitModal(null); setDebitAmount(''); setDebitReason(''); }} style={{ flex:1, padding:'12px', background:'#f1f5f9', color:'#64748b', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'700' }}>{t('history.modals.cancel')}</button>
             </div>
           </div>
         </div>

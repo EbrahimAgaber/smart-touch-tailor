@@ -103,6 +103,10 @@ contextBridge.exposeInMainWorld('api', {
   addSupplier:          (d)      => ipcRenderer.invoke('db:addSupplier', d),
   updateSupplier:       (d)      => ipcRenderer.invoke('db:updateSupplier', d),
   deleteSupplier:       (id)     => ipcRenderer.invoke('db:deleteSupplier', id),
+  getSupplierStatement: (id)     => ipcRenderer.invoke('db:getSupplierStatement', id),
+  recordSupplierPayment:(d)      => ipcRenderer.invoke('db:recordSupplierPayment', d),
+  getCustomerStatementBasic:(id) => ipcRenderer.invoke('db:getCustomerStatementBasic', id),
+  recordCustomerPaymentBasic:(d) => ipcRenderer.invoke('db:recordCustomerPaymentBasic', d),
 
   // ── Stock History & Purchases ─────────────────
   getStockHistory:      (id)     => ipcRenderer.invoke('db:getStockHistory', id),

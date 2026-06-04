@@ -1,7 +1,7 @@
 {
   "name": "smart-touch-pos",
   "private": true,
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "البصمة الذكية - نظام إدارة نقاط البيع المتطور",
   "productName": "البصمة الذكية",
   "main": "electron/main.cjs",

@@ -44,9 +44,7 @@ export default function Shift() {
   const handleOpen = async () => {
     const amount = parseFloat(cashInput) || 0;
     await window.api.openShift({ cash: amount, staffId: null });
-    const r = String(role || '').trim().toLowerCase();
-    if (r === 'admin' || r === 'manager') navigate('/dashboard', { replace: true });
-    else navigate('/pos', { replace: true });
+    navigate('/home', { replace: true });
   };
 
   const handleClose = () => {
@@ -74,9 +72,7 @@ export default function Shift() {
   // Redirect if shift is already open and we're not in close mode
   useEffect(() => {
     if (!loading && shift && !isClosing) {
-      const r = String(role || '').trim().toLowerCase();
-      if (r === 'admin' || r === 'manager') navigate('/dashboard', { replace: true });
-      else navigate('/pos', { replace: true });
+      navigate('/home', { replace: true });
     }
   }, [loading, shift, isClosing, role, navigate]);
 

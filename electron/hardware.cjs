@@ -183,10 +183,12 @@ async function printLabelHTML(html, widthMm, heightMm, printerName, dpi = 203) {
         const widthMicrons  = Math.round(widthMm  * MICRONS_PER_MM);
         const heightMicrons = Math.round(heightMm * MICRONS_PER_MM);
 
-        // Device-pixel window size: mm → inches → px @ dpi
+        // Device-pixel window size: mm → inches → px @ 96 DPI (standard CSS web scale)
+        // This ensures Chromium's CSS pixel rendering aligns perfectly with the window size.
         const MM_PER_INCH = 25.4;
-        const winW = Math.ceil((widthMm  / MM_PER_INCH) * dpi);
-        const winH = Math.ceil((heightMm / MM_PER_INCH) * dpi);
+        const SCREEN_DPI = 96;
+        const winW = Math.ceil((widthMm  / MM_PER_INCH) * SCREEN_DPI);
+        const winH = Math.ceil((heightMm / MM_PER_INCH) * SCREEN_DPI);
 
         let win;
         try {

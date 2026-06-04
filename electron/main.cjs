@@ -540,6 +540,10 @@ function registerIpcHandlers() {
     ipcMain.handle('db:addSupplier',         _gated((e, d)  => db.addSupplier(d)));
     ipcMain.handle('db:updateSupplier',      _gated((e, d)  => db.updateSupplier(d)));
     ipcMain.handle('db:deleteSupplier',      _gated((e, id) => db.deleteSupplier(id)));
+    ipcMain.handle('db:getSupplierStatement',(e, id) => db.getSupplierStatement(id));
+    ipcMain.handle('db:recordSupplierPayment',_gated((e,d)  => db.recordSupplierPayment(d)));
+    ipcMain.handle('db:getCustomerStatementBasic',(e, id) => db.getCustomerStatementBasic(id));
+    ipcMain.handle('db:recordCustomerPaymentBasic',_gated((e,d)  => db.recordCustomerPaymentBasic(d)));
 
     // ── Stock History & Purchases ──────────────────────
     ipcMain.handle('db:getStockHistory',      (e, id) => db.getStockHistory(id));

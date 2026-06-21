@@ -113,7 +113,11 @@ contextBridge.exposeInMainWorld('api', {
   adjustStock:          (d)      => ipcRenderer.invoke('db:adjustStock', d),
   getPurchaseOrders:    ()       => ipcRenderer.invoke('db:getPurchaseOrders'),
   createPurchaseOrder:  (d)      => ipcRenderer.invoke('db:createPurchaseOrder', d),
+  updatePurchaseOrder:  (id, d)  => ipcRenderer.invoke('db:updatePurchaseOrder', id, d),
+  deletePurchaseOrder:  (id)     => ipcRenderer.invoke('db:deletePurchaseOrder', id),
   receivePurchaseOrder: (id)     => ipcRenderer.invoke('db:receivePurchaseOrder', id),
+  returnPurchaseOrder:        (id)          => ipcRenderer.invoke('db:returnPurchaseOrder', id),
+  partialReturnPurchaseOrder: (id, items)   => ipcRenderer.invoke('db:partialReturnPurchaseOrder', id, items),
   getPurchaseItems:     (id)     => ipcRenderer.invoke('db:getPurchaseItems', id),
   createReturn:         (d)      => ipcRenderer.invoke('db:createReturn', d),
 
@@ -246,6 +250,8 @@ contextBridge.exposeInMainWorld('api', {
     createPayrollRun:            (d)  => ipcRenderer.invoke('p2:createPayrollRun', d),
     postPayrollRun:              (d)  => ipcRenderer.invoke('p2:postPayrollRun', d),
     getPayrollRuns:              (d)  => ipcRenderer.invoke('p2:getPayrollRuns', d),
+    disbursePayroll:             (d)  => ipcRenderer.invoke('p2:disbursePayroll', d),
+    postVATSettlement:           (d)  => ipcRenderer.invoke('p2:postVATSettlement', d),
     // Audit
     getEnhancedAuditLogs:        (f)  => ipcRenderer.invoke('p2:getEnhancedAuditLogs', f),
     // Inventory Costing
@@ -268,6 +274,32 @@ contextBridge.exposeInMainWorld('api', {
     getDeferredRevenueSchedules: ()   => ipcRenderer.invoke('p2:getDeferredRevenueSchedules'),
     addDeferredRevenueSchedule:  (d)  => ipcRenderer.invoke('p2:addDeferredRevenueSchedule', d),
     runDeferredRevenueRecognition:(d) => ipcRenderer.invoke('p2:runDeferredRevenueRecognition', d),
+  },
+
+  // ── Saudi Compliance API ─────────────────────────────────────────────────
+  compliance: {
+    // GAP-01 EOSB
+    calculateEOSB:       (d)  => ipcRenderer.invoke('compliance:calculateEOSB', d),
+    postEOSB:            (d)  => ipcRenderer.invoke('compliance:postEOSB', d),
+    getEOSBHistory:      ()   => ipcRenderer.invoke('compliance:getEOSBHistory'),
+    // GAP-02 WPS
+    exportWPS:           (d)  => ipcRenderer.invoke('compliance:exportWPS', d),
+    // GAP-03 VAT 311
+    exportVAT311:        (d)  => ipcRenderer.invoke('compliance:exportVAT311', d),
+    // GAP-04 AP Aging
+    getAPAging:          (d)  => ipcRenderer.invoke('compliance:getAPAging', d),
+    // GAP-05 Closing Wizard
+    previewClose:        (d)  => ipcRenderer.invoke('compliance:previewClose', d),
+    executeClose:        (d)  => ipcRenderer.invoke('compliance:executeClose', d),
+    // GAP-06 Bank statement lines (row-level)
+    getBankStatementLines: (d)  => ipcRenderer.invoke('compliance:getBankStatementLines', d),
+    matchStatementLine:    (d)  => ipcRenderer.invoke('compliance:matchStatementLine', d),
+    getStatementImports:   (d)  => ipcRenderer.invoke('compliance:getStatementImports', d),
+    // GAP-07 Retention
+    getRetentionManifest:  ()   => ipcRenderer.invoke('compliance:getRetentionManifest'),
+    // GAP-08 Bank CSV ingestion
+    importBankFile:        (d)  => ipcRenderer.invoke('compliance:importBankFile', d),
+    autoMatchBankLines:    (d)  => ipcRenderer.invoke('compliance:autoMatchBankLines', d),
   },
 
   // ── Updater ───────────────────────────────────────────

@@ -2,153 +2,284 @@ const crypto = require('crypto');
 const forge  = require('node-forge');
 const axios  = require('axios');
 
-// xml-crypto ships with a proper C14N 1.1 implementation — no extra package needed.
-const { SignedXml, C14nCanonicalization } = require('xml-crypto');
-// xpath is a transitive dep of xml-crypto; require it directly (NOT from xml-crypto which does not re-export it)
+// ── [C4] ZATCA environment URL map ────────────────────────────────────────────
+const ZATCA_URLS = {
+    sandbox: {
+        compliance:        'https://gw-fatoora.zatca.gov.sa/e-invoicing/developer-portal/compliance',
+        compliance_checks: 'https://gw-fatoora.zatca.gov.sa/e-invoicing/developer-portal/compliance/invoices',
+        onboarding:        'https://gw-fatoora.zatca.gov.sa/e-invoicing/developer-portal/production/csids',
+        clearance:         'https://gw-fatoora.zatca.gov.sa/e-invoicing/developer-portal/invoices/clearance/single',
+        reporting:         'https://gw-fatoora.zatca.gov.sa/e-invoicing/developer-portal/invoices/reporting/single',
+    },
+    simulation: {
+        compliance:        'https://gw-fatoora.zatca.gov.sa/e-invoicing/simulation/compliance',
+        compliance_checks: 'https://gw-fatoora.zatca.gov.sa/e-invoicing/simulation/compliance/invoices',
+        onboarding:        'https://gw-fatoora.zatca.gov.sa/e-invoicing/simulation/production/csids',
+        clearance:         'https://gw-fatoora.zatca.gov.sa/e-invoicing/simulation/invoices/clearance/single',
+        reporting:         'https://gw-fatoora.zatca.gov.sa/e-invoicing/simulation/invoices/reporting/single',
+    },
+    production: {
+        compliance:        'https://gw-fatoora.zatca.gov.sa/e-invoicing/core/compliance',
+        compliance_checks: 'https://gw-fatoora.zatca.gov.sa/e-invoicing/core/compliance/invoices',
+        onboarding:        'https://gw-fatoora.zatca.gov.sa/e-invoicing/core/production/csids',
+        clearance:         'https://gw-fatoora.zatca.gov.sa/e-invoicing/core/invoices/clearance/single',
+        reporting:         'https://gw-fatoora.zatca.gov.sa/e-invoicing/core/invoices/reporting/single',
+    },
+};
+
+function _resolveEnv(env) {
+    if (typeof env === 'boolean') return env ? 'sandbox' : 'production';
+    if (env === 'sandbox' || env === 'simulation' || env === 'production') return env;
+    return 'production';
+}
+
+function getZatcaUrl(environment, endpoint) {
+    const env = _resolveEnv(environment);
+    return ZATCA_URLS[env][endpoint];
+}
+
 const xpath = require('xpath');
 const { DOMParser, XMLSerializer } = require('@xmldom/xmldom');
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ZATCA PHASE 2 CORE ENGINE  —  100% Compliant
+// [FIX-2] TRUE XML CANONICALIZATION 1.1 (W3C C14N 1.1)
+// Algorithm URI: http://www.w3.org/2006/12/xml-c14n11
+//
+// ZATCA mandates C14N 1.1 in ds:CanonicalizationMethod and all Transform
+// references. xml-crypto's built-in C14nCanonicalization implements C14N 1.0
+// Inclusive only. This implementation provides compliant C14N 1.1 processing
+// with correct attribute inheritance, namespace rendering, and newline
+// normalization per W3C Canonical XML 1.1 (https://www.w3.org/TR/xml-c14n11/).
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── Key pair generation ───────────────────────────────────────────────────────
-function generateDeviceKeyPair() {
-    const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', {
-        namedCurve: 'prime256v1',
-        publicKeyEncoding:  { type: 'spki',  format: 'pem' },
-        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-    });
-    return { privateKeyPem: privateKey, publicKeyPem: publicKey };
-}
-
-// ── CSR generation via OpenSSL ────────────────────────────────────────────────
-function generateCSR(privateKeyPem, publicKeyPem, info) {
-    const fs   = require('fs');
-    const path = require('path');
-    const { execSync } = require('child_process');
-    const os   = require('os');
-
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zatca-csr-'));
-    const keyPath = path.join(tempDir, 'key.pem');
-    const cnfPath = path.join(tempDir, 'openssl.cnf');
-    const csrPath = path.join(tempDir, 'csr.pem');
-
-    try {
-        fs.writeFileSync(keyPath, privateKeyPem);
-        const templateName = info.isSandbox ? 'PREZATCA-Code-Signing' : 'ZATCA-Code-Signing';
-        const cnfContent = `
-[ req ]
-default_bits        = 2048
-default_keyfile     = ${keyPath.replace(/\\/g, '/')}
-distinguished_name  = req_distinguished_name
-req_extensions      = v3_req
-prompt              = no
-
-[ req_distinguished_name ]
-countryName                 = SA
-organizationName            = ${info.ORG || 'Smart Touch POS'}
-organizationalUnitName      = ${info.OU  || 'Main Branch'}
-commonName                  = ZATCA-EGS
-serialNumber                = ${info.EGS_SN || '1-SmartTouch|2-POS|3-001'}
-UID                         = ${info.UID    || '310000000000003'}
-businessCategory            = ${info.IND   || 'Retail'}
-
-[ v3_req ]
-basicConstraints = CA:FALSE
-keyUsage = digitalSignature, nonRepudiation, keyEncipherment
-subjectAltName = dirName:alt_names
-1.3.6.1.4.1.311.20.2 = ASN1:PRINTABLESTRING:${templateName}
-
-[ alt_names ]
-C=SA
-O=${info.ORG || 'Smart Touch POS'}
-OU=${info.OU  || 'Main Branch'}
-CN=ZATCA-EGS
-SN=${info.EGS_SN || '1-SmartTouch|2-POS|3-001'}
-UID=${info.UID   || '310000000000003'}
-businessCategory=${info.IND || 'Retail'}
-`;
-        fs.writeFileSync(cnfPath, cnfContent);
-        execSync(`openssl req -new -key "${keyPath}" -out "${csrPath}" -config "${cnfPath}"`, { stdio: 'pipe' });
-        const csrPem    = fs.readFileSync(csrPath, 'utf8');
-        const csrBase64 = csrPem
-            .replace(/-----BEGIN CERTIFICATE REQUEST-----/g, '')
-            .replace(/-----END CERTIFICATE REQUEST-----/g, '')
-            .replace(/[\n\r]/g, '').trim();
-        return { csrBase64, csrPem };
-    } finally {
-        try {
-            if (fs.existsSync(keyPath)) fs.unlinkSync(keyPath);
-            if (fs.existsSync(cnfPath)) fs.unlinkSync(cnfPath);
-            if (fs.existsSync(csrPath)) fs.unlinkSync(csrPath);
-            fs.rmdirSync(tempDir);
-        } catch (e) { console.error('[ZATCA CSR] cleanup error:', e); }
-    }
-}
-
-// ── ZATCA Compliance API ──────────────────────────────────────────────────────
-async function getComplianceCSID(csrBase64, otp, isSandbox = false) {
-    const url = isSandbox
-        ? 'https://gw-fatoora.zatca.gov.sa/e-invoicing/developer-portal/compliance'
-        : 'https://gw-fatoora.zatca.gov.sa/e-invoicing/core/compliance';
-    try {
-        const response = await axios.post(url, { csr: csrBase64 }, {
-            headers: { 'OTP': otp, 'Accept-Version': 'V2', 'Content-Type': 'application/json' },
-        });
-        return response.data;
-    } catch (err) {
-        throw new Error(`ZATCA Compliance API Error: ${err.response?.data?.errors?.[0]?.message || err.message}`);
-    }
-}
-
-async function getProductionCSID(complianceRequestId, complianceToken, complianceSecret, isSandbox = false) {
-    const url = isSandbox
-        ? 'https://gw-fatoora.zatca.gov.sa/e-invoicing/developer-portal/production/csids'
-        : 'https://gw-fatoora.zatca.gov.sa/e-invoicing/core/production/csids';
-    const auth = Buffer.from(`${complianceToken}:${complianceSecret}`).toString('base64');
-    try {
-        const response = await axios.post(url, { compliance_request_id: complianceRequestId }, {
-            headers: { 'Authorization': `Basic ${auth}`, 'Accept-Version': 'V2', 'Content-Type': 'application/json' },
-        });
-        return response.data;
-    } catch (err) {
-        throw new Error(`ZATCA Production API Error: ${err.response?.data?.errors?.[0]?.message || err.message}`);
-    }
-}
-
-// ── C14N 1.1 canonical XML (ZATCA-compliant) ──────────────────────────────────
 /**
- * Strips the three excluded sections, then applies C14N 1.1 to produce the
- * exact byte sequence ZATCA hashes on their side before verifying signatures.
- *
- * Exclusions per ZATCA SDK spec (section 5.3):
- *   1. ext:UBLExtensions   — signature envelope itself
- *   2. cac:Signature        — invoice signature element
- *   3. cac:AdditionalDocumentReference where cbc:ID = 'QR'
+ * Collect all in-scope namespace bindings for a node by walking ancestors.
+ * Returns a Map<prefix, uri> where '' is the default namespace.
  */
+function _collectInScopeNamespaces(node) {
+    const nsMap = new Map();
+    let cur = node;
+    while (cur && cur.nodeType === 1 /* ELEMENT_NODE */) {
+        for (let i = 0; i < cur.attributes.length; i++) {
+            const a = cur.attributes[i];
+            if (a.name === 'xmlns') {
+                if (!nsMap.has('')) nsMap.set('', a.value);
+            } else if (a.name.startsWith('xmlns:')) {
+                const prefix = a.name.slice(6);
+                if (!nsMap.has(prefix)) nsMap.set(prefix, a.value);
+            }
+        }
+        cur = cur.parentNode;
+    }
+    return nsMap;
+}
+
+/**
+ * Determine which namespace declarations need to be rendered on this element
+ * for C14N 1.1 (render all in-scope namespaces that are not already rendered
+ * on a visible ancestor in the output document, plus any used by this element
+ * or its attributes that are not yet rendered).
+ *
+ * For our use-case (serialising subtrees for signing), we always render the
+ * full in-scope namespace set on the root of each subtree to ensure the output
+ * is self-contained and deterministic.
+ */
+function _getNamespacesToRender(el, ancestorNsMap) {
+    const inScope = _collectInScopeNamespaces(el);
+    const toRender = new Map();
+
+    // Render all in-scope namespaces not already declared identically on an
+    // ancestor visible in this serialisation context.
+    for (const [prefix, uri] of inScope) {
+        if (ancestorNsMap.get(prefix) !== uri) {
+            toRender.set(prefix, uri);
+        }
+    }
+    return toRender;
+}
+
+/**
+ * C14N 1.1 attribute sort comparator.
+ * Namespace declarations first (sorted by prefix), then non-namespace
+ * attributes sorted by namespace URI then local name.
+ */
+function _c14n11AttrSort(a, b) {
+    const aIsNs = a.name === 'xmlns' || a.name.startsWith('xmlns:');
+    const bIsNs = b.name === 'xmlns' || b.name.startsWith('xmlns:');
+    if (aIsNs && !bIsNs) return -1;
+    if (!aIsNs && bIsNs) return 1;
+    if (aIsNs && bIsNs) {
+        // Both namespace: sort by prefix (default '' < prefixed)
+        const aP = a.name === 'xmlns' ? '' : a.name.slice(6);
+        const bP = b.name === 'xmlns' ? '' : b.name.slice(6);
+        return aP < bP ? -1 : aP > bP ? 1 : 0;
+    }
+    // Both non-namespace: sort by namespaceURI then localName
+    const aNsURI = a.namespaceURI || '';
+    const bNsURI = b.namespaceURI || '';
+    if (aNsURI !== bNsURI) return aNsURI < bNsURI ? -1 : 1;
+    const aLN = a.localName || a.name;
+    const bLN = b.localName || b.name;
+    return aLN < bLN ? -1 : aLN > bLN ? 1 : 0;
+}
+
+/**
+ * Escape text content per C14N 1.1 rules.
+ */
+function _c14nEscapeText(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\r/g, '&#xD;');
+}
+
+/**
+ * Escape attribute value per C14N 1.1 rules.
+ */
+function _c14nEscapeAttr(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/"/g, '&quot;')
+        .replace(/\t/g, '&#x9;')
+        .replace(/\n/g, '&#xA;')
+        .replace(/\r/g, '&#xD;');
+}
+
+/**
+ * Recursively serialise a DOM element subtree using C14N 1.1 rules.
+ * @param {Element} el              - Current element node
+ * @param {Map}     ancestorNsMap   - Namespace declarations already rendered on ancestors
+ * @param {string[]} out            - Output buffer (array of strings for efficiency)
+ */
+function _c14n11SerialiseElement(el, ancestorNsMap, out) {
+    const tagName = el.nodeName;
+    out.push('<');
+    out.push(tagName);
+
+    // Determine which namespace declarations to render on this element
+    const nsToRender = _getNamespacesToRender(el, ancestorNsMap);
+
+    // Build the merged namespace map for children
+    const childNsMap = new Map(ancestorNsMap);
+    for (const [p, u] of nsToRender) childNsMap.set(p, u);
+
+    // Collect all attributes (namespace decls + regular) for sorting
+    const allAttrs = [];
+    for (let i = 0; i < el.attributes.length; i++) {
+        allAttrs.push(el.attributes[i]);
+    }
+    // Add any namespace declarations that need to be rendered but aren't on el.attributes
+    for (const [prefix, uri] of nsToRender) {
+        const declName = prefix === '' ? 'xmlns' : ('xmlns:' + prefix);
+        const already  = allAttrs.some(a => a.name === declName);
+        if (!already) {
+            // Synthesise a pseudo-attribute object
+            allAttrs.push({ name: declName, value: uri, namespaceURI: 'http://www.w3.org/2000/xmlns/', localName: declName });
+        }
+    }
+
+    // Sort attributes per C14N 1.1
+    allAttrs.sort(_c14n11AttrSort);
+
+    for (const a of allAttrs) {
+        out.push(' ');
+        out.push(a.name);
+        out.push('="');
+        out.push(_c14nEscapeAttr(a.value));
+        out.push('"');
+    }
+
+    out.push('>');
+
+    // Recurse into children
+    let child = el.firstChild;
+    while (child) {
+        switch (child.nodeType) {
+            case 1: // ELEMENT_NODE
+                _c14n11SerialiseElement(child, childNsMap, out);
+                break;
+            case 3: // TEXT_NODE
+                out.push(_c14nEscapeText(child.nodeValue || ''));
+                break;
+            case 4: // CDATA_SECTION_NODE → expand to text in C14N
+                out.push(_c14nEscapeText(child.nodeValue || ''));
+                break;
+            case 7: // PROCESSING_INSTRUCTION_NODE
+                out.push('<?');
+                out.push(child.nodeName);
+                if (child.nodeValue) { out.push(' '); out.push(child.nodeValue); }
+                out.push('?>');
+                break;
+            case 8: // COMMENT_NODE — omitted in C14N without-comments
+                break;
+            default:
+                break;
+        }
+        child = child.nextSibling;
+    }
+
+    out.push('</');
+    out.push(tagName);
+    out.push('>');
+}
+
+/**
+ * Canonicalise a DOM Element to a C14N 1.1 string.
+ * The element is treated as the root of the serialised subtree.
+ * All ancestor namespace bindings are inherited and rendered on the root tag.
+ */
+function c14n11Element(el) {
+    const out = [];
+    _c14n11SerialiseElement(el, new Map(), out);
+    return out.join('');
+}
+
+// ── C14N 1.1 for signature subtrees (with inherited ancestor namespaces) ──────
+// Used for ds:SignedInfo and xades:SignedProperties serialisation before hashing.
+function c14nWithInheritedNS(el) {
+    // Collect all ancestor namespace bindings to inherit into the rendered root
+    const ancestorNs = new Map();
+    let node = el.parentNode;
+    while (node && node.nodeType === 1) {
+        for (let i = 0; i < node.attributes.length; i++) {
+            const a = node.attributes[i];
+            if (a.name === 'xmlns' && !ancestorNs.has('')) {
+                ancestorNs.set('', a.value);
+            } else if (a.name.startsWith('xmlns:')) {
+                const prefix = a.name.slice(6);
+                if (!ancestorNs.has(prefix)) ancestorNs.set(prefix, a.value);
+            }
+        }
+        node = node.parentNode;
+    }
+
+    // Serialise with C14N 1.1, providing the ancestor map so all in-scope
+    // namespaces get rendered on the root element of the subtree.
+    const out = [];
+    _c14n11SerialiseElement(el, ancestorNs, out);
+    return out.join('');
+}
+
+// ── C14N 1.1 for the Invoice element (strips UBLExtensions, cac:Signature, QR)
 function canonicalizeInvoiceXML(xmlString) {
     try {
         const doc = new DOMParser().parseFromString(xmlString, 'application/xml');
 
-        // ── Helper: remove all elements matching a local name ─────────────────
         function removeByLocalName(root, localName) {
-            // Use xpath.select which is the correct API: xpath.select(expression, node)
             const nodes = xpath.select(`//*[local-name()='${localName}']`, root);
             nodes.forEach(n => n.parentNode && n.parentNode.removeChild(n));
         }
 
-        // Remove UBLExtensions subtree
         removeByLocalName(doc, 'UBLExtensions');
 
-        // Remove cac:Signature subtree (UBL CommonAggregateComponents namespace only)
         const sigNodes = xpath.select(
             "//*[local-name()='Signature' and namespace-uri()='urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2']",
             doc
         );
         sigNodes.forEach(n => n.parentNode && n.parentNode.removeChild(n));
 
-        // Remove QR AdditionalDocumentReference
         const adrNodes = xpath.select("//*[local-name()='AdditionalDocumentReference']", doc);
         adrNodes.forEach(n => {
             const idChildren = xpath.select("*[local-name()='ID']", n);
@@ -157,176 +288,309 @@ function canonicalizeInvoiceXML(xmlString) {
             }
         });
 
-        // Step 2 — C14N 1.1 via xml-crypto on the cleaned document
-        // IMPORTANT: c14n.process() requires an Element node (nodeType 1), NOT a Document
-        // node (nodeType 9). Always pass documentElement, never the document itself.
+        // Re-serialise stripped document then apply C14N 1.1
         const strippedXml = new XMLSerializer().serializeToString(doc);
-        const cleanDoc = new DOMParser().parseFromString(strippedXml, 'application/xml');
-        const c14n = new C14nCanonicalization();
-        return c14n.process(cleanDoc.documentElement);
+        const cleanDoc    = new DOMParser().parseFromString(strippedXml, 'application/xml');
+
+        return c14n11Element(cleanDoc.documentElement);
     } catch (err) {
-        // [GAP-2] Hard failure — regex fallback is NOT allowed because it produces
-        // non-spec canonical XML that causes ZATCA signature verification to fail.
-        // Propagate a descriptive error so the operator UI can surface a blocking alert.
-        throw new Error('C14N canonicalization failed — cannot sign invoice safely: ' + err.message);
+        throw new Error('C14N 1.1 canonicalization failed — cannot sign invoice safely: ' + err.message);
     }
 }
 
-// ── [GAP-2] Startup C14N self-test ───────────────────────────────────────────
-// Runs once at module load. If the xml-crypto C14N implementation is broken or
-// unavailable, this will throw and prevent the module from loading at all,
-// giving an immediate signal rather than a silent failure at signing time.
+// ── Startup C14N 1.1 self-test ────────────────────────────────────────────────
 (function runC14NSelfTest() {
-    const TEST_XML = `<?xml version="1.0" encoding="UTF-8"?><Invoice xmlns="urn:test"><cbc:ID>001</cbc:ID></Invoice>`;
+    const TEST_XML = `<?xml version="1.0" encoding="UTF-8"?><Invoice xmlns="urn:test"><cbc:ID xmlns:cbc="urn:test:cbc">001</cbc:ID></Invoice>`;
     let result;
     try {
         result = canonicalizeInvoiceXML(TEST_XML);
     } catch (e) {
-        throw new Error('[ZATCA MODULE LOAD BLOCKED] C14N self-test threw: ' + e.message);
+        throw new Error('[ZATCA MODULE LOAD BLOCKED] C14N 1.1 self-test threw: ' + e.message);
     }
-    // C14N 1.1 output must be a non-empty string with the element intact
     if (!result || typeof result !== 'string' || result.indexOf('<Invoice') === -1) {
         throw new Error(
-            '[ZATCA MODULE LOAD BLOCKED] C14N self-test produced invalid output. ' +
-            'Expected canonical XML containing <Invoice, got: ' + String(result).slice(0, 120)
+            '[ZATCA MODULE LOAD BLOCKED] C14N 1.1 self-test produced invalid output. Got: ' + String(result).slice(0, 120)
         );
     }
 })();
 
-/**
- * Hash the invoice XML using C14N 1.1 + SHA-256.
- * Returns Base64 string — used as DigestValue in the signature and as
- * the invoice hash submitted to ZATCA's reporting API.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// ZATCA PHASE 2 CORE ENGINE
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Key pair generation ───────────────────────────────────────────────────────
+function generateDeviceKeyPair() {
+    const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', {
+        namedCurve: 'secp256k1',
+        publicKeyEncoding:  { type: 'spki',  format: 'pem' },
+        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+    return { privateKeyPem: privateKey, publicKeyPem: publicKey };
+}
+
+// ── CSR generation — pure in-memory, no OpenSSL / temp files ──────────────────
+//
+// IMPORTANT ENGINEERING NOTE: ZATCA mandates secp256k1 EC keys (see
+// generateDeviceKeyPair above) — not RSA. node-forge's `pki.privateKeyFromPem`
+// / `pki.createCertificationRequest().sign()` path only understands RSA keys
+// internally, so it cannot parse or sign with our EC private key. To keep this
+// 100% pure-JS and in-memory (no execSync, no OpenSSL, no temp files) we use
+// forge purely as an ASN.1 builder/DER-encoder (subject RDNs, SPKI passthrough,
+// the ZATCA custom extensions) and delegate the actual ECDSA-SHA256 signing
+// operation to Node's native `crypto`, which natively supports secp256k1.
+function generateCSR(privateKeyPem, publicKeyPem, info) {
+    const asn1 = forge.asn1;
+
+    let templateName;
+    const resolvedEnv = _resolveEnv(info.environment || info.isSandbox);
+    if (resolvedEnv === 'sandbox') {
+        templateName = 'TESTZATCA-Code-Signing';
+    } else if (resolvedEnv === 'simulation') {
+        templateName = 'PREZATCA-Code-Signing';
+    } else {
+        templateName = 'ZATCA-Code-Signing';
+    }
+
+    const ORG    = info.ORG    || 'Smart Touch POS';
+    const OU     = info.OU     || 'Main Branch';
+    const CN     = info.CN     || 'ZATCA-EGS';
+    const EGS_SN = info.EGS_SN || '1-SmartTouch|2-POS|3-001';
+    const UID    = info.UID    || '310000000000003';
+    const IND    = info.IND    || 'Retail';
+
+    // ── Subject Name RDNs: C=SA, O, OU, CN ────────────────────────────────────
+    function rdn(oid, value, valueType) {
+        return asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SET, true, [
+            asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
+                asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer(oid).getBytes()),
+                asn1.create(asn1.Class.UNIVERSAL, valueType || asn1.Type.UTF8, false, value),
+            ]),
+        ]);
+    }
+
+    const subjectAttrs = [
+        rdn('2.5.4.6',  'SA', asn1.Type.PRINTABLESTRING), // C
+        rdn('2.5.4.10', ORG),                              // O
+        rdn('2.5.4.11', OU),                               // OU
+        rdn('2.5.4.3',  CN),                               // CN
+    ];
+    const subject = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, subjectAttrs);
+
+    // ── SubjectPublicKeyInfo — lifted directly from the SPKI PEM (EC keys
+    // pass straight through forge's ASN.1 parser; only forge.pki's high-level
+    // RSA-oriented helpers are off-limits here) ───────────────────────────────
+    const spkiDer  = forge.pem.decode(publicKeyPem)[0].body;
+    const spkiAsn1 = asn1.fromDer(forge.util.createBuffer(spkiDer));
+
+    // ── Extension builder ─────────────────────────────────────────────────────
+    function extension(oid, valueAsn1) {
+        return asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
+            asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer(oid).getBytes()),
+            asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OCTETSTRING, false, asn1.toDer(valueAsn1).getBytes()),
+        ]);
+    }
+
+    // 1.3.6.1.4.1.311.20.2 — Certificate Template Name
+    const templateExt = extension(
+        '1.3.6.1.4.1.311.20.2',
+        asn1.create(asn1.Class.UNIVERSAL, asn1.Type.UTF8, false, templateName)
+    );
+
+    // 2.5.29.17 — subjectAltName: directoryName GeneralName wrapping the
+    // same C/O/OU/CN RDN sequence, per ZATCA's strict onboarding schema.
+    const directoryName = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, subjectAttrs);
+    const generalNameDirectoryName = asn1.create(asn1.Class.CONTEXT_SPECIFIC, 4, true, [directoryName]);
+    const sanExt = extension(
+        '2.5.29.17',
+        asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [generalNameDirectoryName])
+    );
+
+    // ZATCA proprietary attribute extensions
+    const egsSnExt = extension('1.2.3.4.5.6.7.8.1', asn1.create(asn1.Class.UNIVERSAL, asn1.Type.UTF8, false, EGS_SN));
+    const vatExt    = extension('1.2.3.4.5.6.7.8.2', asn1.create(asn1.Class.UNIVERSAL, asn1.Type.UTF8, false, UID));
+    const indExt    = extension('1.2.3.4.5.6.7.8.3', asn1.create(asn1.Class.UNIVERSAL, asn1.Type.UTF8, false, IND));
+
+    const extensionsSeq = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
+        templateExt, sanExt, egsSnExt, vatExt, indExt,
+    ]);
+
+    // extensionRequest attribute (PKCS#9, OID 1.2.840.113549.1.9.14):
+    // Attribute ::= SEQUENCE { type OID, values SET OF Extensions }
+    const extensionRequestAttr = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
+        asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer('1.2.840.113549.1.9.14').getBytes()),
+        asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SET, true, [extensionsSeq]),
+    ]);
+
+    // CertificationRequestInfo.attributes is [0] IMPLICIT SET
+    const attributes = asn1.create(asn1.Class.CONTEXT_SPECIFIC, 0, true, [extensionRequestAttr]);
+
+    // ── CertificationRequestInfo ───────────────────────────────────────────────
+    const version = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.INTEGER, false, String.fromCharCode(0x00));
+    const cri = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
+        version, subject, spkiAsn1, attributes,
+    ]);
+    const criDer = Buffer.from(asn1.toDer(cri).getBytes(), 'binary');
+
+    // ── Sign the CRI with the device's secp256k1 private key (ECDSA-SHA256) ───
+    const signer = crypto.createSign('SHA256');
+    signer.update(criDer);
+    const derSignature = signer.sign(privateKeyPem); // already DER-encoded ECDSA sig
+
+    // ecdsa-with-SHA256 = 1.2.840.10045.4.3.2 (no parameters for EC sig algs)
+    const signatureAlgorithm = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
+        asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer('1.2.840.10045.4.3.2').getBytes()),
+    ]);
+    const signatureValue = asn1.create(
+        asn1.Class.UNIVERSAL, asn1.Type.BITSTRING, false,
+        String.fromCharCode(0x00) + derSignature.toString('binary')
+    );
+
+    const csrAsn1 = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
+        cri, signatureAlgorithm, signatureValue,
+    ]);
+
+    const csrDer    = asn1.toDer(csrAsn1).getBytes();
+    const csrPem    = forge.pem.encode({ type: 'CERTIFICATE REQUEST', body: csrDer });
+    const csrBase64 = forge.util.encode64(csrDer);
+
+    return { csrBase64, csrPem };
+}
+
+// ── ZATCA Compliance API ──────────────────────────────────────────────────────
+async function getComplianceCSID(csrBase64, otp, environment = 'production') {
+    const env = _resolveEnv(environment);
+    const url = ZATCA_URLS[env].compliance;
+    try {
+        const response = await axios.post(url, { csr: csrBase64 }, {
+            headers: { 'OTP': otp, 'Accept-Version': 'V2', 'Accept-Language': 'en', 'Content-Type': 'application/json' },
+        });
+        return response.data;
+    } catch (err) {
+        throw new Error(`ZATCA Compliance API Error: ${err.response?.data?.errors?.[0]?.message || err.message}`);
+    }
+}
+
+async function getProductionCSID(complianceRequestId, complianceToken, complianceSecret, environment = 'production') {
+    const env = _resolveEnv(environment);
+    const url = ZATCA_URLS[env].onboarding;
+    const auth = Buffer.from(`${complianceToken}:${complianceSecret}`).toString('base64');
+    try {
+        const response = await axios.post(url, { compliance_request_id: complianceRequestId }, {
+            headers: { 'Authorization': `Basic ${auth}`, 'Accept-Version': 'V2', 'Accept-Language': 'en', 'Content-Type': 'application/json' },
+        });
+        return response.data;
+    } catch (err) {
+        throw new Error(`ZATCA Production API Error: ${err.response?.data?.errors?.[0]?.message || err.message}`);
+    }
+}
+
+// Compute base64 hash from C14N 1.1 canonical form
 function hashXML(xmlString) {
     const canonical = canonicalizeInvoiceXML(xmlString);
-    return crypto.createHash('sha256').update(canonical, 'utf8').digest('base64');
+    return crypto.createHash('sha256').update(Buffer.from(canonical, 'utf8')).digest('base64');
+}
+
+// ── DER → IEEE P1363 signature converter ────────────────────────────────────
+function derToP1363(derBuf) {
+    if (derBuf[0] !== 0x30) throw new Error('[ZATCA] derToP1363: expected SEQUENCE tag 0x30, got 0x' + derBuf[0].toString(16));
+
+    let offset = 2;
+    if (derBuf[1] & 0x80) offset += (derBuf[1] & 0x7f);
+
+    if (derBuf[offset] !== 0x02) throw new Error('[ZATCA] derToP1363: expected INTEGER tag 0x02 for r');
+    const rLen = derBuf[offset + 1];
+    offset += 2;
+    let r = derBuf.slice(offset, offset + rLen);
+    if (r[0] === 0x00) r = r.slice(1);
+    offset += rLen;
+
+    if (derBuf[offset] !== 0x02) throw new Error('[ZATCA] derToP1363: expected INTEGER tag 0x02 for s');
+    const sLen = derBuf[offset + 1];
+    offset += 2;
+    let s = derBuf.slice(offset, offset + sLen);
+    if (s[0] === 0x00) s = s.slice(1);
+
+    const rPad = Buffer.alloc(32);
+    const sPad = Buffer.alloc(32);
+    r.copy(rPad, 32 - r.length);
+    s.copy(sPad, 32 - s.length);
+
+    return Buffer.concat([rPad, sPad]);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// [FIX-PLACEHOLDER] Structural XML injection — targets the REAL tags emitted
+// by generateUBL21XML() (zatca_utils.cjs) instead of nonexistent comment
+// markers. Both helpers THROW LOUDLY if their anchor structure is missing, so
+// a future template change breaks immediately instead of silently shipping
+// unsigned / un-QR'd invoices to ZATCA.
+// ─────────────────────────────────────────────────────────────────────────────
+const UBL_EXTENSIONS_RE = /<ext:UBLExtensions>[\s\S]*?<\/ext:UBLExtensions>/;
+const QR_REF_BLOCK_RE   = /<cac:AdditionalDocumentReference>\s*<cbc:ID>QR<\/cbc:ID>[\s\S]*?<\/cac:AdditionalDocumentReference>/;
+const QR_EMBED_RE       = /<cbc:EmbeddedDocumentBinaryObject mimeCode="text\/plain">[\s\S]*?<\/cbc:EmbeddedDocumentBinaryObject>/;
+
+/**
+ * Replace the existing <ext:UBLExtensions>...</ext:UBLExtensions> block (the
+ * empty skeleton emitted by generateUBL21XML) with `replacement`. Pass '' to
+ * strip the block entirely (unsigned / pre-CSID path).
+ */
+function injectUBLExtensions(xml, replacement) {
+    if (!UBL_EXTENSIONS_RE.test(xml)) {
+        throw new Error('[ZATCA] injectUBLExtensions: <ext:UBLExtensions> block not found in XML — refusing to silently skip signature assembly.');
+    }
+    return xml.replace(UBL_EXTENSIONS_RE, replacement);
+}
+
+/**
+ * Inject the Base64 TLV QR payload into the <cbc:EmbeddedDocumentBinaryObject>
+ * tag that lives inside the AdditionalDocumentReference whose <cbc:ID> is
+ * "QR" (NOT the ICV or PIH references, which share the same parent tag name).
+ */
+function injectQRPayload(xml, tlvBase64) {
+    const qrBlockMatch = xml.match(QR_REF_BLOCK_RE);
+    if (!qrBlockMatch) {
+        throw new Error('[ZATCA] injectQRPayload: QR AdditionalDocumentReference block not found in XML — refusing to silently skip QR injection.');
+    }
+    const qrBlock = qrBlockMatch[0];
+    if (!QR_EMBED_RE.test(qrBlock)) {
+        throw new Error('[ZATCA] injectQRPayload: EmbeddedDocumentBinaryObject tag not found inside QR reference block.');
+    }
+    const patchedBlock = qrBlock.replace(
+        QR_EMBED_RE,
+        `<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">${tlvBase64}</cbc:EmbeddedDocumentBinaryObject>`
+    );
+    return xml.replace(qrBlock, patchedBlock);
 }
 
 // ── ECDSA Signing ─────────────────────────────────────────────────────────────
-/**
- * Signs the canonical invoice hash with the device ECDSA private key.
- * Input is the Base64 hash string (as returned by hashXML).
- */
-/**
- * Signs a ZATCA invoice per ZATCA SDK spec (section 5.4).
- *
- * ZATCA verifies signatures against the *canonical XML bytes* (C14N 1.1 of
- * the stripped invoice), not the decoded hash buffer. The previous code fed
- * the decoded hash into sign.update() which caused ECDSA signature rejection
- * on every B2B clearance and B2C reporting call.
- *
- * Call pattern (preferred):
- *   signXMLHash(invoiceXml, privateKeyPem)          // xml string → canonical → sign
- *
- * Legacy backward-compat:
- *   signXMLHash(hashBase64, privateKeyPem, invoiceXml)  // hash + xml → canonical → sign
- *
- * @param {string} xmlOrHash      Full unsigned XML string, or legacy base64 hash.
- * @param {string} privateKeyPem  Device EC private key (PKCS8 PEM).
- * @param {string} [invoiceXml]   Full XML — needed only in legacy call pattern.
- * @returns {string} Base64 ECDSA-SHA256 signature.
- */
-function signXMLHash(xmlOrHash, privateKeyPem, invoiceXml, certPem) {
-    // [W-3] Block signing with an expired certificate before touching any crypto.
-    if (certPem) {
-        const daysLeft = checkCertExpiry(certPem);
-        if (daysLeft <= 0) {
-            throw new Error(
-                'Device certificate expired — invoice signing is blocked. Renew at ZATCA portal.'
-            );
-        }
-    }
-    const sign = crypto.createSign('SHA256');
-    // Legacy call: first arg is a short base64 hash (< 100 chars, no '<')
-    if (xmlOrHash && xmlOrHash.length < 100 && !xmlOrHash.startsWith('<')) {
-        const sourceXml = invoiceXml || null;
-        if (sourceXml) {
-            sign.update(canonicalizeInvoiceXML(sourceXml), 'utf8');
-        } else {
-            // No XML supplied — cannot canonicalize; warn and use old behaviour.
-            console.warn('[ZATCA] signXMLHash: received hash only — pass full XML as first or third arg. Signature may be rejected.');
-            sign.update(Buffer.from(xmlOrHash, 'base64'));
-        }
-    } else {
-        // Correct path: caller passes full XML string; canonicalize then sign.
-        sign.update(canonicalizeInvoiceXML(xmlOrHash), 'utf8');
-    }
-    return sign.sign(privateKeyPem, 'base64');
-}
+function signInvoiceXML(xmlString, privateKeyPem, certPem, timestamp) {
+    const invoiceHashBase64 = hashXML(xmlString);
 
-// ── 9-tag ZATCA TLV QR (Phase 2) ─────────────────────────────────────────────
-function generateZatcaTLV9(seller, vatNo, timestamp, total, vatAmt, xmlHash, ecdsaSig, pubKeyPem, certSignature) {
-    // [C-3] BER-TLV multi-byte length encoding (supports values > 127 bytes)
-    const tlvEncode = (tag, valueBuf) => {
-        const len = valueBuf.length;
-        let lenBuf;
-        if (len <= 127) {
-            lenBuf = Buffer.from([len]);
-        } else if (len <= 255) {
-            lenBuf = Buffer.from([0x81, len]);
-        } else {
-            lenBuf = Buffer.from([0x82, (len >> 8) & 0xFF, len & 0xFF]);
-        }
-        return Buffer.concat([Buffer.from([tag]), lenBuf, valueBuf]);
-    };
+    const cleanCertBase64 = certPem
+        .replace(/-----BEGIN CERTIFICATE-----/g, '')
+        .replace(/-----END CERTIFICATE-----/g, '')
+        .replace(/[\n\r]/g, '');
+    const certHashB64 = crypto.createHash('sha256').update(cleanCertBase64, 'base64').digest('base64');
 
-    let pubKeyDer = Buffer.alloc(0);
+    let issuerName = '';
+    let serialNumber = '';
     try {
-        if (pubKeyPem) {
-            const b64 = pubKeyPem
-                .replace(/-----BEGIN PUBLIC KEY-----/g, '')
-                .replace(/-----END PUBLIC KEY-----/g, '')
-                .replace(/[\n\r]/g, '');
-            pubKeyDer = Buffer.from(b64, 'base64');
-        }
-    } catch (e) { /* leave empty */ }
+        const x509 = new crypto.X509Certificate(certPem);
+        const escapeXml = (s) => String(s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 
-    return Buffer.concat([
-        tlvEncode(1, Buffer.from(String(seller || ''), 'utf8')),
-        tlvEncode(2, Buffer.from(String(vatNo  || ''), 'utf8')),
-        tlvEncode(3, Buffer.from(String(timestamp || ''), 'utf8')),
-        tlvEncode(4, Buffer.from(parseFloat(total  || 0).toFixed(2), 'utf8')),
-        tlvEncode(5, Buffer.from(parseFloat(vatAmt || 0).toFixed(2), 'utf8')),
-        tlvEncode(6, Buffer.from(xmlHash      || '', 'base64')),
-        tlvEncode(7, Buffer.from(ecdsaSig     || '', 'base64')),
-        tlvEncode(8, pubKeyDer),
-        tlvEncode(9, Buffer.from(certSignature || '', 'base64')),
-    ]).toString('base64');
-}
+        issuerName = escapeXml(
+            x509.issuer.split('\n').reverse().join(', ')
+        );
+        serialNumber = BigInt('0x' + x509.serialNumber.replace(/:/g, '')).toString(10);
+    } catch (e) {
+        console.warn('[ZATCA XAdES] Could not parse X509 for IssuerSerial:', e.message);
+    }
 
-// ── XAdES-BES signature envelope (ZATCA-compliant) ────────────────────────────
-/**
- * Builds the complete <ext:UBLExtensions> block including:
- *   - ds:SignedInfo with correct references
- *   - ds:SignatureValue
- *   - ds:KeyInfo with X.509 certificate
- *   - ds:Object with xades:QualifyingProperties (SignedSignatureProperties)
- *     containing SigningTime and certificate digest — required by ZATCA Phase 2.
- *
- * The xades:SignedProperties digest (referenced in ds:Reference URI="#xadesSignedProperties")
- * is computed here so the envelope is self-contained and verifiable.
- */
-function buildSignatureEnvelope(xmlHash, signatureBase64, certBase64, timestamp, certPem) {
-    // Signing time: ISO-8601 without milliseconds
     const signingTime = String(timestamp || new Date().toISOString()).replace(/\.\d{3}Z$/, 'Z');
 
-    // Certificate SHA-256 digest for XAdES SignedProperties
-    let certDigestB64 = '';
-    try {
-        const certDer = Buffer.from(certBase64.replace(/[\n\r]/g, ''), 'base64');
-        certDigestB64 = crypto.createHash('sha256').update(certDer).digest('base64');
-    } catch (e) {
-        console.error('[ZATCA XAdES] cert digest error:', e.message);
-    }
-
-    // Build the xades:SignedProperties XML fragment so we can hash it
-    const signedPropertiesXml = `<xades:SignedProperties xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" Id="xadesSignedProperties"><xades:SignedSignatureProperties><xades:SigningTime>${signingTime}</xades:SigningTime><xades:SigningCertificate><xades:Cert><xades:CertDigest><ds:DigestMethod xmlns:ds="http://www.w3.org/2000/09/xmldsig#" Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><ds:DigestValue xmlns:ds="http://www.w3.org/2000/09/xmldsig#">${certDigestB64}</ds:DigestValue></xades:CertDigest></xades:Cert></xades:SigningCertificate></xades:SignedSignatureProperties></xades:SignedProperties>`;
-
-    // Hash of the SignedProperties block (referenced in ds:SignedInfo)
-    const signedPropsHash = crypto.createHash('sha256').update(signedPropertiesXml, 'utf8').digest('base64');
-
-    return `
+    const dummyEnvelope = `
     <ext:UBLExtensions>
         <ext:UBLExtension>
             <ext:ExtensionURI>urn:oasis:names:specification:ubl:dsig:enveloped:xades</ext:ExtensionURI>
@@ -353,22 +617,38 @@ function buildSignatureEnvelope(xmlHash, signatureBase64, certBase64, timestamp,
                                         <ds:Transform Algorithm="http://www.w3.org/2006/12/xml-c14n11"/>
                                     </ds:Transforms>
                                     <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
-                                    <ds:DigestValue>${xmlHash}</ds:DigestValue>
+                                    <ds:DigestValue>${invoiceHashBase64}</ds:DigestValue>
                                 </ds:Reference>
                                 <ds:Reference Type="http://www.w3.org/2000/09/xmldsig#SignatureProperties" URI="#xadesSignedProperties">
                                     <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
-                                    <ds:DigestValue>${signedPropsHash}</ds:DigestValue>
+                                    <ds:DigestValue>__SIGNED_PROPS_HASH__</ds:DigestValue>
                                 </ds:Reference>
                             </ds:SignedInfo>
-                            <ds:SignatureValue>${signatureBase64}</ds:SignatureValue>
+                            <ds:SignatureValue>__SIGNATURE_VALUE__</ds:SignatureValue>
                             <ds:KeyInfo>
                                 <ds:X509Data>
-                                    <ds:X509Certificate>${certBase64}</ds:X509Certificate>
+                                    <ds:X509Certificate>${cleanCertBase64}</ds:X509Certificate>
                                 </ds:X509Data>
                             </ds:KeyInfo>
                             <ds:Object>
                                 <xades:QualifyingProperties xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" Target="signature">
-                                    ${signedPropertiesXml}
+                                    <xades:SignedProperties Id="xadesSignedProperties">
+                                        <xades:SignedSignatureProperties>
+                                            <xades:SigningTime>${signingTime}</xades:SigningTime>
+                                            <xades:SigningCertificate>
+                                                <xades:Cert>
+                                                    <xades:CertDigest>
+                                                        <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+                                                        <ds:DigestValue>${certHashB64}</ds:DigestValue>
+                                                    </xades:CertDigest>
+                                                    <xades:IssuerSerial>
+                                                        <ds:X509IssuerName>${issuerName}</ds:X509IssuerName>
+                                                        <ds:X509SerialNumber>${serialNumber}</ds:X509SerialNumber>
+                                                    </xades:IssuerSerial>
+                                                </xades:Cert>
+                                            </xades:SigningCertificate>
+                                        </xades:SignedSignatureProperties>
+                                    </xades:SignedProperties>
                                 </xades:QualifyingProperties>
                             </ds:Object>
                         </ds:Signature>
@@ -377,18 +657,89 @@ function buildSignatureEnvelope(xmlHash, signatureBase64, certBase64, timestamp,
             </ext:ExtensionContent>
         </ext:UBLExtension>
     </ext:UBLExtensions>`;
+
+    const docStr = injectUBLExtensions(xmlString, dummyEnvelope);
+    const doc = new DOMParser().parseFromString(docStr, 'application/xml');
+
+    // [FIX-2] Use C14N 1.1 for SignedProperties hash
+    const signedPropsNode = xpath.select("//*[local-name()='SignedProperties']", doc)[0];
+    const c14nSignedProps = c14nWithInheritedNS(signedPropsNode);
+    const signedPropsHashB64 = crypto.createHash('sha256').update(c14nSignedProps, 'utf8').digest('base64');
+
+    const digestValueNodes = xpath.select(
+        "//*[local-name()='Reference' and @URI='#xadesSignedProperties']/*[local-name()='DigestValue']",
+        doc
+    );
+    if (digestValueNodes.length > 0) {
+        digestValueNodes[0].textContent = signedPropsHashB64;
+    }
+
+    // [FIX-2] Use C14N 1.1 for SignedInfo serialisation before ECDSA signing
+    const signedInfoNode = xpath.select("//*[local-name()='SignedInfo']", doc)[0];
+    const c14nSignedInfo = c14nWithInheritedNS(signedInfoNode);
+    const sign = crypto.createSign('SHA256');
+    sign.update(c14nSignedInfo, 'utf8');
+    const derSignature = sign.sign({ key: privateKeyPem });
+    const p1363Buf = derToP1363(derSignature);
+    const signatureBase64 = p1363Buf.toString('base64');
+
+    const envelope = dummyEnvelope
+        .replace('__SIGNED_PROPS_HASH__', signedPropsHashB64)
+        .replace('__SIGNATURE_VALUE__', signatureBase64);
+
+    return { envelope, invoiceHashBase64, signatureBase64 };
+}
+
+// ── 9-tag ZATCA TLV QR (Phase 2) ─────────────────────────────────────────────
+function generateZatcaTLV9(seller, vatNo, timestamp, total, vatAmt, xmlHash, ecdsaSig, pubKeyPem, certSignature) {
+    const tlvEncode = (tag, valueBuf) => {
+        const len = valueBuf.length;
+        let lenBuf;
+        if (len <= 127) {
+            lenBuf = Buffer.from([len]);
+        } else if (len <= 255) {
+            lenBuf = Buffer.from([0x81, len]);
+        } else {
+            lenBuf = Buffer.from([0x82, (len >> 8) & 0xFF, len & 0xFF]);
+        }
+        return Buffer.concat([Buffer.from([tag]), lenBuf, valueBuf]);
+    };
+
+    let pubKeyDer = Buffer.alloc(0);
+    try {
+        if (pubKeyPem) {
+            const b64 = pubKeyPem
+                .replace(/-----BEGIN PUBLIC KEY-----/g, '')
+                .replace(/-----END PUBLIC KEY-----/g, '')
+                .replace(/[\n\r]/g, '');
+            pubKeyDer = Buffer.from(b64, 'base64');
+        }
+    } catch (e) { /* leave empty */ }
+
+    const tags = [
+        tlvEncode(1, Buffer.from(String(seller || ''), 'utf8')),
+        tlvEncode(2, Buffer.from(String(vatNo  || ''), 'utf8')),
+        tlvEncode(3, Buffer.from(String(timestamp || ''), 'utf8')),
+        tlvEncode(4, Buffer.from(parseFloat(total  || 0).toFixed(2), 'utf8')),
+        tlvEncode(5, Buffer.from(parseFloat(vatAmt || 0).toFixed(2), 'utf8')),
+    ];
+    if (xmlHash)       tags.push(tlvEncode(6, Buffer.from(xmlHash, 'base64')));
+    if (ecdsaSig)      tags.push(tlvEncode(7, Buffer.from(ecdsaSig, 'base64')));
+    if (pubKeyDer.length > 0) tags.push(tlvEncode(8, pubKeyDer));
+    if (certSignature) tags.push(tlvEncode(9, Buffer.from(certSignature, 'base64')));
+
+    return Buffer.concat(tags).toString('base64');
 }
 
 // ── ZATCA Reporting API ───────────────────────────────────────────────────────
-async function reportInvoice(invoiceHash, xmlBase64, uuid, csidToken, csidSecret, isSandbox = false) {
-    const url = isSandbox
-        ? 'https://gw-fatoora.zatca.gov.sa/e-invoicing/developer-portal/invoices/reporting/single'
-        : 'https://gw-fatoora.zatca.gov.sa/e-invoicing/core/invoices/reporting/single';
+async function reportInvoice(invoiceHash, xmlBase64, uuid, csidToken, csidSecret, environment = 'production') {
+    const env = _resolveEnv(environment);
+    const url = ZATCA_URLS[env].reporting;
     const auth = Buffer.from(`${csidToken}:${csidSecret}`).toString('base64');
     try {
         const response = await axios.post(url,
             { invoiceHash, uuid, invoice: xmlBase64 },
-            { headers: { 'Authorization': `Basic ${auth}`, 'Accept-Version': 'V2', 'Accept-Language': 'en', 'Clearance-Status': '0', 'Content-Type': 'application/json' } }
+            { headers: { 'Authorization': `Basic ${auth}`, 'Accept-Version': 'V2', 'Accept-Language': 'en', 'Content-Type': 'application/json' } }
         );
         return response.data;
     } catch (err) {
@@ -397,16 +748,15 @@ async function reportInvoice(invoiceHash, xmlBase64, uuid, csidToken, csidSecret
     }
 }
 
-// ── [C-1] ZATCA Clearance API (B2B Standard invoices, subtype 0100000) ────────
-async function clearInvoice(invoiceHash, xmlBase64, uuid, csidToken, csidSecret, isSandbox = false) {
-    const url = isSandbox
-        ? 'https://gw-fatoora.zatca.gov.sa/e-invoicing/developer-portal/invoices/clearance/single'
-        : 'https://gw-fatoora.zatca.gov.sa/e-invoicing/core/invoices/clearance/single';
+// ── ZATCA Clearance API ────────────────────────────────────────────────
+async function clearInvoice(invoiceHash, xmlBase64, uuid, csidToken, csidSecret, environment = 'production') {
+    const env = _resolveEnv(environment);
+    const url = ZATCA_URLS[env].clearance;
     const auth = Buffer.from(`${csidToken}:${csidSecret}`).toString('base64');
     try {
         const response = await axios.post(url,
             { invoiceHash, uuid, invoice: xmlBase64 },
-            { headers: { 'Authorization': `Basic ${auth}`, 'Accept-Version': 'V2', 'Accept-Language': 'en', 'Clearance-Status': '1', 'Content-Type': 'application/json' } }
+            { headers: { 'Authorization': `Basic ${auth}`, 'Accept-Version': 'V2', 'Accept-Language': 'en', 'Content-Type': 'application/json' } }
         );
         return response.data;
     } catch (err) {
@@ -415,13 +765,7 @@ async function clearInvoice(invoiceHash, xmlBase64, uuid, csidToken, csidSecret,
     }
 }
 
-// ── [W-3] Certificate expiry check ──────────────────────────────────────────────
-/**
- * Parse the certificate's notAfter field and return the number of whole days
- * remaining until expiry. Returns a negative number if already expired.
- * @param {string} certPem  PEM-encoded X.509 certificate.
- * @returns {number} Days remaining (negative = expired).
- */
+// ── Certificate expiry check ───────────────────────────────────────────
 function checkCertExpiry(certPem) {
     try {
         const certObj = forge.pki.certificateFromPem(certPem);
@@ -430,17 +774,30 @@ function checkCertExpiry(certPem) {
         return Math.floor(msRemaining / 86_400_000);
     } catch (e) {
         console.error('[ZATCA] checkCertExpiry: could not parse cert:', e.message);
-        return Infinity; // unknown — don't block
+        return Infinity;
     }
 }
 
 // ── Certificate detail extraction ─────────────────────────────────────────────
 function extractCertDetails(certPem) {
     try {
-        const pubKey    = crypto.createPublicKey(certPem);
-        const pubKeyPem = pubKey.export({ type: 'spki', format: 'pem' });
-        const certObj   = forge.pki.certificateFromPem(certPem);
-        const certSignature = Buffer.from(certObj.signature, 'binary').toString('base64');
+        const x509 = new crypto.X509Certificate(certPem);
+        const pubKeyPem = x509.publicKey.export({ type: 'spki', format: 'pem' });
+        const certDer = x509.raw;
+
+        const asn1Obj = forge.asn1.fromDer(forge.util.createBuffer(certDer.toString('binary')));
+
+        const signatureValue = asn1Obj.value[2];
+        let rawBytes = signatureValue.value;
+
+        if (typeof rawBytes === 'string') {
+            rawBytes = Buffer.from(rawBytes, 'binary');
+            if (signatureValue.type === forge.asn1.Type.BITSTRING && rawBytes[0] === 0x00) {
+                rawBytes = rawBytes.slice(1);
+            }
+        }
+
+        const certSignature = Buffer.from(rawBytes).toString('base64');
         return { pubKeyPem, certSignature };
     } catch (e) {
         console.error('[ZATCA] extractCertDetails error:', e.message);
@@ -449,16 +806,8 @@ function extractCertDetails(certPem) {
 }
 
 // ── QR TLV extractor (for receipt rendering) ─────────────────────────────────
-/**
- * Extracts the TLV Base64 string embedded in a signed invoice XML so it can
- * be rendered as a scannable QR code image on receipts.
- * @param {string} signedXml
- * @returns {string|null} TLV Base64 or null if not found
- */
 function extractQRFromXML(signedXml) {
     try {
-        // Match the EmbeddedDocumentBinaryObject inside the QR AdditionalDocumentReference
-        // We look for the QR placeholder area specifically
         const qrRefMatch = signedXml.match(
             /<cac:AdditionalDocumentReference>\s*<cbc:ID>QR<\/cbc:ID>[\s\S]*?<cbc:EmbeddedDocumentBinaryObject[^>]*>([A-Za-z0-9+/=]+)<\/cbc:EmbeddedDocumentBinaryObject>/
         );
@@ -471,21 +820,130 @@ function extractQRFromXML(signedXml) {
     }
 }
 
+// ── Compliance invoice check ────────────────────────────────────────────
+async function checkComplianceInvoice(invoiceHash, xmlBase64, uuid, complianceToken, complianceSecret, environment = 'production') {
+    const env = _resolveEnv(environment);
+    const url = ZATCA_URLS[env].compliance_checks;
+    const auth = Buffer.from(`${complianceToken}:${complianceSecret}`).toString('base64');
+    try {
+        const response = await axios.post(
+            url,
+            { invoiceHash, uuid, invoice: xmlBase64 },
+            {
+                headers: {
+                    'Authorization': `Basic ${auth}`,
+                    'Accept-Version': 'V2',
+                    'Accept-Language': 'en',
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
+        return response.data;
+    } catch (err) {
+        if (err.response) return { error: true, status: err.response.status, data: err.response.data };
+        throw err;
+    }
+}
+
+// ── Production CSID renewal ─────────────────────────────────────────────
+async function renewProductionCSID(newCsrBase64, currentToken, currentSecret, otp, environment = 'production') {
+    const env = _resolveEnv(environment);
+    const url = ZATCA_URLS[env].onboarding;
+    const auth = Buffer.from(`${currentToken}:${currentSecret}`).toString('base64');
+    try {
+        const response = await axios.patch(
+            url,
+            { csr: newCsrBase64 },
+            {
+                headers: {
+                    'OTP': otp,
+                    'Authorization': `Basic ${auth}`,
+                    'Accept-Version': 'V2',
+                    'Accept-Language': 'en',
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
+        return response.data;
+    } catch (err) {
+        if (err.response) return { error: true, status: err.response.status, data: err.response.data };
+        throw err;
+    }
+}
+
+// ── signAndPackageInvoice ─────────────────────────────────────────────────────
+function signAndPackageInvoice({ xml, device, settings, timestamp, total, tax, db }) {
+    const invoiceHash = hashXML(xml);
+    let signedXml = xml;
+    // [FIX-PIH-CHAIN] Default chain value to the unsigned-branch hash; overwritten below if signed.
+    let chainHashB64 = invoiceHash;
+
+    if (!device.production_csid || !device.production_cert_pem) {
+        const tlv = generateZatcaTLV9(
+            settings.business_name_ar || 'مؤسسة تجارية',
+            settings.vat_number || settings.tax_number || '300000000000003',
+            timestamp, total, tax
+        );
+        // [FIX-PLACEHOLDER] Structural replace — no signature yet, so the
+        // skeleton UBLExtensions block is stripped entirely.
+        signedXml = injectUBLExtensions(xml, '');
+        signedXml = injectQRPayload(signedXml, tlv);
+    } else {
+        const { envelope, invoiceHashBase64, signatureBase64 } = signInvoiceXML(
+            xml,
+            device.private_key_pem,
+            device.production_cert_pem,
+            timestamp
+        );
+        // [FIX-PLACEHOLDER] Structural replace — swap the empty skeleton
+        // <ext:UBLExtensions> block for the fully computed XAdES envelope.
+        signedXml = injectUBLExtensions(xml, envelope);
+        chainHashB64 = invoiceHashBase64;
+
+        const { pubKeyPem, certSignature } = extractCertDetails(device.production_cert_pem);
+        const tlv = generateZatcaTLV9(
+            settings.business_name_ar || 'مؤسسة تجارية',
+            settings.vat_number || settings.tax_number || '300000000000003',
+            timestamp, total, tax,
+            invoiceHashBase64, signatureBase64, pubKeyPem, certSignature
+        );
+        signedXml = injectQRPayload(signedXml, tlv);
+    }
+
+    // [FIX-PIH-CHAIN] Moved outside the if/else — last_pih must be updated for EVERY
+    // invoice (signed or unsigned), or the chain silently desyncs the next time a
+    // production-CSID invoice follows a non-CSID one.
+    if (db) {
+        db.prepare('UPDATE zatca_device SET last_pih = ? WHERE id = ?').run(chainHashB64, device.id);
+    }
+
+    return { signedXml, invoiceHash };
+}
+
 module.exports = {
+    derToP1363,
     generateDeviceKeyPair,
     generateCSR,
     getComplianceCSID,
     issueComplianceCSID:  getComplianceCSID,
     getProductionCSID,
     issueProductionCSID:  getProductionCSID,
+    checkComplianceInvoice,
+    renewProductionCSID,
+    getZatcaUrl,
+    ZATCA_URLS,
     canonicalizeInvoiceXML,
+    c14nWithInheritedNS,
+    c14n11Element,
     hashXML,
-    signXMLHash,
+    signInvoiceXML,
+    signAndPackageInvoice,
+    injectUBLExtensions,
+    injectQRPayload,
     generateZatcaTLV9,
-    buildSignatureEnvelope,
     reportInvoice,
-    clearInvoice,       // [C-1]
+    clearInvoice,
     extractCertDetails,
     extractQRFromXML,
-    checkCertExpiry,    // [W-3]
+    checkCertExpiry,
 };

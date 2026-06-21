@@ -52,6 +52,7 @@ const DEFAULT_CFG = {
   textColor:        '#1a1a1a',
   priceColor:       '#111827',
   borderStyle:      'none',
+  fitMode:          'none',
   copies:           1,
   size:             '58x40',
   labelPrinterName: '',
@@ -83,13 +84,45 @@ const EXTRA_FIELDS = [
 ];
 
 const PRESET_GROUPS = [
-  { label:'طابعة ٥٨ مم', printerWidth:'58', color:'#2563eb' },
-  { label:'طابعة ٨٠ مم', printerWidth:'80', color:'#7c3aed' },
-  { label:'طابعة A4',    printerWidth:'A4', color:'#059669' },
+  { label:'58mm',  printerWidth:'58',  color:'#2563eb' },
+  { label:'80mm',  printerWidth:'80',  color:'#7c3aed' },
+  { label:'100mm', printerWidth:'100', color:'#dc2626' },
+  { label:'A4',    printerWidth:'A4',  color:'#059669' },
 ];
 
 const DRIVER_LABELS = { gdi:'GDI/Windows', cups:'CUPS/Linux', escpos:'ESC/POS', zpl:'ZPL II (Zebra)' };
 const STRATEGY_LABELS = { embed:'مضمّن (موصى به)', system:'نظام التشغيل', bitmap:'نقطي (Dot-matrix)' };
+
+const FIT_MODE_OPTIONS = [
+  {
+    value: 'none',
+    label: 'عادي',
+    labelEn: 'Normal',
+    icon: '▭',
+    desc: 'أحجام ثابتة بناءً على حجم الملصق',
+  },
+  {
+    value: 'fit-width',
+    label: 'ملء العرض',
+    labelEn: 'Fit Width',
+    icon: '↔',
+    desc: 'تمديد المحتوى ليملأ عرض الملصق',
+  },
+  {
+    value: 'fit-height',
+    label: 'ملء الارتفاع',
+    labelEn: 'Fit Height',
+    icon: '↕',
+    desc: 'توزيع المحتوى ليملأ ارتفاع الملصق',
+  },
+  {
+    value: 'stretch',
+    label: 'ملء الكل',
+    labelEn: 'Stretch to Fill',
+    icon: '⤢',
+    desc: 'تمديد المحتوى ليملأ الملصق بالكامل',
+  },
+];
 
 // ─── P4: Live Preview ─────────────────────────────────────────────────────────
 // Scale is derived dynamically from the preview container pixel width.
@@ -160,7 +193,7 @@ function LabelPreview({ cfg, settings, sampleBarcode }) {
       <div style={{ fontSize:'11px', color:'#94a3b8', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em' }}>
         معاينة — {preset.w}×{preset.h} مم
       </div>
-      <div style={{ width:pW+'px', height:pH+'px', background:cfg.labelBackground, border: cfg.borderStyle !== 'none' ? `1px ${cfg.borderStyle} #aaa` : '1px solid #e2e8f0', borderRadius:'3px', boxShadow:'0 4px 16px rgba(0,0,0,0.1)', padding:pad+'px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'1px', overflow:'hidden', fontFamily:cfg.fontFamily, direction:'rtl', transition:'all 0.2s' }}>
+      <div style={{ width:pW+'px', height:pH+'px', background:cfg.labelBackground, border: cfg.borderStyle !== 'none' ? `1px ${cfg.borderStyle} #aaa` : '1px solid #e2e8f0', borderRadius:'3px', boxShadow:'0 4px 16px rgba(0,0,0,0.1)', padding:pad+'px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent: (cfg.fitMode === 'fit-height' || cfg.fitMode === 'stretch') ? 'space-between' : 'center', gap: (cfg.fitMode === 'fit-height' || cfg.fitMode === 'stretch') ? '0' : '1px', overflow:'hidden', fontFamily:cfg.fontFamily, direction:'rtl', transition:'all 0.2s' }}>
         {cfg.barcodePosition === 'top' && bcSection}
         {cfg.showBusinessName && settings?.business_name_ar && <div style={{ fontSize:fs.biz+'px', fontWeight:600, color:'#666', textAlign:'center', width:'100%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{settings.business_name_ar}</div>}
         {cfg.showProductName  && <div style={{ fontSize:fs.prod+'px', fontWeight:900, color:cfg.textColor, textAlign:'center', width:'100%', lineHeight:1.25, wordBreak:'break-word' }}>منتج تجريبي</div>}
@@ -266,13 +299,13 @@ export default function LabelPrintSettings({ value, onChange, settings, printers
         </select>
         {cfg.labelPrinterName && (
           <div style={{ marginTop:'6px', padding:'8px 10px', borderRadius:'8px', background: isUnknownPrinter ? '#fffbeb' : '#f0fdf4', border:`1px solid ${isUnknownPrinter ? '#fde68a' : '#bbf7d0'}`, fontSize:'11px', color: isUnknownPrinter ? '#92400e' : '#065f46', display:'flex', gap:'12px', flexWrap:'wrap' }}>
-            {isUnknownPrinter && <span>⚠️ طابعة غير معروفة — تم تطبيق هوامش محافظة (3 مم)</span>}
-            {!isUnknownPrinter && <span>✅ ملف تعريف: {cfg.labelPrinterName}</span>}
-            <span>LNPZ: {activeProfile.lnpzMm}مم</span>
-            <span>RNPZ: {activeProfile.rnpzMm}مم</span>
+            {isUnknownPrinter && <span>⚠️ Unknown printer — conservative margins (3mm) applied</span>}
+            {!isUnknownPrinter && <span>✅ Profile: {cfg.labelPrinterName}</span>}
+            <span>L/R margins: {activeProfile.lnpzMm}mm</span>
+            <span>T/B margins: {activeProfile.tnpzMm}mm</span>
             <span>DPI: {activeProfile.maxDPI}</span>
-            <span>البروتوكول: {DRIVER_LABELS[activeProfile.driverType] || activeProfile.driverType}</span>
-            <span>الخط: {STRATEGY_LABELS[activeProfile.fontStrategy] || activeProfile.fontStrategy}</span>
+            <span>Driver: {DRIVER_LABELS[activeProfile.driverType] || activeProfile.driverType}{activeProfile.zplCapable ? ' + ZPL capable' : ''}</span>
+            <span>Font: {STRATEGY_LABELS[activeProfile.fontStrategy] || activeProfile.fontStrategy}</span>
           </div>
         )}
       </div>
@@ -364,6 +397,53 @@ export default function LabelPrintSettings({ value, onChange, settings, printers
               </div>
             </div>
           )}
+
+          {/* Fit Mode */}
+          <div>
+            <div style={{ fontSize:'12px', fontWeight:700, color:'var(--text-muted)', marginBottom:'8px', display:'flex', alignItems:'center', gap:'6px' }}>
+              ⤢ وضع ملء الملصق
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'7px' }}>
+              {FIT_MODE_OPTIONS.map(opt => {
+                const active = cfg.fitMode === opt.value;
+                const colors = {
+                  none:       { bg:'#f8fafc', ac:'#64748b', border:'#cbd5e1' },
+                  'fit-width':{ bg:'#eff6ff', ac:'#2563eb', border:'#bfdbfe' },
+                  'fit-height':{ bg:'#f5f3ff', ac:'#7c3aed', border:'#ddd6fe' },
+                  stretch:    { bg:'#fff7ed', ac:'#ea580c', border:'#fed7aa' },
+                }[opt.value];
+                return (
+                  <button key={opt.value} onClick={() => u('fitMode', opt.value)}
+                    style={{
+                      display:'flex', flexDirection:'column', alignItems:'flex-start',
+                      gap:'3px', padding:'10px 11px', borderRadius:'11px',
+                      border: active ? `1.5px solid ${colors.border}` : '1.5px solid var(--border-subtle)',
+                      background: active ? colors.bg : 'var(--bg-app)',
+                      cursor:'pointer', fontFamily:'inherit', textAlign:'right',
+                      transition:'all 0.12s',
+                      boxShadow: active ? `0 0 0 3px ${colors.border}55` : 'none',
+                    }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:'5px', width:'100%' }}>
+                      <span style={{ fontSize:'15px', lineHeight:1 }}>{opt.icon}</span>
+                      <span style={{ fontSize:'12px', fontWeight:800, color: active ? colors.ac : 'var(--text-main)' }}>{opt.label}</span>
+                      <span style={{ fontSize:'10px', color:'#94a3b8', marginRight:'auto', direction:'ltr' }}>{opt.labelEn}</span>
+                    </div>
+                    <div style={{ fontSize:'10px', color: active ? colors.ac : '#94a3b8', lineHeight:1.4 }}>{opt.desc}</div>
+                  </button>
+                );
+              })}
+            </div>
+            {cfg.fitMode !== 'none' && (
+              <div style={{ marginTop:'7px', padding:'7px 10px', borderRadius:'8px', background:'#fffbeb', border:'1px solid #fde68a', fontSize:'11px', color:'#92400e', display:'flex', alignItems:'flex-start', gap:'5px' }}>
+                <span style={{ flexShrink:0 }}>⚠️</span>
+                <span>
+                  {cfg.fitMode === 'stretch' && 'وضع التمديد الكامل قد يغيّر نسبة أبعاد الباركود — تحقّق من إمكانية قراءته قبل الطباعة الفعلية.'}
+                  {cfg.fitMode === 'fit-width'  && 'سيتم تكبير النص والباركود ليملأا عرض الملصق — مفيد للملصقات العريضة.'}
+                  {cfg.fitMode === 'fit-height' && 'سيتم توزيع المحتوى على كامل ارتفاع الملصق — مفيد للملصقات الطويلة.'}
+                </span>
+              </div>
+            )}
+          </div>
 
           {/* QR content field when showQR is on */}
           {cfg.showQR && (

@@ -1863,6 +1863,113 @@ function getBreakEvenInputs() {
 // ─────────────────────────────────────────────────────────────────────────────
 // EXPORTS
 // ─────────────────────────────────────────────────────────────────────────────
+// IP-6: PAYROLL DISBURSEMENT
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Disburse a posted payroll run.
+ * Posts: DR 2210 (Salaries Payable) / CR 1112 (Bank)
+ * runId        — ID of a payroll_runs row with status = 'posted'
+ * paymentMethod— 'bank' (default) | 'cash'
+ * createdBy    — staff id
+ */
+function disbursePayroll(runId, paymentMethod = 'bank', createdBy = 1) {
+    const run = _db.prepare(`SELECT * FROM payroll_runs WHERE id = ?`).get(runId);
+    if (!run) throw new Error('كشف الراتب غير موجود');
+    if (run.status !== 'posted') throw new Error('يجب ترحيل كشف الراتب أولاً قبل الصرف');
+    if (run.status === 'disbursed') throw new Error('تم صرف هذا الكشف مسبقاً');
+
+    const netSAR    = fromHalala(run.total_net_halala);
+    const creditAcct = (paymentMethod === 'cash') ? 1111 : 1112;
+    const disbursedDate = fmtDate(new Date());
+
+    return _db.transaction(() => {
+        const jeId = postJournalEntry({
+            entry_date:     disbursedDate,
+            reference_no:   `DISB-${run.run_month}`,
+            description:    `صرف رواتب — ${run.run_month}`,
+            entry_type:     'Auto',
+            reference_type: 'payroll_run',
+            reference_id:   String(runId),
+            lines: [
+                { account_code: 2210,       debit: netSAR, credit: 0 },
+                { account_code: creditAcct, debit: 0,      credit: netSAR },
+            ],
+            created_by: createdBy,
+        });
+        _db.prepare(`UPDATE payroll_runs SET status = 'disbursed' WHERE id = ?`).run(runId);
+        return { success: true, journal_entry_id: jeId };
+    })();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IP-7: VAT SETTLEMENT
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Settle VAT for a period.
+ * Reads getVATReturnBoxes() for net VAT due, then posts:
+ *   DR 2300 (VAT Output — full output collected)
+ *   CR 2400 (VAT Input  — net off recoverable input)
+ *   CR 1112 (Bank       — net payment to ZATCA)
+ * If vatDue < 0 (refund): DR 1112, CR 2400, CR/DR 2300 accordingly.
+ */
+function postVATSettlement(startDate, endDate, paymentDate, createdBy = 1) {
+    const boxes = getVATReturnBoxes(startDate, endDate);
+    const outputVAT = parseFloat(boxes.box1_standard_vat)   || 0;
+    const inputVAT  = parseFloat(boxes.box5_input_vat)       || 0;
+    const vatDue    = parseFloat(boxes.box9_vat_due)         || 0;  // outputVAT - inputVAT
+
+    if (Math.abs(vatDue) < 0.01 && Math.abs(outputVAT) < 0.01) {
+        throw new Error('لا توجد ضريبة مستحقة لهذه الفترة');
+    }
+
+    const pDate = fmtDate(paymentDate || new Date());
+    const refNo = `VAT-SET-${startDate.substring(0, 7)}`;
+
+    const lines = [];
+
+    if (vatDue >= 0) {
+        // Normal: pay ZATCA
+        // DR 2300 (clear output VAT liability)
+        lines.push({ account_code: 2300, debit: outputVAT, credit: 0,         description: 'تسوية ضريبة مخرجات' });
+        // CR 2400 (clear input VAT asset)
+        if (inputVAT > 0) {
+            lines.push({ account_code: 2400, debit: 0, credit: inputVAT, description: 'تسوية ضريبة مدخلات' });
+        }
+        // CR 1112 Bank (payment to ZATCA)
+        lines.push({ account_code: 1112, debit: 0, credit: vatDue, description: 'دفع ضريبة لهيئة الزكاة' });
+    } else {
+        // Refund scenario: ZATCA owes us
+        // DR 2300 (clear output)
+        lines.push({ account_code: 2300, debit: outputVAT, credit: 0,          description: 'تسوية ضريبة مخرجات' });
+        // DR 1112 (refund receivable from ZATCA)
+        lines.push({ account_code: 1112, debit: Math.abs(vatDue), credit: 0,   description: 'استرداد ضريبة من هيئة الزكاة' });
+        // CR 2400 (clear input asset)
+        lines.push({ account_code: 2400, debit: 0, credit: inputVAT,           description: 'تسوية ضريبة مدخلات' });
+    }
+
+    const jeId = postJournalEntry({
+        entry_date:     pDate,
+        reference_no:   refNo,
+        description:    `تسوية ضريبة القيمة المضافة — ${startDate.substring(0,7)}`,
+        entry_type:     'Auto',
+        reference_type: 'vat_settlement',
+        reference_id:   `${startDate}:${endDate}`,
+        lines,
+        created_by:     createdBy,
+    });
+
+    return {
+        success:          true,
+        journal_entry_id: jeId,
+        output_vat:       outputVAT,
+        input_vat:        inputVAT,
+        vat_due:          vatDue,
+        is_refund:        vatDue < 0,
+    };
+}
+
 module.exports = {
     initP2,
     // AR
@@ -1931,4 +2038,8 @@ module.exports = {
     getDeferredRevenueSchedules,
     addDeferredRevenueSchedule,
     runDeferredRevenueRecognition,
+    // IP-6: Payroll Disbursement
+    disbursePayroll,
+    // IP-7: VAT Settlement
+    postVATSettlement,
 };

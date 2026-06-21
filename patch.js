@@ -23,7 +23,7 @@ const newTables = `
             production_csid TEXT,
             production_cert_pem TEXT,
             current_icv INTEGER DEFAULT 0,
-            last_pih TEXT DEFAULT '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=',
+            last_pih TEXT DEFAULT 'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
@@ -116,7 +116,7 @@ const saveSaleReplace = `
         
         db.prepare('UPDATE zatca_device SET current_icv = current_icv + 1 WHERE id = ?').run(device.id);
         const newIcv = device.current_icv;
-        const prevHash = device.last_pih || '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=';
+        const prevHash = device.last_pih || 'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==';
         const invoiceUUID = generateUUID();
 
         const saleTimestamp = (saleData.date && typeof saleData.date === 'string')
@@ -140,18 +140,20 @@ const saveSaleReplace = `
         let signedXml = xml;
         let signatureBase64 = '';
         
-        if (device.production_csid && device.production_cert_pem) {
-            signatureBase64 = zatca.signXMLHash(invoiceHash, device.private_key_pem);
-            const certBase64 = device.production_cert_pem.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/\\n/g, '').replace(/\\r/g, '');
-            const env = zatca.buildSignatureEnvelope(invoiceHash, signatureBase64, certBase64, saleTimestamp);
-            signedXml = xml.replace('<!-- UBLEXTENSIONS_PLACEHOLDER -->', env);
-            
-            const tlv = zatca.generateZatcaTLV9(
-                settings.business_name_ar || 'مؤسسة تجارية', settings.tax_number || '300000000000003', saleTimestamp, finalTotal, finalTax,
-                invoiceHash, signatureBase64, '', ''
-            );
-            signedXml = signedXml.replace('<!-- QR_PLACEHOLDER -->', \`<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">\${tlv}</cbc:EmbeddedDocumentBinaryObject>\`);
+        if (!device.production_csid || !device.production_cert_pem) {
+            throw new Error('ZATCA_MISSING_CREDENTIALS: Certificate and CSID are required to sign the invoice. Please onboard the device.');
         }
+        signatureBase64 = zatca.signXMLHash(invoiceHash, device.private_key_pem);
+        const certBase64 = device.production_cert_pem.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/\\n/g, '').replace(/\\r/g, '');
+        const env = zatca.buildSignatureEnvelope(invoiceHash, signatureBase64, certBase64, saleTimestamp, device.production_cert_pem);
+        signedXml = xml.replace('<!-- UBLEXTENSIONS_PLACEHOLDER -->', env);
+        
+        const { pubKeyPem, certSignature } = zatca.extractCertDetails(device.production_cert_pem);
+        const tlv = zatca.generateZatcaTLV9(
+            settings.business_name_ar || 'مؤسسة تجارية', settings.tax_number || '300000000000003', saleTimestamp, finalTotal, finalTax,
+            invoiceHash, signatureBase64, pubKeyPem, certSignature
+        );
+        signedXml = signedXml.replace('<!-- QR_PLACEHOLDER -->', \`<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">\${tlv}</cbc:EmbeddedDocumentBinaryObject>\`);
 
         db.prepare('UPDATE zatca_device SET last_pih = ? WHERE id = ?').run(invoiceHash, device.id);
 
@@ -188,7 +190,7 @@ const voidSaleReplace = `db.prepare('UPDATE sales SET status=? WHERE invoice=?')
         if (device) {
             db.prepare('UPDATE zatca_device SET current_icv = current_icv + 1 WHERE id = ?').run(device.id);
             const newIcv = device.current_icv + 1; // using db triggers would be safer but this is fine in tx
-            const prevHash = device.last_pih || '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=';
+            const prevHash = device.last_pih || 'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==';
             const uuid = generateUUID();
             const timestamp = new Date().toISOString();
             const settings = getSettings();
@@ -207,14 +209,16 @@ const voidSaleReplace = `db.prepare('UPDATE sales SET status=? WHERE invoice=?')
             const invoiceHash = zatca.hashXML(xml);
             let signedXml = xml;
             
-            if (device.production_csid && device.production_cert_pem) {
-                const signatureBase64 = zatca.signXMLHash(invoiceHash, device.private_key_pem);
-                const certBase64 = device.production_cert_pem.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/\\n/g, '').replace(/\\r/g, '');
-                const env = zatca.buildSignatureEnvelope(invoiceHash, signatureBase64, certBase64, timestamp);
-                signedXml = xml.replace('<!-- UBLEXTENSIONS_PLACEHOLDER -->', env);
-                const tlv = zatca.generateZatcaTLV9(settings.business_name_ar, settings.tax_number, timestamp, total, taxVal, invoiceHash, signatureBase64, '', '');
-                signedXml = signedXml.replace('<!-- QR_PLACEHOLDER -->', \`<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">\${tlv}</cbc:EmbeddedDocumentBinaryObject>\`);
+            if (!device.production_csid || !device.production_cert_pem) {
+                throw new Error('ZATCA_MISSING_CREDENTIALS: Certificate and CSID are required to sign the invoice. Please onboard the device.');
             }
+            const signatureBase64 = zatca.signXMLHash(invoiceHash, device.private_key_pem);
+            const certBase64 = device.production_cert_pem.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/\\n/g, '').replace(/\\r/g, '');
+            const env = zatca.buildSignatureEnvelope(invoiceHash, signatureBase64, certBase64, timestamp, device.production_cert_pem);
+            signedXml = xml.replace('<!-- UBLEXTENSIONS_PLACEHOLDER -->', env);
+            const { pubKeyPem, certSignature } = zatca.extractCertDetails(device.production_cert_pem);
+            const tlv = zatca.generateZatcaTLV9(settings.business_name_ar, settings.tax_number, timestamp, total, taxVal, invoiceHash, signatureBase64, pubKeyPem, certSignature);
+            signedXml = signedXml.replace('<!-- QR_PLACEHOLDER -->', \`<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">\${tlv}</cbc:EmbeddedDocumentBinaryObject>\`);
             
             db.prepare('UPDATE zatca_device SET last_pih = ? WHERE id = ?').run(invoiceHash, device.id);
             db.prepare(\`
@@ -245,7 +249,7 @@ const createReturnReplace = `
         }
         db.prepare('UPDATE zatca_device SET current_icv = current_icv + 1 WHERE id = ?').run(device.id);
         const newIcv = device.current_icv + 1;
-        const prevHash = device.last_pih || '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=';
+        const prevHash = device.last_pih || 'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==';
         const uuid = generateUUID();
         const timestamp = new Date().toISOString();
         const settings = getSettings();
@@ -262,14 +266,16 @@ const createReturnReplace = `
         const invoiceHash = zatca.hashXML(xml);
         let signedXml = xml;
         
-        if (device.production_csid && device.production_cert_pem) {
-            const signatureBase64 = zatca.signXMLHash(invoiceHash, device.private_key_pem);
-            const certBase64 = device.production_cert_pem.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/\\n/g, '').replace(/\\r/g, '');
-            const env = zatca.buildSignatureEnvelope(invoiceHash, signatureBase64, certBase64, timestamp);
-            signedXml = xml.replace('<!-- UBLEXTENSIONS_PLACEHOLDER -->', env);
-            const tlv = zatca.generateZatcaTLV9(settings.business_name_ar, settings.tax_number, timestamp, returnTotal, returnTax, invoiceHash, signatureBase64, '', '');
-            signedXml = signedXml.replace('<!-- QR_PLACEHOLDER -->', \`<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">\${tlv}</cbc:EmbeddedDocumentBinaryObject>\`);
+        if (!device.production_csid || !device.production_cert_pem) {
+            throw new Error('ZATCA_MISSING_CREDENTIALS: Certificate and CSID are required to sign the invoice. Please onboard the device.');
         }
+        const signatureBase64 = zatca.signXMLHash(invoiceHash, device.private_key_pem);
+        const certBase64 = device.production_cert_pem.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/\\n/g, '').replace(/\\r/g, '');
+        const env = zatca.buildSignatureEnvelope(invoiceHash, signatureBase64, certBase64, timestamp, device.production_cert_pem);
+        signedXml = xml.replace('<!-- UBLEXTENSIONS_PLACEHOLDER -->', env);
+        const { pubKeyPem, certSignature } = zatca.extractCertDetails(device.production_cert_pem);
+        const tlv = zatca.generateZatcaTLV9(settings.business_name_ar, settings.tax_number, timestamp, returnTotal, returnTax, invoiceHash, signatureBase64, pubKeyPem, certSignature);
+        signedXml = signedXml.replace('<!-- QR_PLACEHOLDER -->', \`<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">\${tlv}</cbc:EmbeddedDocumentBinaryObject>\`);
         
         db.prepare('UPDATE zatca_device SET last_pih = ? WHERE id = ?').run(invoiceHash, device.id);
 

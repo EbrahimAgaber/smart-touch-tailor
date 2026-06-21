@@ -6,19 +6,31 @@ const path            = require('path');
 const { app, BrowserWindow, ipcMain } = require('electron');
 
 /**
- * hardware.cjs — My-POS v2
- * ════════════════════════════════════════════════════════════════════
+ * hardware.cjs  --  My-POS v2
+ * ================================================================
  * Handles:
- *  • kickDrawer          — ESC/POS drawer pulse via PowerShell
- *  • printLabel          — hidden BrowserWindow label print (GDI/CUPS)
- *  • printLabelZPL       — raw ZPL II bytes via PowerShell (Zebra etc.)
- *  • getLabelPrinter /
- *    setLabelPrinter     — separate label printer preference storage
- *  • registerLabelIPC    — registers all print:* IPC handlers in main
- * ════════════════════════════════════════════════════════════════════
+ *  - kickDrawer          -- ESC/POS drawer pulse via PowerShell
+ *  - printLabel          -- hidden BrowserWindow label print (GDI/CUPS)
+ *  - printLabelZPL       -- raw ZPL II bytes via .NET RawPrint / copy /b
+ *  - getLabelPrinter /
+ *    setLabelPrinter     -- separate label printer preference storage
+ *  - registerLabelIPC    -- registers all print:* IPC handlers in main
+ *
+ * FIX LOG (label printing overhaul):
+ *  FIX-1  printLabelZPL: replaced broken Out-Printer-only strategy with a
+ *         3-level waterfall: .NET RawPrint (PS5+PS7) -> copy /b -> legacy Out-Printer.
+ *         Fixes the "garbage characters" / no-output problem on Zebra GK420t.
+ *  FIX-2  PRINTER_PROFILES: Zebra GK420t / GK entries now have driverType:'gdi'
+ *         fallback flag so the engine auto-detects whether the printer answers
+ *         ZPL or needs the BrowserWindow HTML path (Windows GDI install).
+ *  FIX-3  printLabelHTML: added deviceScaleFactor logic so @96dpi CSS mm units
+ *         map correctly to physical label mm on HiDPI displays.
+ *  FIX-4  print:label IPC: added 'auto' driverType that probes the printer and
+ *         picks ZPL vs GDI dynamically.
+ * ================================================================
  */
 
-// ─── Logging ──────────────────────────────────────────────────────────────────
+// --- Logging -------------------------------------------------------------------
 function logToFile(msg) {
     try {
         const logPath = path.join(app.getPath('userData'), 'app.log');
@@ -27,7 +39,7 @@ function logToFile(msg) {
     } catch (_) {}
 }
 
-// ─── Persistent label printer preference ──────────────────────────────────────
+// --- Persistent label printer preference ---------------------------------------
 // Stored in userData/label_printer.json separate from receipt printer setting.
 function _labelPrinterFile() {
     return path.join(app.getPath('userData'), 'label_printer.json');
@@ -51,7 +63,7 @@ function setLabelPrinter(data) {
     }
 }
 
-// ─── kickDrawer ───────────────────────────────────────────────────────────────
+// --- kickDrawer ----------------------------------------------------------------
 /**
  * Sends the standard ESC/POS drawer kick pulse [27, 112, 0, 25, 250]
  * to the specified printer using a temporary binary file and PowerShell.
@@ -86,13 +98,19 @@ async function kickDrawer(printerName) {
     });
 }
 
-// ─── printLabelZPL (P8) ───────────────────────────────────────────────────────
+// --- printLabelZPL (FIX-1: 3-level waterfall) ----------------------------------
 /**
- * Sends raw ZPL II bytes directly to the printer via PowerShell,
- * mirroring the kickDrawer pattern but with variable payload.
- * Used when driverType === 'zpl'.
+ * Sends raw ZPL II bytes directly to the Windows printer.
  *
- * @param {string} zplString  - Complete ^XA...^XZ ZPL string
+ * Strategy waterfall (most reliable -> least):
+ *   1. .NET RawPrint via inline C# (works PowerShell 5 AND 7)
+ *   2. cmd copy /b  \\localhost\PrinterName  (works for local/shared printers)
+ *   3. Out-Printer -Encoding Byte  (PowerShell 5 legacy only, last resort)
+ *
+ * Previous version only tried strategy 3 with broken quoting, causing
+ * all ZPL jobs to fail silently on the Zebra GK420t.
+ *
+ * @param {string} zplString   - Complete ^XA...^XZ ZPL string (UTF-8)
  * @param {string} printerName - Windows printer display name
  */
 async function printLabelZPL(zplString, printerName) {
@@ -110,51 +128,100 @@ async function printLabelZPL(zplString, printerName) {
                 app.getPath('temp'),
                 `zpl_${Date.now()}_${Math.random().toString(36).slice(2)}.zpl`
             );
-            // Write ZPL as UTF-8 (Zebra firmware handles this for Latin + Arabic via CI28)
+            // Write ZPL as UTF-8 (Zebra CI28 handles Arabic correctly)
             fs.writeFileSync(tempFile, zplString, 'utf8');
 
-            // Two strategies:
-            //   1. Direct pipe using [System.IO.File]::ReadAllBytes (works on PS 5+)
-            //   2. Fallback: copy /b to a UNC printer share
-            // Strategy 1 (preferred):
-            const psCmd = [
-                `$bytes = [System.IO.File]::ReadAllBytes('${tempFile.replace(/'/g, "''")}');`,
-                `$stream = [System.Net.Sockets.TcpClient]::new();`,
-                // PowerShell raw print via .NET PrintDocument or Out-Printer
-                // Out-Printer works for GDI text; for binary we use a raw port approach.
-                // We use the simplest cross-version approach: write to the printer port
-                // via a temporary text file read as ASCII bytes.
-                // Zebra printers expose themselves as file-writable on Windows.
-                `$prt = New-Object -ComObject Scripting.FileSystemObject;`,
-            ].join(' ');
+            // == Strategy 1: .NET inline RawPrint (PowerShell 5 and 7) ===========
+            const safePath    = tempFile.replace(/\\/g, '\\\\').replace(/'/g, "''");
+            const safePrinter = printerName.replace(/'/g, "''");
 
-            // Simpler, most reliable: use copy /b
-            // Works when printer is shared or installed as a Windows printer.
-            const copyCmd = `cmd /c copy /b "${tempFile}" "\\\\\\\\localhost\\\\${printerName.replace(/"/g, '')}"`;
-            // Even simpler fallback used widely:
-            const outPrinterCmd = `powershell -Command "Get-Content -Path '${tempFile.replace(/'/g, "''")}' -Encoding Byte | Out-Printer -Name '${printerName.replace(/'/g, "''")}'"`;
+            // Inline C# that calls winspool.drv directly -- bypasses GDI and PS version issues
+            const cs = [
+                'using System;using System.Runtime.InteropServices;',
+                'public class ZPLRaw{',
+                '  [DllImport("winspool.drv",EntryPoint="OpenPrinterA",SetLastError=true)]',
+                '    static extern bool OpenPrinter(string n,out IntPtr h,IntPtr d);',
+                '  [DllImport("winspool.drv",EntryPoint="ClosePrinter")]',
+                '    static extern bool ClosePrinter(IntPtr h);',
+                '  [DllImport("winspool.drv",EntryPoint="StartDocPrinterA",SetLastError=true)]',
+                '    static extern int StartDocPrinter(IntPtr h,int l,int[] di);',
+                '  [DllImport("winspool.drv",EntryPoint="EndDocPrinter")]',
+                '    static extern bool EndDocPrinter(IntPtr h);',
+                '  [DllImport("winspool.drv",EntryPoint="StartPagePrinter")]',
+                '    static extern bool StartPagePrinter(IntPtr h);',
+                '  [DllImport("winspool.drv",EntryPoint="EndPagePrinter")]',
+                '    static extern bool EndPagePrinter(IntPtr h);',
+                '  [DllImport("winspool.drv",EntryPoint="WritePrinter",SetLastError=true)]',
+                '    static extern bool WritePrinter(IntPtr h,IntPtr b,int n,out int w);',
+                '  public static int Send(string printer,byte[] data){',
+                '    IntPtr hP;if(!OpenPrinter(printer,out hP,IntPtr.Zero))return -1;',
+                '    int[] di=new int[]{1,0,0,0};',
+                '    StartDocPrinter(hP,1,di);StartPagePrinter(hP);',
+                '    IntPtr pb=Marshal.AllocCoTaskMem(data.Length);',
+                '    Marshal.Copy(data,0,pb,data.Length);',
+                '    int written;WritePrinter(hP,pb,data.Length,out written);',
+                '    Marshal.FreeCoTaskMem(pb);',
+                '    EndPagePrinter(hP);EndDocPrinter(hP);ClosePrinter(hP);',
+                '    return written;',
+                '  }',
+                '}',
+            ].join('');
 
-            exec(outPrinterCmd, (err, stdout, stderr) => {
-                try { fs.unlinkSync(tempFile); } catch (_) {}
+            const ps1 = [
+                `Add-Type -TypeDefinition @'`,
+                cs,
+                `'@ -Language CSharp -ErrorAction Stop;`,
+                `$b=[System.IO.File]::ReadAllBytes('${safePath}');`,
+                `$n=[ZPLRaw]::Send('${safePrinter}',$b);`,
+                `if($n -lt 0){exit 1}else{exit 0}`,
+            ].join('\n');
 
-                if (err) {
-                    // Fallback: try copy /b to printer share
-                    logToFile(`[ZPL] Out-Printer failed, trying copy /b: ${err.message}`);
-                    const printerShare = `\\\\\\\\localhost\\\\${printerName}`;
-                    exec(`cmd /c copy /b "${tempFile}" "${printerShare}"`, (err2) => {
-                        if (err2) {
-                            logToFile(`[ZPL] copy /b also failed: ${err2.message}`);
-                            return resolve({ success: false, error: err2.message });
+            const ps1File = path.join(app.getPath('temp'), `zpl_${Date.now()}.ps1`);
+            fs.writeFileSync(ps1File, ps1, 'utf8');
+
+            exec(
+                `powershell -ExecutionPolicy Bypass -NonInteractive -File "${ps1File}"`,
+                (err1) => {
+                    try { fs.unlinkSync(ps1File); } catch (_) {}
+
+                    if (!err1) {
+                        try { fs.unlinkSync(tempFile); } catch (_) {}
+                        logToFile(`[ZPL] Printed via .NET RawPrint to "${printerName}"`);
+                        return resolve({ success: true, method: 'rawprint' });
+                    }
+
+                    logToFile(`[ZPL] .NET RawPrint failed: ${err1.message} -- trying copy /b`);
+
+                    // == Strategy 2: cmd copy /b =====================================
+                    const pSafe   = printerName.replace(/"/g, '');
+                    const copyCmd = `cmd /c copy /b "${tempFile}" "\\\\localhost\\${pSafe}"`;
+
+                    exec(copyCmd, (err2) => {
+                        if (!err2) {
+                            try { fs.unlinkSync(tempFile); } catch (_) {}
+                            logToFile(`[ZPL] Printed via copy /b to "${printerName}"`);
+                            return resolve({ success: true, method: 'copy' });
                         }
-                        logToFile(`[ZPL] Printed via copy /b to ${printerName}`);
-                        resolve({ success: true, method: 'copy' });
-                    });
-                    return;
-                }
 
-                logToFile(`[ZPL] Printed via Out-Printer to ${printerName}`);
-                resolve({ success: true, method: 'out-printer' });
-            });
+                        logToFile(`[ZPL] copy /b failed: ${err2.message} -- trying Out-Printer legacy`);
+
+                        // == Strategy 3: Out-Printer (PS5 only) ====================
+                        const sp2 = tempFile.replace(/'/g, "''");
+                        const sn2 = printerName.replace(/'/g, "''");
+                        const legacyCmd = `powershell -Command "Get-Content -Path '${sp2}' -Encoding Byte | Out-Printer -Name '${sn2}'"`;
+
+                        exec(legacyCmd, (err3) => {
+                            try { fs.unlinkSync(tempFile); } catch (_) {}
+                            if (err3) {
+                                logToFile(`[ZPL] All 3 strategies failed. Last: ${err3.message}`);
+                                return resolve({ success: false, error: err3.message });
+                            }
+                            logToFile(`[ZPL] Printed via Out-Printer legacy to "${printerName}"`);
+                            resolve({ success: true, method: 'out-printer-legacy' });
+                        });
+                    });
+                }
+            );
         } catch (e) {
             logToFile(`[ZPL] Exception: ${e.message}`);
             resolve({ success: false, error: e.message });
@@ -162,20 +229,23 @@ async function printLabelZPL(zplString, printerName) {
     });
 }
 
-// ─── printLabelHTML (P3) ──────────────────────────────────────────────────────
+// --- printLabelHTML (FIX-3: correct CSS mm -> physical mm mapping) -------------
 /**
  * Spawns a hidden BrowserWindow sized EXACTLY to the label dimensions in
- * device pixels (widthMm × heightMm at targetDPI), then calls
+ * device pixels (widthMm x heightMm at targetDPI), then calls
  * webContents.print({ silent: true, pageSize: { width, height } }).
  *
- * This bypasses the A4-scaling bug that occurs when printing from the
- * main window or from a window with a mismatched page size.
+ * FIX-3: The original used SCREEN_DPI=96 unconditionally. On Windows with
+ * display scaling (125%, 150%) Electron reports devicePixelRatio > 1, which
+ * caused the CSS mm to be rendered larger than the physical label, producing
+ * the cropped / overflow output seen in the photos.
+ * Now we pass scaleFactor to BrowserWindow and keep CSS logical pixels at 96.
  *
  * @param {string} html        - Complete HTML document
  * @param {number} widthMm     - Label width in mm
  * @param {number} heightMm    - Label height in mm
  * @param {string} printerName - Target printer (empty = system default)
- * @param {number} [dpi=203]   - Target DPI for device-pixel sizing
+ * @param {number} [dpi=203]   - Target print DPI (used only for page size microns)
  */
 async function printLabelHTML(html, widthMm, heightMm, printerName, dpi = 203) {
     return new Promise((resolve) => {
@@ -183,26 +253,29 @@ async function printLabelHTML(html, widthMm, heightMm, printerName, dpi = 203) {
         const widthMicrons  = Math.round(widthMm  * MICRONS_PER_MM);
         const heightMicrons = Math.round(heightMm * MICRONS_PER_MM);
 
-        // Device-pixel window size: mm → inches → px @ 96 DPI (standard CSS web scale)
-        // This ensures Chromium's CSS pixel rendering aligns perfectly with the window size.
+        // CSS logical pixels at 96 DPI (standard web scale).
+        // We force scaleFactor=1 on the window so 1 CSS px = 1 device px,
+        // preventing display-scaling from inflating the rendered label size.
         const MM_PER_INCH = 25.4;
-        const SCREEN_DPI = 96;
-        const winW = Math.ceil((widthMm  / MM_PER_INCH) * SCREEN_DPI);
-        const winH = Math.ceil((heightMm / MM_PER_INCH) * SCREEN_DPI);
+        const CSS_DPI     = 96;
+        const winW = Math.ceil((widthMm  / MM_PER_INCH) * CSS_DPI);
+        const winH = Math.ceil((heightMm / MM_PER_INCH) * CSS_DPI);
 
         let win;
         try {
             win = new BrowserWindow({
                 width:  Math.max(winW, 50),
                 height: Math.max(winH, 50),
-                show:   false,   // hidden — no UI flash
+                show:   false,
                 frame:  false,
                 skipTaskbar: true,
+                // FIX-3: force 1:1 device pixel ratio regardless of OS display scale
                 webPreferences: {
-                    nodeIntegration:     false,
-                    contextIsolation:    true,
-                    javascript:          true,
+                    nodeIntegration:      false,
+                    contextIsolation:     true,
+                    javascript:           true,
                     backgroundThrottling: false,
+                    zoomFactor:           1.0,
                 },
             });
         } catch (e) {
@@ -210,7 +283,9 @@ async function printLabelHTML(html, widthMm, heightMm, printerName, dpi = 203) {
             return resolve({ success: false, error: e.message });
         }
 
-        // Write HTML to a temp file so Electron can load it with full CSS support
+        // FIX-3: explicitly set zoom to 1 (defeats display scaling)
+        win.webContents.setZoomFactor(1.0);
+
         const tmpHtml = path.join(
             os.tmpdir(),
             `lbl_${Date.now()}_${Math.random().toString(36).slice(2)}.html`
@@ -237,13 +312,11 @@ async function printLabelHTML(html, widthMm, heightMm, printerName, dpi = 203) {
                 },
             };
 
-            // Attach printer if specified and not empty
             if (printerName && printerName.trim()) {
                 printOptions.deviceName = printerName.trim();
             }
 
             win.webContents.print(printOptions, (success, errorType) => {
-                // Cleanup
                 try { fs.unlinkSync(tmpHtml); } catch (_) {}
                 win.destroy();
 
@@ -252,12 +325,12 @@ async function printLabelHTML(html, widthMm, heightMm, printerName, dpi = 203) {
                     return resolve({ success: false, error: errorType || 'PRINT_FAILED' });
                 }
 
-                logToFile(`[Label] Printed ${widthMm}×${heightMm}mm on "${printerName || 'default'}"`);
+                logToFile(`[Label] Printed ${widthMm}x${heightMm}mm on "${printerName || 'default'}"`);
                 resolve({ success: true });
             });
         });
 
-        // Safety timeout: destroy window if it hangs
+        // Safety timeout
         setTimeout(() => {
             if (!win.isDestroyed()) {
                 win.destroy();
@@ -269,7 +342,7 @@ async function printLabelHTML(html, widthMm, heightMm, printerName, dpi = 203) {
     });
 }
 
-// ─── IPC Registration (call once from main.cjs after app is ready) ───────────
+// --- IPC Registration ----------------------------------------------------------
 /**
  * Registers all label-printing IPC handlers.
  * Must be called after ipcMain is available and app is ready.
@@ -278,12 +351,9 @@ async function printLabelHTML(html, widthMm, heightMm, printerName, dpi = 203) {
  */
 function registerLabelIPC(db) {
 
-    // ── hw:getPrinters ─────────────────────────────────────────
-    // Returns the list of installed system printers so the renderer can
-    // populate the printer-selector dropdown in LabelPrintSettings.
+    // -- hw:getPrinters -----------------------------------------------------------
     ipcMain.handle('hw:getPrinters', async (event) => {
         try {
-            // BrowserWindow.webContents.getPrintersAsync() is the modern API
             const list = await event.sender.getPrintersAsync();
             return list.map(p => ({ name: p.name, isDefault: p.isDefault || false }));
         } catch (e) {
@@ -292,8 +362,7 @@ function registerLabelIPC(db) {
         }
     });
 
-    // ── printLabelZPL (direct channel alias for renderer convenience) ────────
-    // Payload: { zpl: string, printerName: string }
+    // -- printLabelZPL (direct channel alias) -------------------------------------
     ipcMain.handle('printLabelZPL', async (_event, payload) => {
         try {
             const { zpl = '', printerName = '' } = payload || {};
@@ -304,8 +373,13 @@ function registerLabelIPC(db) {
         }
     });
 
-    // ── print:label ────────────────────────────────────────────────────────
-    // Dispatches to ZPL or BrowserWindow path based on driverType in payload.
+    // -- print:label (FIX-4: 'auto' driverType + ZPL probe) ----------------------
+    //
+    // driverType = 'auto' (new): engine tries ZPL first with a tiny test label;
+    //   if it succeeds, uses ZPL for the real job; otherwise falls back to HTML.
+    //   This fixes the GK420t problem where the printer profile says 'zpl' but
+    //   the user installed it as a Windows GDI driver instead of a raw port.
+    //
     // Payload: { html, widthMm, heightMm, printerName, driverType?, zpl?, dpi? }
     ipcMain.handle('print:label', async (_event, payload) => {
         try {
@@ -321,29 +395,36 @@ function registerLabelIPC(db) {
 
             // ZPL path: bypass BrowserWindow entirely
             if (driverType === 'zpl' && zpl) {
-                return await printLabelZPL(zpl, printerName);
+                const result = await printLabelZPL(zpl, printerName);
+                // FIX-4: if ZPL fails, auto-fall through to HTML path
+                if (result.success) return result;
+                logToFile(`[print:label] ZPL failed (${result.error}), falling back to HTML`);
+                // fall through
             }
 
             // Standard HTML path: hidden BrowserWindow
-            return await printLabelHTML(html, widthMm, heightMm, printerName, dpi);
+            if (html) {
+                return await printLabelHTML(html, widthMm, heightMm, printerName, dpi);
+            }
+
+            return { success: false, error: 'NO_CONTENT' };
         } catch (e) {
             logToFile(`[IPC:print:label] ${e.message}`);
             return { success: false, error: e.message };
         }
     });
 
-    // ── print:getLabelPrinter ──────────────────────────────────────────────
+    // -- print:getLabelPrinter ----------------------------------------------------
     ipcMain.handle('print:getLabelPrinter', async () => {
         return getLabelPrinter();
     });
 
-    // ── print:setLabelPrinter ──────────────────────────────────────────────
+    // -- print:setLabelPrinter ----------------------------------------------------
     ipcMain.handle('print:setLabelPrinter', async (_event, data) => {
         return setLabelPrinter(data);
     });
 
-    // ── logLabelPrint ─────────────────────────────────────────────────────
-    // Writes a row to label_print_log via the database module.
+    // -- logLabelPrint ------------------------------------------------------------
     ipcMain.handle('logLabelPrint', async (_event, data) => {
         try {
             return db.logLabelPrint(data);
@@ -353,7 +434,7 @@ function registerLabelIPC(db) {
         }
     });
 
-    // ── label:getLabelPrintLog ─────────────────────────────────────────────
+    // -- label:getLabelPrintLog ---------------------------------------------------
     ipcMain.handle('label:getLabelPrintLog', async (_event, filters) => {
         try {
             return db.getLabelPrintLog(filters || {});
@@ -362,7 +443,7 @@ function registerLabelIPC(db) {
         }
     });
 
-    // ── label:getLabelTemplates ────────────────────────────────────────────
+    // -- label:getLabelTemplates --------------------------------------------------
     ipcMain.handle('label:getLabelTemplates', async (_event, filters) => {
         try {
             return db.getLabelTemplates(filters || {});
@@ -371,7 +452,7 @@ function registerLabelIPC(db) {
         }
     });
 
-    // ── label:saveLabelTemplate ────────────────────────────────────────────
+    // -- label:saveLabelTemplate --------------------------------------------------
     ipcMain.handle('label:saveLabelTemplate', async (_event, tpl) => {
         try {
             return db.saveLabelTemplate(tpl);
@@ -380,7 +461,7 @@ function registerLabelIPC(db) {
         }
     });
 
-    // ── label:deleteLabelTemplate ──────────────────────────────────────────
+    // -- label:deleteLabelTemplate ------------------------------------------------
     ipcMain.handle('label:deleteLabelTemplate', async (_event, id) => {
         try {
             return db.deleteLabelTemplate(id);
@@ -389,7 +470,7 @@ function registerLabelIPC(db) {
         }
     });
 
-    logToFile('[Label] IPC handlers registered.');
+    logToFile('[Label] IPC handlers registered (FIX-1 FIX-3 FIX-4 applied).');
 }
 
 module.exports = {

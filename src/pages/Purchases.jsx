@@ -3,7 +3,7 @@ import AppLayout from '../components/AppLayout';
 import {
   ShoppingBag, Plus, Search, Trash2, CheckCircle2,
   Truck, Archive, ArrowLeftRight, Save, X,
-  Eye, Tag, Package, ShoppingCart, ChevronLeft
+  Eye, Tag, Package, ShoppingCart, ChevronLeft, RotateCcw
 } from 'lucide-react';
 import { useToast } from '../components/ToastManager';
 import { printLabelBatch } from '../utils/LabelPrintEngine.js';
@@ -35,6 +35,14 @@ export default function Purchases() {
     fieldsOrder: ['business', 'name', 'price', 'barcode'], size: '50x30'
   });
   const [productSearch, setProductSearch] = useState('');
+  const [editingOrderId, setEditingOrderId] = useState(null);
+
+  // Return modal state
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [returnOrder, setReturnOrder] = useState(null);
+  const [returnItems, setReturnItems] = useState([]); // [{ product_id, product_name, orderedQty, unit_name, pieces_per_unit, unit_cost, returnQty }]
+  const [returnMode, setReturnMode] = useState('full'); // 'full' | 'partial'
+  const [submittingReturn, setSubmittingReturn] = useState(false);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -62,6 +70,98 @@ export default function Purchases() {
     setLoading(false);
   };
 
+  const handleEditOrder = async (order) => {
+    try {
+      const items = await window.api.getPurchaseItems(order.id);
+      setEditingOrderId(order.id);
+      setSelectedSupplier(order.supplier_id || '');
+      setNote(order.note || '');
+      setVatIncluded(order.vat_included !== 0);
+      setPaidAmount(order.paid_amount || '');
+      setCart(items.map(it => ({
+        product_id: it.product_id,
+        name: it.product_name,
+        quantity: it.quantity,
+        unit_name: it.unit_name || 'وحدة',
+        pieces_per_unit: it.pieces_per_unit || 1,
+        unit_cost: it.unit_cost,
+        is_bulk: it.is_bulk === 1,
+        costManuallySet: true,
+        originalCost: it.unit_cost
+      })));
+      setShowAddModal(true);
+    } catch(e) {
+      toast('تعذر تحميل تفاصيل الطلب: ' + e.message, 'error');
+    }
+  };
+
+  const handleDeleteOrder = async (orderId) => {
+    if (!window.confirm('هل أنت متأكد من حذف طلب الشراء؟ لا يمكن التراجع عن هذا الإجراء.')) return;
+    try {
+      await window.api.deletePurchaseOrder(orderId);
+      toast('تم حذف طلب الشراء بنجاح', 'success');
+      fetchData();
+    } catch (e) {
+      toast('حدث خطأ أثناء الحذف: ' + e.message, 'error');
+    }
+  };
+
+  const handleOpenReturnModal = async (order) => {
+    try {
+      const items = await window.api.getPurchaseItems(order.id);
+      setReturnOrder(order);
+      setReturnMode('full');
+      setReturnItems(items.map(it => {
+        const ppu = it.pieces_per_unit || 1;
+        return {
+          product_id: it.product_id,
+          product_name: it.product_name,
+          orderedQty: it.quantity / ppu,   // user-facing qty (e.g. 12 not 144)
+          unit_name: it.unit_name || 'وحدة',
+          pieces_per_unit: ppu,
+          unit_cost: it.unit_cost * ppu,   // cost per user-facing unit
+          returnQty: it.quantity / ppu,    // default = full return
+        };
+      }));
+      setShowReturnModal(true);
+    } catch (e) {
+      toast('تعذر تحميل تفاصيل الطلب: ' + e.message, 'error');
+    }
+  };
+
+  const handleConfirmFullReturn = async () => {
+    if (!window.confirm('هل أنت متأكد من إرجاع الطلب بالكامل؟ سيتم خصم المخزون وإنشاء قيد محاسبي عكسي.')) return;
+    setSubmittingReturn(true);
+    try {
+      await window.api.returnPurchaseOrder(returnOrder.id);
+      toast('تم إرجاع الطلب بالكامل بنجاح', 'success');
+      setShowReturnModal(false);
+      fetchData();
+      if (detailOrder && detailOrder.id === returnOrder.id) setDetailOrder(null);
+    } catch (e) {
+      toast('حدث خطأ أثناء الإرجاع: ' + e.message, 'error');
+    } finally { setSubmittingReturn(false); }
+  };
+
+  const handleConfirmPartialReturn = async () => {
+    const payload = returnItems
+      .filter(it => parseFloat(it.returnQty) > 0)
+      .map(it => ({ product_id: it.product_id, return_qty: parseFloat(it.returnQty) }));
+    if (payload.length === 0) return toast('يرجى تحديد الكمية المرتجعة لمنتج واحد على الأقل', 'warn');
+    if (!window.confirm(`إرجاع جزئي: ${payload.length} صنف. سيتم خصم المخزون وإنشاء قيد محاسبي عكسي. متابعة؟`)) return;
+    setSubmittingReturn(true);
+    try {
+      const res = await window.api.partialReturnPurchaseOrder(returnOrder.id, payload);
+      toast(`تم الإرجاع الجزئي بنجاح (${res.status === 'returned' ? 'مرتجع كامل' : 'مرتجع جزئي'})`, 'success');
+      setShowReturnModal(false);
+      fetchData();
+      if (detailOrder && detailOrder.id === returnOrder.id) setDetailOrder(null);
+    } catch (e) {
+      toast('حدث خطأ أثناء الإرجاع الجزئي: ' + e.message, 'error');
+    } finally { setSubmittingReturn(false); }
+  };
+
+
   const filteredProducts = useMemo(() => {
     if (!productSearch.trim()) return products;
     const q = productSearch.toLowerCase();
@@ -86,7 +186,7 @@ export default function Purchases() {
     if (detailItems.length === 0) return;
     const batchPayload = detailItems.map(it => {
       const p = products.find(prod => prod.ID === it.product_id) || { ID: it.product_id, Name: it.product_name, Price: 0 };
-      const actualQty = it.is_bulk ? it.quantity * (it.bulk_unit_size || 1) : it.quantity;
+      const actualQty = it.is_bulk ? it.quantity * (it.bulk_unit_size || 1) : (it.quantity * (it.pieces_per_unit || 1));
       return { product: p, copies: Math.min(parseInt(actualQty) || 1, 500) };
     });
     printLabelBatch(batchPayload, settings, labelConfig.size, 1, labelConfig)
@@ -106,9 +206,8 @@ export default function Purchases() {
         unit_cost: product.Cost || 0,
         costManuallySet: false,
         originalCost: product.Cost || 0,
-        is_bulk: false,
-        bulk_size: product.BulkUnitSize || 1,
-        bulk_name: product.BulkUnitName || 'كرتون'
+        unit_name: 'حبة',
+        pieces_per_unit: 1
       }]);
     }
   };
@@ -127,7 +226,7 @@ export default function Purchases() {
   const calculateTotal = () => cart.reduce((acc, c) => {
     const unitCost = parseFloat(c.unit_cost) || 0;
     const qty = parseFloat(c.quantity) || 0;
-    return acc + (c.is_bulk ? qty * unitCost * (c.bulk_size || 1) : qty * unitCost);
+    return acc + (qty * unitCost);
   }, 0);
 
   const netTotal = calculateTotal();
@@ -139,33 +238,48 @@ export default function Purchases() {
   const handleSubmitOrder = async () => {
     if (!selectedSupplier) return toast('يرجى اختيار المورد', 'warn');
     if (cart.length === 0) return toast('يرجى إضافة منتج واحد على الأقل', 'warn');
-    const invalidItems = cart.filter(c => !c.quantity || c.quantity <= 0 || !c.unit_cost || c.unit_cost <= 0);
-    if (invalidItems.length > 0) return toast('يرجى التأكد من إدخال الكمية والتكلفة لجميع المنتجات', 'warn');
+    const invalidItems = cart.filter(c => !c.quantity || c.quantity <= 0 || !c.unit_cost || c.unit_cost < 0 || !c.pieces_per_unit || c.pieces_per_unit <= 0);
+    if (invalidItems.length > 0) return toast('يرجى التأكد من إدخال الكمية والتكلفة وعدد القطع لجميع المنتجات', 'warn');
     const staleCosts = cart.filter(c => !c.costManuallySet && c.originalCost > 0);
     if (staleCosts.length > 0) {
       const ok = confirm(`تنبيه: ${staleCosts.length} منتج يحتوي على سعر مبدئي ولم يتم تحديثه من الفاتورة. هل تريد المتابعة؟`);
       if (!ok) return;
     }
+    const data = {
+      supplier_id: parseInt(selectedSupplier),
+      total_amount: grossTotal,
+      vat_included: vatIncluded ? 1 : 0,
+      paid_amount: paid,
+      payment_status: paid >= grossTotal ? 'paid' : paid > 0 ? 'partial' : 'unpaid',
+      note,
+      items: cart.map(c => ({
+        product_id: c.product_id,
+        quantity: parseFloat(c.quantity), // Sent as requested by user (e.g., 12)
+        unit_cost: parseFloat(c.unit_cost), // Sent as requested by user
+        is_bulk: false,
+        unit_name: c.unit_name || 'وحدة',
+        pieces_per_unit: parseFloat(c.pieces_per_unit) || 1
+      }))
+    };
+
     try {
-      await window.api.createPurchaseOrder({
-        supplier_id: parseInt(selectedSupplier),
-        total_amount: netTotal,
-        vat_included: vatIncluded,
-        paid_amount: paid,
-        payment_status: paid >= grossTotal ? 'paid' : paid > 0 ? 'partial' : 'unpaid',
-        items: cart.map(c => ({
-          product_id: c.product_id,
-          quantity: parseFloat(c.quantity),
-          unit_cost: parseFloat(c.unit_cost),
-          is_bulk: c.is_bulk,
-        })),
-        note
-      });
-      setShowAddModal(false); setCart([]); setSelectedSupplier('');
-      setNote(''); setProductSearch(''); setVatIncluded(true); setPaidAmount('');
+      if (editingOrderId) {
+        await window.api.updatePurchaseOrder(editingOrderId, data);
+        toast('تم تعديل طلب الشراء بنجاح', 'success');
+      } else {
+        await window.api.createPurchaseOrder(data);
+        toast('تم إنشاء طلب الشراء بنجاح', 'success');
+      }
+      setShowAddModal(false); 
+      setEditingOrderId(null);
+      setCart([]); 
+      setSelectedSupplier('');
+      setPaidAmount('');
+      setNote('');
       fetchData();
-      toast('تم حفظ طلب الشراء بنجاح', 'success');
-    } catch (e) { toast('خطأ في حفظ الطلب: ' + e.message, 'error'); }
+    } catch (e) {
+      toast('حدث خطأ: ' + e.message, 'error');
+    }
   };
 
   const handleOpenReceive = async (order) => {
@@ -208,9 +322,9 @@ export default function Purchases() {
         .po-product-row:hover { background: #eff6ff !important; border-color: #bfdbfe !important; }
         .po-product-row:hover .po-add-btn { opacity: 1 !important; transform: scale(1) !important; }
         .po-cart-row { animation: slideIn 0.2s ease; }
+        .po-cart-row:hover { background: #f0f9ff !important; }
+        .po-cart-row td input:focus { border-color: #3b82f6 !important; box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
         @keyframes slideIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
-        .po-remove-btn { opacity: 0; transition: opacity 0.15s; }
-        .po-cart-row:hover .po-remove-btn { opacity: 1; }
         .po-table-row:hover { background: #f8fafc !important; }
       `}</style>
 
@@ -243,6 +357,8 @@ export default function Purchases() {
                   received: { bg: '#ecfdf5', color: '#10b981', label: 'تم الاستلام', icon: <CheckCircle2 size={12} /> },
                   partial: { bg: '#eff6ff', color: '#3b82f6', label: 'استلام جزئي', icon: <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} /> },
                   pending: { bg: '#fff7ed', color: '#f59e0b', label: 'قيد الانتظار', icon: <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} /> },
+                  returned: { bg: '#fef2f2', color: '#ef4444', label: 'مرتجع كامل', icon: <X size={12} /> },
+                  partial_return: { bg: '#fdf4ff', color: '#9333ea', label: 'مرتجع جزئي', icon: <RotateCcw size={12} /> },
                 };
                 const st = statusMap[o.status] || statusMap.pending;
                 return (
@@ -262,10 +378,23 @@ export default function Purchases() {
                     <td style={s.td}><span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(o.created_at).toLocaleDateString('ar-SA')}</span></td>
                     <td style={s.td}>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        {o.status !== 'received' && (
-                          <button onClick={() => handleOpenReceive(o)} disabled={receiving === o.id} style={s.actionBtn('#eff6ff', '#3b82f6')}>
-                            <Archive size={13} /> {receiving === o.id ? 'جاري...' : 'استلام'}
+                        {(o.status === 'received' || o.status === 'partial_return') && (
+                          <button onClick={() => handleOpenReturnModal(o)} style={s.actionBtn('#fef2f2', '#ef4444')}>
+                            <RotateCcw size={13} /> إرجاع
                           </button>
+                        )}
+                        {o.status !== 'received' && o.status !== 'returned' && o.status !== 'partial_return' && (
+                          <>
+                            <button onClick={() => handleOpenReceive(o)} disabled={receiving === o.id} style={s.actionBtn('#eff6ff', '#3b82f6')}>
+                              <Archive size={13} /> {receiving === o.id ? 'جاري...' : 'استلام'}
+                            </button>
+                            <button onClick={() => handleEditOrder(o)} style={s.actionBtn('#fffbeb', '#d97706')}>
+                              تعديل
+                            </button>
+                            <button onClick={() => handleDeleteOrder(o.id)} style={s.actionBtn('#fef2f2', '#ef4444')}>
+                              حذف
+                            </button>
+                          </>
                         )}
                         <button onClick={() => handleViewDetail(o)} style={s.actionBtn('#f5f3ff', '#7c3aed')}>
                           <Eye size={13} /> تفاصيل
@@ -289,47 +418,68 @@ export default function Purchases() {
       </div>
 
       {/* ═══════════════════════════════════════════════════
-          CREATE ORDER MODAL — 3-panel redesign
+          CREATE ORDER MODAL — Invoice-style redesign
       ═══════════════════════════════════════════════════ */}
       {showAddModal && (
         <div style={s.overlay}>
-          <div style={s.modalShell}>
+          <div style={{ ...s.modalShell, maxWidth: '1100px', height: '95vh' }}>
 
-            {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 28px', borderBottom: '1px solid #e8edf2', flexShrink: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ background: 'linear-gradient(135deg,#3b82f6,#2563eb)', borderRadius: '12px', padding: '8px', display: 'flex' }}>
-                  <ShoppingCart size={18} color="white" />
-                </div>
-                <div>
-                  <h2 style={{ fontWeight: '900', fontSize: '18px', margin: 0 }}>طلب توريد جديد</h2>
-                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>{cart.length === 0 ? 'اختر منتجات من القائمة' : `${cart.length} ${cart.length === 1 ? 'منتج' : 'منتجات'} في الطلب`}</p>
-                </div>
-              </div>
-              <button onClick={handleCloseModal} style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', color: '#64748b', borderRadius: '10px', padding: '8px', display: 'flex', lineHeight: 1 }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Modal Body: 3 columns */}
-            <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-
-              {/* ── COL 1: Product Browser ── */}
-              <div style={{ width: '280px', flexShrink: 0, borderLeft: '1px solid #e8edf2', display: 'flex', flexDirection: 'column', background: '#fafbfc' }}>
-                <div style={{ padding: '16px', borderBottom: '1px solid #e8edf2' }}>
-                  <div style={{ position: 'relative' }}>
-                    <Search size={14} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                    <input
-                      value={productSearch}
-                      onChange={e => setProductSearch(e.target.value)}
-                      placeholder="بحث بالاسم أو الباركود..."
-                      style={{ ...s.input, paddingRight: '36px', fontSize: '13px', padding: '10px 36px 10px 12px' }}
-                    />
+            {/* ── INVOICE HEADER ── */}
+            <div style={{ padding: '24px 32px 20px', borderBottom: '2px solid #e2e8f0', flexShrink: 0, background: 'var(--bg-card)' }}>
+              {/* Top row: Title + Close */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div style={{ background: 'linear-gradient(135deg,#3b82f6,#2563eb)', borderRadius: '14px', padding: '10px', display: 'flex' }}>
+                    <ShoppingCart size={20} color="white" />
+                  </div>
+                  <div>
+                    <h2 style={{ fontWeight: '900', fontSize: '20px', margin: 0, color: '#0f172a' }}>
+                      {editingOrderId ? `تعديل فاتورة توريد #PO-${editingOrderId}` : 'فاتورة توريد جديدة'}
+                    </h2>
+                    <p style={{ fontSize: '12px', color: '#94a3b8', margin: '2px 0 0' }}>
+                      {cart.length === 0 ? 'اختر منتجات من القائمة لإضافتها للفاتورة' : `${cart.length} صنف في الفاتورة`}
+                    </p>
                   </div>
                 </div>
-                <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
+                <button onClick={handleCloseModal} style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', color: '#64748b', borderRadius: '10px', padding: '8px', display: 'flex', lineHeight: 1 }}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Supplier & Notes — invoice-style info fields */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px 18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#475569', whiteSpace: 'nowrap' }}>المورد:</span>
+                  <select value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)}
+                    style={{ ...s.input, background: 'white', padding: '8px 12px', fontSize: '13px', borderColor: !selectedSupplier ? '#fbbf24' : '#e2e8f0' }}>
+                    <option value="">— اختر المورد —</option>
+                    {suppliers.map(sup => <option key={sup.id} value={sup.id}>{sup.name}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#475569', whiteSpace: 'nowrap' }}>ملاحظات:</span>
+                  <input placeholder="رقم فاتورة، مرجع..." value={note} onChange={e => setNote(e.target.value)}
+                    style={{ ...s.input, background: 'white', padding: '8px 12px', fontSize: '13px' }} />
+                </div>
+              </div>
+            </div>
+
+            {/* ── BODY: Product browser + Invoice Table ── */}
+            <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+
+              {/* COL 1: Product Browser (right side in RTL) */}
+              <div style={{ width: '260px', flexShrink: 0, borderLeft: '2px solid #e2e8f0', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
+                <div style={{ padding: '12px', borderBottom: '1px solid #e8edf2' }}>
+                  <div style={{ position: 'relative' }}>
+                    <Search size={14} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    <input value={productSearch} onChange={e => setProductSearch(e.target.value)}
+                      placeholder="بحث بالاسم أو الباركود..."
+                      style={{ ...s.input, paddingRight: '32px', fontSize: '12px', padding: '9px 32px 9px 10px', background: 'white' }} />
+                  </div>
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
                   {filteredProducts.length === 0 && (
-                    <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', fontSize: '12px' }}>
+                    <div style={{ textAlign: 'center', padding: '30px 10px', color: '#94a3b8', fontSize: '12px' }}>
                       {productSearch ? `لا نتائج لـ "${productSearch}"` : 'لا توجد منتجات'}
                     </div>
                   )}
@@ -337,17 +487,17 @@ export default function Purchases() {
                     const inCart = cart.find(c => c.product_id === p.ID);
                     return (
                       <div key={p.ID} className="po-product-row" onClick={() => addToCart(p)}
-                        style={{ padding: '10px 12px', background: inCart ? '#eff6ff' : 'var(--bg-card)', border: `1px solid ${inCart ? '#bfdbfe' : '#e8edf2'}`, borderRadius: '12px', marginBottom: '6px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.15s' }}>
+                        style={{ padding: '8px 10px', background: inCart ? '#eff6ff' : 'white', border: `1px solid ${inCart ? '#bfdbfe' : '#e8edf2'}`, borderRadius: '10px', marginBottom: '5px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.15s' }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.Name}</div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                            مخزون: {p.Stock} · SAR {(p.Cost || 0).toFixed(2)}
+                          <div style={{ fontWeight: '700', fontSize: '12px', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.Name}</div>
+                          <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '1px' }}>
+                            مخزون: {p.Stock} · {(p.Cost || 0).toFixed(2)} ر.س
                           </div>
                         </div>
-                        <div className="po-add-btn" style={{ background: inCart ? '#3b82f6' : '#dbeafe', borderRadius: '8px', padding: '4px', display: 'flex', opacity: inCart ? 1 : 0.6, transform: inCart ? 'scale(1)' : 'scale(0.9)', transition: 'all 0.15s', flexShrink: 0, marginRight: '8px' }}>
+                        <div className="po-add-btn" style={{ background: inCart ? '#3b82f6' : '#dbeafe', borderRadius: '6px', padding: '3px', display: 'flex', opacity: inCart ? 1 : 0.5, transform: inCart ? 'scale(1)' : 'scale(0.85)', transition: 'all 0.15s', flexShrink: 0, marginRight: '6px' }}>
                           {inCart
-                            ? <span style={{ fontSize: '10px', fontWeight: '800', color: 'white', padding: '0 4px' }}>×{inCart.quantity}</span>
-                            : <Plus size={14} color="#3b82f6" />}
+                            ? <span style={{ fontSize: '9px', fontWeight: '800', color: 'white', padding: '0 4px' }}>×{inCart.quantity}</span>
+                            : <Plus size={12} color="#3b82f6" />}
                         </div>
                       </div>
                     );
@@ -355,192 +505,206 @@ export default function Purchases() {
                 </div>
               </div>
 
-              {/* ── COL 2: Cart Items ── */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                {/* Cart header */}
-                <div style={{ padding: '14px 20px', borderBottom: '1px solid #e8edf2', display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-card)', flexShrink: 0 }}>
-                  <Package size={15} color="#64748b" />
-                  <span style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-muted)' }}>أصناف الطلب</span>
-                  {cart.length > 0 && (
-                    <span style={{ background: '#3b82f6', color: 'white', fontSize: '11px', fontWeight: '800', borderRadius: '20px', padding: '1px 8px', marginRight: 'auto' }}>{cart.length}</span>
-                  )}
-                </div>
+              {/* COL 2: Invoice Table */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: 'white' }}>
 
-                {/* Cart items list */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {cart.length === 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', gap: '12px', padding: '40px' }}>
-                      <div style={{ background: '#f1f5f9', borderRadius: '50%', padding: '20px', display: 'flex' }}>
-                        <ShoppingCart size={32} color="#cbd5e1" />
-                      </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontWeight: '700', fontSize: '14px', marginBottom: '4px' }}>الطلب فارغ</div>
-                        <div style={{ fontSize: '12px' }}>اختر منتجات من القائمة على اليسار لإضافتها</div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#94a3b8' }}>
-                        <ChevronLeft size={14} /> اضغط على أي منتج لإضافته
-                      </div>
-                    </div>
-                  )}
-
-                  {cart.map(item => {
-                    const lineTotal = item.is_bulk
-                      ? item.quantity * item.unit_cost * (item.bulk_size || 1)
-                      : item.quantity * item.unit_cost;
-                    return (
-                      <div key={item.product_id} className="po-cart-row"
-                        style={{ background: 'var(--bg-card)', border: '1px solid #e8edf2', borderRadius: '16px', padding: '16px', position: 'relative' }}>
-                        {/* Row top: name + remove */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                          <div style={{ fontWeight: '800', fontSize: '14px', color: 'var(--text-main)' }}>{item.name}</div>
-                          <button className="po-remove-btn" onClick={() => removeFromCart(item.product_id)}
-                            style={{ background: '#fef2f2', border: 'none', cursor: 'pointer', borderRadius: '8px', padding: '4px 8px', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '700' }}>
-                            <Trash2 size={12} /> حذف
-                          </button>
-                        </div>
-
-                        {/* Row controls */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', alignItems: 'end' }}>
-                          {/* Quantity */}
-                          <div>
-                            <label style={s.fieldLabel}>الكمية ({item.is_bulk ? item.bulk_name : 'وحدة'})</label>
-                            <input
-                              type="number" value={item.quantity} min="0.1" step="1"
-                              onChange={e => updateCartItem(item.product_id, 'quantity', parseFloat(e.target.value) || 0)}
-                              style={s.numInput}
-                            />
-                            {item.is_bulk && (
-                              <div style={{ fontSize: '10px', color: '#3b82f6', marginTop: '4px', fontWeight: '700' }}>
-                                = {(item.quantity * item.bulk_size).toFixed(0)} وحدة مفردة
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Unit cost */}
-                          <div>
-                            <label style={s.fieldLabel}>
-                              تكلفة {item.is_bulk ? item.bulk_name : 'الوحدة'} (SAR)
-                              {!item.costManuallySet && item.originalCost > 0 && (
-                                <span title="سعر مبدئي" style={{ background: '#fef9c3', color: '#854d0e', padding: '1px 5px', borderRadius: '4px', fontSize: '9px', fontWeight: '800', marginRight: '4px' }}>⚠ مبدئي</span>
+                {/* Invoice Table */}
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ background: '#1e293b', color: 'white' }}>
+                        <th style={s.invoiceTh}>م</th>
+                        <th style={{ ...s.invoiceTh, textAlign: 'right', minWidth: '160px' }}>البيان</th>
+                        <th style={s.invoiceTh}>الكمية</th>
+                        <th style={{ ...s.invoiceTh, minWidth: '90px' }}>الوحدة</th>
+                        <th style={s.invoiceTh}>قطع/وحدة</th>
+                        <th style={s.invoiceTh}>السعر</th>
+                        <th style={s.invoiceTh}>الصافي</th>
+                        <th style={{ ...s.invoiceTh, width: '36px' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cart.length === 0 && (
+                        <tr>
+                          <td colSpan={8} style={{ padding: '60px 20px', textAlign: 'center', color: '#94a3b8' }}>
+                            <ShoppingCart size={36} color="#e2e8f0" style={{ display: 'block', margin: '0 auto 12px' }} />
+                            <div style={{ fontWeight: '700', fontSize: '14px', color: '#64748b', marginBottom: '4px' }}>لا توجد أصناف</div>
+                            <div style={{ fontSize: '12px' }}>اضغط على منتج من القائمة لإضافته للفاتورة</div>
+                          </td>
+                        </tr>
+                      )}
+                      {cart.map((item, idx) => {
+                        const lineTotal = (parseFloat(item.quantity) || 0) * (parseFloat(item.unit_cost) || 0);
+                        const piecesCount = (parseFloat(item.quantity) || 0) * (parseFloat(item.pieces_per_unit) || 1);
+                        const costPerPiece = (parseFloat(item.unit_cost) || 0) / (parseFloat(item.pieces_per_unit) || 1);
+                        const isDefaultCost = !item.costManuallySet && item.originalCost > 0;
+                        return (
+                          <tr key={item.product_id} className="po-cart-row"
+                            style={{ borderBottom: '1px solid #e8edf2', background: idx % 2 === 0 ? 'white' : '#fafbfc' }}>
+                            {/* Row # */}
+                            <td style={s.invoiceTd}>
+                              <span style={{ fontWeight: '800', color: '#94a3b8', fontSize: '12px' }}>{idx + 1}</span>
+                            </td>
+                            {/* Description */}
+                            <td style={{ ...s.invoiceTd, textAlign: 'right' }}>
+                              <div style={{ fontWeight: '700', color: '#1e293b', fontSize: '13px' }}>{item.name}</div>
+                              {parseFloat(item.pieces_per_unit) > 1 && (
+                                <div style={{ fontSize: '10px', color: '#3b82f6', marginTop: '2px' }}>
+                                  ← {piecesCount.toFixed(0)} قطعة × {costPerPiece.toFixed(2)} ر.س
+                                </div>
                               )}
-                            </label>
-                            <input
-                              type="number" value={item.unit_cost} min="0" step="0.01"
-                              onChange={e => updateCartItem(item.product_id, 'unit_cost', parseFloat(e.target.value) || 0)}
-                              style={{ ...s.numInput, borderColor: !item.costManuallySet && item.originalCost > 0 ? '#fbbf24' : '#e2e8f0' }}
-                            />
-                          </div>
-
-                          {/* Line total + bulk toggle */}
-                          <div>
-                            <label style={s.fieldLabel}>إجمالي الصنف</label>
-                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '9px 12px', fontWeight: '800', fontSize: '14px', color: '#1e293b', fontFamily: 'monospace' }}>
+                            </td>
+                            {/* Quantity */}
+                            <td style={s.invoiceTd}>
+                              <input type="number" value={item.quantity} min="0.1" step="any"
+                                onChange={e => updateCartItem(item.product_id, 'quantity', parseFloat(e.target.value) || 0)}
+                                style={s.invoiceInput} />
+                            </td>
+                            {/* Unit */}
+                            <td style={s.invoiceTd}>
+                              <input list={`units-${item.product_id}`} value={item.unit_name}
+                                placeholder="حبة"
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  updateCartItem(item.product_id, 'unit_name', val);
+                                  const presets = { 'درزن': 12, 'حبة': 1, 'قطعة': 1, 'زوج': 2 };
+                                  if (presets[val]) updateCartItem(item.product_id, 'pieces_per_unit', presets[val]);
+                                }}
+                                style={{ ...s.invoiceInput, textAlign: 'right', fontFamily: 'inherit' }} />
+                              <datalist id={`units-${item.product_id}`}>
+                                <option value="حبة" />
+                                <option value="علبة" />
+                                <option value="كرتون" />
+                                <option value="درزن" />
+                                <option value="زوج" />
+                                <option value="كيلو" />
+                                <option value="لتر" />
+                                <option value="متر" />
+                                <option value="ربطة" />
+                                <option value="كيس" />
+                              </datalist>
+                            </td>
+                            {/* Pieces per unit */}
+                            <td style={s.invoiceTd}>
+                              <input type="number" value={item.pieces_per_unit} min="1" step="1"
+                                onChange={e => updateCartItem(item.product_id, 'pieces_per_unit', parseFloat(e.target.value) || 1)}
+                                style={s.invoiceInput} />
+                            </td>
+                            {/* Price */}
+                            <td style={s.invoiceTd}>
+                              <div style={{ position: 'relative' }}>
+                                <input type="number" value={item.unit_cost} min="0" step="0.01"
+                                  onChange={e => updateCartItem(item.product_id, 'unit_cost', parseFloat(e.target.value) || 0)}
+                                  style={{ ...s.invoiceInput, borderColor: isDefaultCost ? '#fbbf24' : '#e2e8f0', background: isDefaultCost ? '#fffbeb' : 'white' }} />
+                                {isDefaultCost && (
+                                  <span style={{ position: 'absolute', top: '-6px', left: '-4px', background: '#fbbf24', color: '#78350f', fontSize: '8px', fontWeight: '900', borderRadius: '4px', padding: '1px 4px', lineHeight: 1 }}>مبدئي</span>
+                                )}
+                              </div>
+                            </td>
+                            {/* Amount */}
+                            <td style={{ ...s.invoiceTd, fontWeight: '800', fontFamily: 'monospace', fontSize: '13px', color: '#0f172a' }}>
                               {lineTotal.toFixed(2)}
-                            </div>
-                            {item.bulk_size > 1 && (
-                              <button onClick={() => updateCartItem(item.product_id, 'is_bulk', !item.is_bulk)}
-                                style={{ marginTop: '6px', padding: '4px 8px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '10px', fontWeight: '800', background: item.is_bulk ? '#3b82f6' : '#e2e8f0', color: item.is_bulk ? 'white' : '#64748b', display: 'flex', alignItems: 'center', gap: '4px', fontFamily: 'inherit' }}>
-                                <ArrowLeftRight size={10} /> {item.is_bulk ? `آحاد (×${item.bulk_size})` : 'بالة/كرتون'}
+                            </td>
+                            {/* Delete */}
+                            <td style={s.invoiceTd}>
+                              <button className="po-remove-btn" onClick={() => removeFromCart(item.product_id)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px', borderRadius: '6px', display: 'flex', opacity: 0.4, transition: 'opacity 0.15s' }}
+                                onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                                onMouseLeave={e => e.currentTarget.style.opacity = '0.4'}>
+                                <Trash2 size={14} />
                               </button>
-                            )}
-                          </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* ── Invoice Footer Summary ── */}
+                <div style={{ borderTop: '2px solid #1e293b', background: '#f8fafc', flexShrink: 0 }}>
+                  {/* Summary Table — like a real invoice */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '16px 24px', gap: '24px' }}>
+
+                    {/* Left side: Payment info */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, maxWidth: '340px' }}>
+                      {/* VAT Toggle */}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px 12px' }}>
+                        <input type="checkbox" checked={vatIncluded} onChange={e => setVatIncluded(e.target.checked)}
+                          style={{ width: '16px', height: '16px', accentColor: '#3b82f6' }} />
+                        <span style={{ fontSize: '13px', fontWeight: '700', color: '#334155' }}>إضافة ضريبة القيمة المضافة (15%)</span>
+                      </label>
+                      {/* Paid Amount */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px 12px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: '700', color: '#64748b', whiteSpace: 'nowrap' }}>المبلغ المدفوع:</span>
+                        <input type="number" value={paidAmount} onChange={e => setPaidAmount(e.target.value)}
+                          placeholder="0.00" style={{ ...s.invoiceInput, flex: 1, fontWeight: '700' }} />
+                        <span style={{ fontSize: '12px', fontWeight: '700', color: '#94a3b8' }}>ر.س</span>
+                      </div>
+                      {/* Payment status badge */}
+                      {paid > 0 && (
+                        <div style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '800', textAlign: 'center',
+                          background: remaining === 0 ? '#ecfdf5' : '#fef2f2', color: remaining === 0 ? '#059669' : '#dc2626' }}>
+                          {remaining === 0 ? '✓ مسدد بالكامل (نقدي)' : `آجل — متبقي: ${remaining.toFixed(2)} ر.س`}
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* ── COL 3: Order Summary ── */}
-              <div style={{ width: '300px', flexShrink: 0, borderRight: '1px solid #e8edf2', display: 'flex', flexDirection: 'column', background: '#fafbfc' }}>
-                <div style={{ padding: '14px 20px', borderBottom: '1px solid #e8edf2', background: 'var(--bg-card)' }}>
-                  <span style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-muted)' }}>ملخص الطلب</span>
-                </div>
-
-                <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-
-                  {/* Supplier */}
-                  <div>
-                    <label style={s.fieldLabel}>المورد المستهدف *</label>
-                    <select value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)} style={s.input}>
-                      <option value="">اختر مورداً...</option>
-                      {suppliers.map(sup => <option key={sup.id} value={sup.id}>{sup.name}</option>)}
-                    </select>
-                  </div>
-
-                  {/* Notes */}
-                  <div>
-                    <label style={s.fieldLabel}>ملاحظات</label>
-                    <textarea
-                      placeholder="ملاحظات اختيارية..."
-                      value={note} onChange={e => setNote(e.target.value)}
-                      style={{ ...s.input, minHeight: '70px', resize: 'vertical', fontSize: '13px' }}
-                    />
-                  </div>
-
-                  {/* VAT toggle */}
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', background: 'var(--bg-card)', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e8edf2' }}>
-                    <input type="checkbox" checked={vatIncluded} onChange={e => setVatIncluded(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: '#3b82f6' }} />
-                    <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-main)' }}>شاملة ضريبة القيمة المضافة (15%)</span>
-                  </label>
-
-                  {/* Totals breakdown */}
-                  <div style={{ background: 'var(--bg-card)', borderRadius: '14px', border: '1px solid #e8edf2', overflow: 'hidden' }}>
-                    <div style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>صافي التوريد</span>
-                      <span style={{ fontWeight: '700', fontFamily: 'monospace' }}>SAR {netTotal.toFixed(2)}</span>
-                    </div>
-                    {vatIncluded && (
-                      <div style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', fontSize: '13px', borderTop: '1px solid #f1f5f9' }}>
-                        <span style={{ color: '#f59e0b' }}>ضريبة 15%</span>
-                        <span style={{ fontWeight: '700', color: '#f59e0b', fontFamily: 'monospace' }}>SAR {vatAmount.toFixed(2)}</span>
-                      </div>
-                    )}
-                    <div style={{ padding: '14px 16px', display: 'flex', justifyContent: 'space-between', background: '#f8fafc', borderTop: '2px solid #e8edf2' }}>
-                      <span style={{ fontWeight: '800', fontSize: '15px' }}>الإجمالي الكلي</span>
-                      <span style={{ fontWeight: '900', fontSize: '16px', fontFamily: 'monospace', color: '#1e293b' }}>SAR {grossTotal.toFixed(2)}</span>
-                    </div>
-                  </div>
-
-                  {/* Payment */}
-                  <div style={{ background: 'var(--bg-card)', borderRadius: '14px', border: '1px solid #e8edf2', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div>
-                      <label style={s.fieldLabel}>المبلغ المدفوع (SAR)</label>
-                      <input
-                        type="number" value={paidAmount} onChange={e => setPaidAmount(e.target.value)}
-                        placeholder="0.00" style={{ ...s.input, fontFamily: 'monospace', fontWeight: '700' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '10px 12px', borderRadius: '10px', background: remaining > 0 ? '#fef2f2' : '#ecfdf5' }}>
-                      <span style={{ fontWeight: '700', color: remaining > 0 ? '#ef4444' : '#10b981' }}>
-                        {remaining > 0 ? 'المبلغ المتبقي' : 'مسدد بالكامل ✓'}
-                      </span>
-                      {remaining > 0 && (
-                        <span style={{ fontWeight: '800', color: '#ef4444', fontFamily: 'monospace' }}>SAR {remaining.toFixed(2)}</span>
                       )}
                     </div>
+
+                    {/* Right side: Financial summary table */}
+                    <div style={{ minWidth: '280px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <tbody>
+                          <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                            <td style={{ padding: '8px 12px', fontWeight: '700', color: '#475569' }}>الإجمالي</td>
+                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '800', fontFamily: 'monospace', color: '#1e293b' }}>
+                              {netTotal.toFixed(2)}
+                            </td>
+                          </tr>
+                          <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                            <td style={{ padding: '8px 12px', fontWeight: '700', color: vatIncluded ? '#d97706' : '#94a3b8' }}>
+                              ضريبة القيمة المضافة (15%)
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '800', fontFamily: 'monospace', color: vatIncluded ? '#d97706' : '#94a3b8' }}>
+                              {vatIncluded ? vatAmount.toFixed(2) : '—'}
+                            </td>
+                          </tr>
+                          <tr style={{ background: '#1e293b' }}>
+                            <td style={{ padding: '10px 12px', fontWeight: '900', color: 'white', fontSize: '14px' }}>الإجمالي شامل الضريبة</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'left', fontWeight: '900', fontFamily: 'monospace', color: 'white', fontSize: '16px' }}>
+                              {grossTotal.toFixed(2)} <span style={{ fontSize: '11px', fontWeight: '600' }}>ر.س</span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Save button row */}
+                  <div style={{ padding: '0 24px 16px', display: 'flex', justifyContent: 'flex-start', gap: '12px' }}>
+                    <button onClick={handleSubmitOrder}
+                      disabled={!selectedSupplier || cart.length === 0}
+                      style={{ ...s.primaryBtn, padding: '12px 32px', fontSize: '15px',
+                        opacity: (!selectedSupplier || cart.length === 0) ? 0.45 : 1,
+                        cursor: (!selectedSupplier || cart.length === 0) ? 'not-allowed' : 'pointer' }}>
+                      <Save size={17} /> حفظ فاتورة التوريد
+                    </button>
+                    <button onClick={handleCloseModal}
+                      style={{ padding: '12px 24px', background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: '12px', fontWeight: '700', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit' }}>
+                      إلغاء
+                    </button>
+                    {!selectedSupplier && cart.length > 0 && (
+                      <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: '700', alignSelf: 'center' }}>⚠ يرجى اختيار المورد أولاً</span>
+                    )}
                   </div>
                 </div>
 
-                {/* Save button */}
-                <div style={{ padding: '16px', borderTop: '1px solid #e8edf2', background: 'var(--bg-card)', flexShrink: 0 }}>
-                  <button
-                    onClick={handleSubmitOrder}
-                    disabled={!selectedSupplier || cart.length === 0}
-                    style={{ ...s.primaryBtn, width: '100%', justifyContent: 'center', padding: '14px', opacity: (!selectedSupplier || cart.length === 0) ? 0.45 : 1, cursor: (!selectedSupplier || cart.length === 0) ? 'not-allowed' : 'pointer' }}>
-                    <Save size={16} /> حفظ طلب الشراء
-                  </button>
-                  {cart.length === 0 && (
-                    <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>أضف منتجاً واحداً على الأقل</div>
-                  )}
-                </div>
               </div>
+            </div>
 
-            </div>{/* end 3-col body */}
           </div>{/* end modalShell */}
         </div>
       )}
-
+      
       {/* PO DETAIL MODAL */}
       {detailOrder && (
         <div style={s.overlay}>
@@ -564,29 +728,39 @@ export default function Purchases() {
                   </tr>
                 </thead>
                 <tbody>
-                  {detailItems.map((it, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '14px', fontWeight: '700' }}>{it.product_name}</td>
-                      <td style={{ padding: '14px' }}>{it.quantity} {it.is_bulk ? (it.bulk_unit_name || 'كرتون') : (it.unit || 'وحدة')}</td>
-                      <td style={{ padding: '14px', fontFamily: 'monospace' }}>SAR {parseFloat(it.unit_cost).toFixed(2)}</td>
-                      <td style={{ padding: '14px' }}>
-                        <span style={{ background: it.is_bulk ? '#eff6ff' : '#f1f5f9', color: it.is_bulk ? '#3b82f6' : '#64748b', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '700' }}>
-                          {it.is_bulk ? `بالة ×${it.bulk_unit_size || 1}` : 'وحدة'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px', fontWeight: '800', fontFamily: 'monospace' }}>
-                        SAR {(it.quantity * it.unit_cost * (it.is_bulk ? (it.bulk_unit_size || 1) : 1)).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
+                  {detailItems.map((it, i) => {
+                    const pieces = it.pieces_per_unit || 1;
+                    const displayQty = it.quantity / pieces;
+                    const displayUnitCost = it.unit_cost * pieces;
+                    return (
+                      <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '14px', fontWeight: '700' }}>
+                          {it.product_name}
+                          {pieces > 1 && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>إجمالي: {it.quantity} قطعة (بمعدل {pieces} قطع/{it.unit_name})</div>}
+                        </td>
+                        <td style={{ padding: '14px' }}>
+                          {displayQty} {it.unit_name || (it.is_bulk ? (it.bulk_unit_name || 'كرتون') : (it.unit || 'وحدة'))}
+                        </td>
+                        <td style={{ padding: '14px', fontFamily: 'monospace' }}>SAR {displayUnitCost.toFixed(2)}</td>
+                        <td style={{ padding: '14px' }}>
+                          <span style={{ background: '#f1f5f9', color: '#64748b', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '700' }}>
+                            {it.unit_name || 'وحدة'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '14px', fontWeight: '800', fontFamily: 'monospace' }}>
+                          SAR {(it.quantity * it.unit_cost).toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
             <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                  الحالة: <strong style={{ color: detailOrder.status === 'received' ? '#10b981' : '#f59e0b' }}>
-                    {detailOrder.status === 'received' ? 'مستلم' : 'قيد الانتظار'}
+                  الحالة: <strong style={{ color: detailOrder.status === 'received' ? '#10b981' : (detailOrder.status === 'returned' ? '#ef4444' : '#f59e0b') }}>
+                    {detailOrder.status === 'received' ? 'مستلم' : (detailOrder.status === 'returned' ? 'مرتجع' : 'قيد الانتظار')}
                   </strong>
                 </span>
                 {detailOrder.status === 'received' && (
@@ -661,6 +835,187 @@ export default function Purchases() {
           </div>
         </div>
       )}
+
+      {/* ═══════════════════════════════════════
+          RETURN MODAL — Full or Partial
+      ═══════════════════════════════════════ */}
+      {showReturnModal && returnOrder && (
+        <div style={s.overlay}>
+          <div style={{ ...s.detailModal, maxWidth: '800px' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                  <div style={{ background: 'linear-gradient(135deg,#ef4444,#dc2626)', borderRadius: '12px', padding: '8px', display: 'flex' }}>
+                    <RotateCcw size={18} color="white" />
+                  </div>
+                  <h2 style={{ fontWeight: '900', fontSize: '20px', margin: 0 }}>
+                    إرجاع طلب #PO-{returnOrder.id}
+                  </h2>
+                </div>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0, paddingRight: '50px' }}>
+                  المورد: {returnOrder.supplier_name} · اختر نوع الإرجاع
+                </p>
+              </div>
+              <button onClick={() => setShowReturnModal(false)} style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', borderRadius: '10px', padding: '8px', display: 'flex' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Mode Toggle */}
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '24px', background: '#f8fafc', padding: '6px', borderRadius: '14px' }}>
+              <button
+                onClick={() => setReturnMode('full')}
+                style={{
+                  flex: 1, padding: '12px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                  fontWeight: '800', fontSize: '14px', fontFamily: 'inherit', transition: 'all .2s',
+                  background: returnMode === 'full' ? '#ef4444' : 'transparent',
+                  color: returnMode === 'full' ? 'white' : '#64748b',
+                  boxShadow: returnMode === 'full' ? '0 4px 12px rgba(239,68,68,0.35)' : 'none',
+                }}
+              >
+                <X size={15} style={{ verticalAlign: 'middle', marginLeft: '6px' }} />
+                إرجاع كامل
+              </button>
+              <button
+                onClick={() => {
+                  setReturnMode('partial');
+                  setReturnItems(ri => ri.map(it => ({ ...it, returnQty: 0 })));
+                }}
+                style={{
+                  flex: 1, padding: '12px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                  fontWeight: '800', fontSize: '14px', fontFamily: 'inherit', transition: 'all .2s',
+                  background: returnMode === 'partial' ? '#9333ea' : 'transparent',
+                  color: returnMode === 'partial' ? 'white' : '#64748b',
+                  boxShadow: returnMode === 'partial' ? '0 4px 12px rgba(147,51,234,0.35)' : 'none',
+                }}
+              >
+                <RotateCcw size={15} style={{ verticalAlign: 'middle', marginLeft: '6px' }} />
+                إرجاع جزئي
+              </button>
+            </div>
+
+            {/* Full Return Summary */}
+            {returnMode === 'full' && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '14px', padding: '20px', marginBottom: '24px' }}>
+                <div style={{ fontWeight: '800', color: '#dc2626', fontSize: '15px', marginBottom: '12px' }}>
+                  ⚠️ سيتم إرجاع جميع الأصناف التالية
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #fecaca' }}>
+                      {['المنتج', 'الكمية المطلوبة', 'الوحدة', 'التكلفة / وحدة'].map(h => (
+                        <th key={h} style={{ padding: '8px 12px', textAlign: 'right', fontWeight: '800', color: '#dc2626', fontSize: '12px' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {returnItems.map(it => (
+                      <tr key={it.product_id} style={{ borderBottom: '1px solid #fee2e2' }}>
+                        <td style={{ padding: '10px 12px', fontWeight: '700' }}>{it.product_name}</td>
+                        <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontWeight: '800' }}>{it.orderedQty}</td>
+                        <td style={{ padding: '10px 12px', color: '#64748b' }}>{it.unit_name}</td>
+                        <td style={{ padding: '10px 12px', fontFamily: 'monospace' }}>SAR {it.unit_cost.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{ marginTop: '14px', fontWeight: '800', color: '#dc2626', fontSize: '14px', textAlign: 'left' }}>
+                  الإجمالي المرتجع: SAR {returnItems.reduce((a, it) => a + (it.orderedQty * it.unit_cost), 0).toFixed(2)}
+                </div>
+              </div>
+            )}
+
+            {/* Partial Return Table */}
+            {returnMode === 'partial' && (
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ background: '#fdf4ff', border: '1px solid #e9d5ff', borderRadius: '14px', padding: '14px 16px', marginBottom: '14px', fontSize: '13px', color: '#7e22ce', fontWeight: '700' }}>
+                  أدخل الكمية المرتجعة لكل صنف. اتركها صفراً للأصناف التي لن تُرجعها.
+                </div>
+                <div style={{ maxHeight: '340px', overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 5 }}>
+                      <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                        {['المنتج', 'تم الطلب', 'الوحدة', 'الكمية المرتجعة', 'الإجمالي المرتجع'].map(h => (
+                          <th key={h} style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '800', fontSize: '12px', color: 'var(--text-muted)' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {returnItems.map((it, idx) => (
+                        <tr key={it.product_id} style={{ borderBottom: '1px solid #f1f5f9', background: parseFloat(it.returnQty) > 0 ? '#fdf4ff' : 'transparent', transition: 'background .15s' }}>
+                          <td style={{ padding: '12px', fontWeight: '700' }}>{it.product_name}</td>
+                          <td style={{ padding: '12px', fontFamily: 'monospace', fontWeight: '800', color: '#64748b' }}>{it.orderedQty}</td>
+                          <td style={{ padding: '12px', color: '#94a3b8', fontSize: '12px' }}>{it.unit_name}</td>
+                          <td style={{ padding: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <input
+                                type="number"
+                                min="0"
+                                max={it.orderedQty}
+                                value={it.returnQty}
+                                onChange={e => {
+                                  const val = Math.min(parseFloat(e.target.value) || 0, it.orderedQty);
+                                  setReturnItems(ri => ri.map((r, i) => i === idx ? { ...r, returnQty: val } : r));
+                                }}
+                                style={{ ...s.numInput, width: '80px', border: `2px solid ${parseFloat(it.returnQty) > 0 ? '#9333ea' : '#e2e8f0'}` }}
+                              />
+                              <button
+                                onClick={() => setReturnItems(ri => ri.map((r, i) => i === idx ? { ...r, returnQty: it.orderedQty } : r))}
+                                style={{ background: '#fdf4ff', color: '#9333ea', border: '1px solid #e9d5ff', padding: '5px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: '800', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+                              >
+                                الكل
+                              </button>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px', fontFamily: 'monospace', fontWeight: '800', color: parseFloat(it.returnQty) > 0 ? '#9333ea' : '#94a3b8' }}>
+                            SAR {(parseFloat(it.returnQty) * it.unit_cost).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ marginTop: '14px', padding: '14px 16px', background: '#f8fafc', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                    {returnItems.filter(it => parseFloat(it.returnQty) > 0).length} صنف محدد للإرجاع
+                  </span>
+                  <span style={{ fontWeight: '900', fontSize: '17px', fontFamily: 'monospace', color: '#9333ea' }}>
+                    الإجمالي المرتجع: SAR {returnItems.reduce((a, it) => a + (parseFloat(it.returnQty) * it.unit_cost), 0).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => setShowReturnModal(false)}
+                style={{ flex: 1, padding: '14px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '12px', fontWeight: '800', cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={returnMode === 'full' ? handleConfirmFullReturn : handleConfirmPartialReturn}
+                disabled={submittingReturn}
+                style={{
+                  flex: 2, padding: '14px', border: 'none', borderRadius: '12px',
+                  fontWeight: '800', cursor: submittingReturn ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  fontFamily: 'inherit', fontSize: '15px',
+                  background: submittingReturn ? '#94a3b8' : (returnMode === 'full' ? 'linear-gradient(135deg,#ef4444,#dc2626)' : 'linear-gradient(135deg,#9333ea,#7c3aed)'),
+                  color: 'white',
+                  boxShadow: submittingReturn ? 'none' : `0 4px 14px ${returnMode === 'full' ? 'rgba(239,68,68,0.4)' : 'rgba(147,51,234,0.4)'}`,
+                }}
+              >
+                <RotateCcw size={17} />
+                {submittingReturn ? 'جاري الإرجاع...' : (returnMode === 'full' ? 'تأكيد الإرجاع الكامل' : 'تأكيد الإرجاع الجزئي')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </AppLayout>
   );
 }
@@ -706,5 +1061,18 @@ const s = {
   fieldLabel: {
     display: 'block', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)',
     marginBottom: '6px', letterSpacing: '0.3px'
+  },
+  invoiceTh: {
+    padding: '10px 12px', fontSize: '12px', fontWeight: '800', textAlign: 'center',
+    whiteSpace: 'nowrap', letterSpacing: '0.3px'
+  },
+  invoiceTd: {
+    padding: '8px 10px', fontSize: '13px', textAlign: 'center', verticalAlign: 'middle'
+  },
+  invoiceInput: {
+    width: '100%', padding: '7px 8px', borderRadius: '6px', border: '1px solid #e2e8f0',
+    fontSize: '13px', fontWeight: '700', fontFamily: 'monospace', outline: 'none',
+    background: 'white', boxSizing: 'border-box', textAlign: 'center', color: '#1e293b',
+    minWidth: '60px'
   },
 };

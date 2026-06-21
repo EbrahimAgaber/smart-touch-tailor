@@ -145,7 +145,55 @@ function migrateLabelEngine(db) {
 }
 
 // ─────────────────────────────────────────────
-// 1. INITIALIZATION
+// JE ACCOUNT CODE BOOTSTRAP (FK guard for existing DBs)
+// ─────────────────────────────────────────────
+/**
+ * Upsert every account_code that the auto-JE integration points write to.
+ * Uses INSERT OR IGNORE so it never corrupts existing rows.
+ * Safe to call on every startup — no-ops when codes already exist.
+ */
+function _ensureJEAccounts(dbInst) {
+    // Add optional columns defensively — accounting.cjs already does this,
+    // but guard here too in case call order ever changes.
+    const safeAlter = (sql) => { try { dbInst.exec(sql); } catch (_) {} };
+    safeAlter(`ALTER TABLE accounts ADD COLUMN name_en TEXT`);
+    safeAlter(`ALTER TABLE accounts ADD COLUMN level INTEGER DEFAULT 3`);
+    safeAlter(`ALTER TABLE accounts ADD COLUMN normal_balance TEXT DEFAULT 'debit'`);
+    safeAlter(`ALTER TABLE accounts ADD COLUMN is_system INTEGER DEFAULT 0`);
+    safeAlter(`ALTER TABLE accounts ADD COLUMN is_active INTEGER DEFAULT 1`);
+
+    const stmt = dbInst.prepare(`
+        INSERT OR IGNORE INTO accounts (account_code, name_ar, name_en, type, level, normal_balance, is_system, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, 1, 1)
+    `);
+    const run = dbInst.transaction((rows) => { for (const r of rows) stmt.run(...r); });
+    run([
+        // ── New 4-digit codes used by auto-JE integration points ──
+        [1111, '\u0627\u0644\u0635\u0646\u062f\u0648\u0642 (\u0646\u0642\u062f\u064a POS)', 'Cash / POS Till',        'Asset',     4, 'debit'],
+        [1112, '\u0631\u0635\u064a\u062f \u0628\u0646\u0643\u064a',            'Bank Account',           'Asset',     4, 'debit'],
+        [1200, '\u0630\u0645\u0645 \u0645\u062f\u064a\u0646\u0629 \u2014 \u0639\u0645\u0644\u0627\u0621', 'Accounts Receivable',    'Asset',     3, 'debit'],
+        [1300, '\u0627\u0644\u0645\u062e\u0632\u0648\u0646',               'Inventory',              'Asset',     3, 'debit'],
+        [2100, '\u0630\u0645\u0645 \u062f\u0627\u0626\u0646\u0629 \u2014 \u0645\u0648\u0631\u062f\u0648\u0646', 'Accounts Payable',       'Liability', 3, 'credit'],
+        [2210, '\u0631\u0648\u0627\u062a\u0628 \u0645\u0633\u062a\u062d\u0642\u0629',          'Salaries Payable',       'Liability', 4, 'credit'],
+        [2300, '\u0636\u0631\u064a\u0628\u0629 \u0642\u064a\u0645\u0629 \u0645\u0636\u0627\u0641\u0629 \u0645\u062e\u0631\u062c\u0627\u062a', 'VAT Collected (Output)', 'Liability', 3, 'credit'],
+        [2400, '\u0636\u0631\u064a\u0628\u0629 \u0642\u064a\u0645\u0629 \u0645\u0636\u0627\u0641\u0629 \u0645\u062f\u062e\u0644\u0627\u062a', 'VAT Deductible (Input)', 'Asset',     3, 'debit'],
+        [4100, '\u0625\u064a\u0631\u0627\u062f\u0627\u062a \u0627\u0644\u0645\u0628\u064a\u0639\u0627\u062a',      'Sales Revenue',          'Revenue',   3, 'credit'],
+        [5100, '\u062a\u0643\u0644\u0641\u0629 \u0627\u0644\u0628\u0636\u0627\u0639\u0629 \u0627\u0644\u0645\u0628\u0627\u0639\u0629 (COGS)', 'Cost of Goods Sold',     'Expense',   3, 'debit'],
+        // ── Legacy 4-digit codes used by recordTransaction() in saveSale ──
+        // These were deleted by _seedCoA() on existing DBs; re-insert as aliases
+        // so ledger_entries FK does not fire.
+        [1101, '\u0635\u0646\u062f\u0648\u0642 (\u0646\u0642\u062f\u064a - \u0644\u064a\u062c\u0627\u0633\u064a)', 'Cash Till (legacy)',      'Asset',     4, 'debit'],
+        [1102, '\u0628\u0646\u0643 / \u0628\u0637\u0627\u0642\u0629 (\u0644\u064a\u062c\u0627\u0633\u064a)',     'Card / Bank (legacy)',    'Asset',     4, 'debit'],
+        [1103, '\u0630\u0645\u0645 \u0645\u062f\u064a\u0646\u0629 - \u0622\u062c\u0644 (\u0644\u064a\u062c\u0627\u0633\u064a)', 'Credit AR (legacy)',     'Asset',     3, 'debit'],
+        [2201, '\u0636\u0631\u064a\u0628\u0629 \u0627\u0644\u0642\u064a\u0645\u0629 \u0627\u0644\u0645\u0636\u0627\u0641\u0629 (\u0644\u064a\u062c\u0627\u0633\u064a)', 'VAT Payable (legacy)',   'Liability', 3, 'credit'],
+        [4101, '\u0625\u064a\u0631\u0627\u062f\u0627\u062a \u0645\u0628\u064a\u0639\u0627\u062a (\u0644\u064a\u062c\u0627\u0633\u064a)', 'Sales Revenue (legacy)', 'Revenue',   3, 'credit'],
+        [5101, '\u062a\u0643\u0644\u0641\u0629 \u0628\u0636\u0627\u0639\u0629 \u0645\u0628\u0627\u0639\u0629 (\u0644\u064a\u062c\u0627\u0633\u064a)', 'COGS (legacy)',           'Expense',   3, 'debit'],
+        [5201, '\u0645\u0634\u062a\u0631\u064a\u0627\u062a (\u0644\u064a\u062c\u0627\u0633\u064a)',            'Purchases (legacy)',      'Expense',   3, 'debit'],
+        [1201, '\u0645\u062e\u0632\u0648\u0646 (\u0644\u064a\u062c\u0627\u0633\u064a)',               'Inventory (legacy)',      'Asset',     3, 'debit'],
+        [2202, '\u0636\u0631\u064a\u0628\u0629 \u0642\u064a\u0645\u0629 \u0645\u0636\u0627\u0641\u0629 \u0645\u062f\u062e\u0644\u0627\u062a (\u0644\u064a\u062c\u0627\u0633\u064a)', 'VAT Input (legacy)',      'Asset',     3, 'debit'],
+    ]);
+}
+
 // ─────────────────────────────────────────────
 function initDatabase(userDataPath) {
     if (db) return;
@@ -157,7 +205,7 @@ function initDatabase(userDataPath) {
         console.log(`Connecting to database at: ${dbPath}`);
         db = new Database(dbPath);
         db.pragma('journal_mode = WAL');
-        db.pragma('synchronous = NORMAL');
+        db.pragma('synchronous = FULL');
         db.pragma('foreign_keys = ON');
     } catch (err) {
         console.error('CRITICAL: Database initialization failed:', err);
@@ -244,7 +292,7 @@ function initDatabase(userDataPath) {
             production_csid TEXT,
             production_cert_pem TEXT,
             current_icv INTEGER DEFAULT 0,
-            last_pih TEXT DEFAULT '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=',
+            last_pih TEXT DEFAULT 'X+zrZv/IbzjZUnhsbWlsecLbwjndTpG0ZynXOif7V+k=',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
@@ -438,6 +486,10 @@ function initDatabase(userDataPath) {
         );
     `);
 
+    // Schema Migrations
+    try { db.exec("ALTER TABLE purchase_items ADD COLUMN unit_name TEXT;"); } catch(e) {}
+    try { db.exec("ALTER TABLE purchase_items ADD COLUMN pieces_per_unit REAL DEFAULT 1;"); } catch(e) {}
+
     db.exec(`
       CREATE TABLE IF NOT EXISTS promotions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -573,6 +625,8 @@ function initDatabase(userDataPath) {
     safe(`ALTER TABLE products ADD COLUMN tax_category TEXT DEFAULT 'S'`);
     safe(`ALTER TABLE zatca_queue ADD COLUMN invoice_subtype TEXT DEFAULT '0200000'`);
     safe(`ALTER TABLE zatca_queue ADD COLUMN stamped_xml TEXT`);
+    safe(`ALTER TABLE zatca_queue ADD COLUMN has_warnings INTEGER DEFAULT 0`);
+    safe(`ALTER TABLE zatca_queue ADD COLUMN warning_messages TEXT`);
     safe(`ALTER TABLE zatca_device ADD COLUMN cert_expires_at DATETIME`);
     safe(`ALTER TABLE purchase_orders ADD COLUMN vat_included INTEGER DEFAULT 1`);
     safe(`ALTER TABLE purchase_orders ADD COLUMN vat_amount REAL DEFAULT 0`);
@@ -637,6 +691,12 @@ function initDatabase(userDataPath) {
     console.log('[Accounting] Phase 1 engine initialized.');
     accountingP2.initP2(db);
     console.log('[AccountingP2] Phase 2 engine initialized.');
+
+    // ── Ensure all account codes used by auto-JEs exist (FK guard) ──────────
+    // On existing databases the CoA migration guard may have skipped seeding.
+    // These INSERT OR IGNORE calls are idempotent and never overwrite existing rows.
+    _ensureJEAccounts(db);
+    console.log('[AccountingMigration] JE account codes verified.');
 }
 
 // ─────────────────────────────────────────────
@@ -941,11 +1001,46 @@ function createPurchaseOrder(data) {
               .run(supplier_id, roundMoney(paid_amount), `دفعة مقدمة لطلب الشراء #${purchase_id}`, new Date().toISOString());
         }
 
-        const item_stmt = db.prepare('INSERT INTO purchase_items (purchase_id, product_id, quantity, unit_cost, is_bulk) VALUES (?,?,?,?,?)');
+        const item_stmt = db.prepare('INSERT INTO purchase_items (purchase_id, product_id, quantity, unit_cost, is_bulk, unit_name, pieces_per_unit) VALUES (?,?,?,?,?,?,?)');
         for (const it of items) {
-            item_stmt.run(purchase_id, it.product_id, it.quantity, roundMoney(it.unit_cost), it.is_bulk ? 1 : 0);
+            item_stmt.run(purchase_id, it.product_id, it.quantity, roundMoney(it.unit_cost), it.is_bulk ? 1 : 0, it.unit_name || '', it.pieces_per_unit || 1);
         }
         return { success: true, id: purchase_id };
+    })();
+}
+
+function updatePurchaseOrder(id, data) {
+    const purchase = db.prepare('SELECT status FROM purchase_orders WHERE id = ?').get(id);
+    if (!purchase || purchase.status !== 'pending') {
+        throw new Error('لا يمكن تعديل طلب الشراء إلا إذا كان قيد الانتظار');
+    }
+    
+    const { supplier_id, total_amount, items, note, vat_included, paid_amount = 0, payment_status = 'unpaid' } = data;
+    return db.transaction(() => {
+        const vatFlag = (vat_included === false || vat_included === 0) ? 0 : 1;
+        db.prepare('UPDATE purchase_orders SET supplier_id=?, total_amount=?, note=?, vat_included=?, paid_amount=?, payment_status=? WHERE id=?')
+          .run(supplier_id, roundMoney(total_amount), note || '', vatFlag, roundMoney(paid_amount), payment_status, id);
+        
+        db.prepare('DELETE FROM purchase_items WHERE purchase_id=?').run(id);
+        
+        const item_stmt = db.prepare('INSERT INTO purchase_items (purchase_id, product_id, quantity, unit_cost, is_bulk, unit_name, pieces_per_unit) VALUES (?,?,?,?,?,?,?)');
+        for (const it of items) {
+            item_stmt.run(id, it.product_id, it.quantity, roundMoney(it.unit_cost), it.is_bulk ? 1 : 0, it.unit_name || '', it.pieces_per_unit || 1);
+        }
+        return { success: true };
+    })();
+}
+
+function deletePurchaseOrder(id) {
+    const purchase = db.prepare('SELECT status FROM purchase_orders WHERE id = ?').get(id);
+    if (!purchase || purchase.status !== 'pending') {
+        throw new Error('لا يمكن حذف طلب الشراء إلا إذا كان قيد الانتظار');
+    }
+    return db.transaction(() => {
+        db.prepare('DELETE FROM purchase_items WHERE purchase_id = ?').run(id);
+        db.prepare('DELETE FROM supplier_payments WHERE note LIKE ?').run(`%لطلب الشراء #${id}%`);
+        db.prepare('DELETE FROM purchase_orders WHERE id = ?').run(id);
+        return { success: true };
     })();
 }
 
@@ -985,26 +1080,198 @@ function receivePurchaseOrder(id) {
         const vatIncluded = purchase.vat_included !== 0;
         const total       = roundMoney(purchase.total_amount);
         const vatRate     = getVatRate();
+        const receivedDate = new Date().toISOString().split('T')[0];
 
         let netValue, vatAmt;
         if (vatIncluded) {
             netValue = roundMoney(total / (1 + vatRate));
             vatAmt   = roundMoney(total - netValue);
-            recordTransaction([
-                { code: 1201, debit: netValue, credit: 0 },
-                { code: 2202, debit: vatAmt,   credit: 0 },
-                { code: 1101, debit: 0,         credit: total }
-            ], `توريد مشتريات #${id}`, `PO-${id}`);
         } else {
-            recordTransaction([
-                { code: 1201, debit: total, credit: 0 },
-                { code: 1101, debit: 0,     credit: total }
-            ], `توريد مشتريات #${id} (بدون ضريبة)`, `PO-${id}`);
+            netValue = total;
+            vatAmt   = 0;
         }
 
-        db.prepare('UPDATE purchase_orders SET vat_amount=? WHERE id=?').run(vatAmt || 0, id);
+        // ── IP-3: Inventory + AP Journal Entry (atomic, inside this db.transaction) ──
+        const jeLines = [
+            { account_code: 1300, debit: netValue, credit: 0,     description: `مخزون: مشتريات #${id}` },
+            { account_code: 2100, debit: 0,        credit: total, description: `ذمم دائنة: مورد PO-${id}` },
+        ];
+        if (vatAmt > 0) {
+            jeLines.push({ account_code: 2400, debit: vatAmt, credit: 0, description: `ضريبة مدخلات: PO-${id}` });
+            // Adjust AP credit to net (total already includes VAT as credit)
+            // Re-balance: DR Inventory(net) + DR VAT-Input(vat) = CR AP(total)
+        }
+        accounting.postJournalEntry({
+            entry_date:     receivedDate,
+            reference_no:   `PO-${id}`,
+            description:    `استلام مشتريات #${id}`,
+            entry_type:     'Auto',
+            reference_type: 'purchase_order',
+            reference_id:   String(id),
+            lines:          jeLines,
+            created_by:     1,
+        });
+
+        // ── IP-3b: Record inventory batches for FIFO/AVCO costing ─────────────
+        for (const it of items) {
+            try {
+                accountingP2.addInventoryBatch(
+                    it.product_id, id,
+                    it.is_bulk ? (it.quantity * (db.prepare('SELECT bulk_unit_size FROM products WHERE id=?').get(it.product_id)?.bulk_unit_size || 1)) : it.quantity,
+                    it.unit_cost,
+                    receivedDate
+                );
+            } catch(_) {}
+        }
+
+        db.prepare('UPDATE purchase_orders SET vat_amount=? WHERE id=?').run(vatAmt, id);
 
         return { success: true };
+    })();
+}
+
+function returnPurchaseOrder(id) {
+    const purchase = db.prepare('SELECT * FROM purchase_orders WHERE id = ?').get(id);
+    if (!purchase || purchase.status !== 'received') throw new Error('لا يمكن إرجاع هذا الطلب لأن حالته ليست مستلم');
+    const items = db.prepare('SELECT * FROM purchase_items WHERE purchase_id = ?').all(id);
+
+    return db.transaction(() => {
+        const history_stmt = db.prepare('INSERT INTO stock_history (product_id, change_amount, reason, reference_id) VALUES (?,?,?,?)');
+
+        for (const it of items) {
+            const product = db.prepare('SELECT stock, bulk_unit_size FROM products WHERE id = ?').get(it.product_id);
+            const actualQty = it.is_bulk ? (it.quantity * (product?.bulk_unit_size || 1)) : (it.quantity * (it.pieces_per_unit || 1));
+
+            db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(actualQty, it.product_id);
+            history_stmt.run(it.product_id, -actualQty, 'purchase_return', `RTN-PO-${id}`);
+        }
+
+        db.prepare("UPDATE purchase_orders SET status = 'returned' WHERE id = ?").run(id);
+
+        const vatIncluded = purchase.vat_included !== 0;
+        const total       = roundMoney(purchase.total_amount);
+        const vatRate     = getVatRate();
+        const returnDate  = new Date().toISOString().split('T')[0];
+
+        let netValue, vatAmt;
+        if (vatIncluded) {
+            netValue = roundMoney(total / (1 + vatRate));
+            vatAmt   = roundMoney(total - netValue);
+        } else {
+            netValue = total;
+            vatAmt   = 0;
+        }
+
+        // Reversing Journal Entry
+        const jeLines = [
+            { account_code: 2100, debit: total, credit: 0,        description: `عكس ذمم دائنة (مرتجع مشتريات): مورد PO-${id}` },
+            { account_code: 1300, debit: 0,     credit: netValue, description: `عكس مخزون (مرتجع مشتريات): #${id}` },
+        ];
+        if (vatAmt > 0) {
+            jeLines.push({ account_code: 2400, debit: 0, credit: vatAmt, description: `عكس ضريبة مدخلات (مرتجع مشتريات): PO-${id}` });
+        }
+        accounting.postJournalEntry({
+            entry_date:     returnDate,
+            reference_no:   `RTN-PO-${id}`,
+            description:    `إرجاع مشتريات #${id}`,
+            entry_type:     'Auto',
+            reference_type: 'purchase_return',
+            reference_id:   String(id),
+            lines:          jeLines,
+            created_by:     1,
+        });
+
+        return { success: true };
+    })();
+}
+
+/**
+ * Partial Purchase Return
+ * returnItems: [{ product_id, return_qty }]
+ *   return_qty is expressed in the user-facing unit (e.g. 3 dozen), so we
+ *   multiply by pieces_per_unit to get base-stock units.
+ */
+function partialReturnPurchaseOrder(id, returnItems) {
+    const purchase = db.prepare('SELECT * FROM purchase_orders WHERE id = ?').get(id);
+    if (!purchase || (purchase.status !== 'received' && purchase.status !== 'partial_return'))
+        throw new Error('لا يمكن إرجاع هذا الطلب — حالته ليست مستلم');
+
+    const allItems = db.prepare('SELECT * FROM purchase_items WHERE purchase_id = ?').all(id);
+
+    return db.transaction(() => {
+        const history_stmt = db.prepare(
+            'INSERT INTO stock_history (product_id, change_amount, reason, reference_id) VALUES (?,?,?,?)'
+        );
+
+        let returnValue = 0; // net monetary value being returned (before VAT split)
+
+        for (const r of returnItems) {
+            if (!r.return_qty || r.return_qty <= 0) continue;
+
+            const orig = allItems.find(i => i.product_id === r.product_id);
+            if (!orig) throw new Error(`المنتج ${r.product_id} غير موجود في هذا الطلب`);
+
+            // Validate: cannot return more than originally ordered
+            const maxReturnQty = orig.quantity / (orig.pieces_per_unit || 1);
+            if (r.return_qty > maxReturnQty + 0.0001)
+                throw new Error(`الكمية المرتجعة تتجاوز الكمية الأصلية للمنتج`);
+
+            const pieces = orig.pieces_per_unit || 1;
+            const baseQty = r.return_qty * pieces; // actual stock units to remove
+
+            db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(baseQty, orig.product_id);
+            history_stmt.run(orig.product_id, -baseQty, 'purchase_return', `PRTN-PO-${id}`);
+
+            // Monetary value: return_qty_units * cost_per_unit
+            returnValue += r.return_qty * (orig.unit_cost * pieces);
+        }
+
+        returnValue = roundMoney(returnValue);
+
+        // Check if everything was returned → mark as fully returned
+        const isFullReturn = returnItems.every(r => {
+            const orig = allItems.find(i => i.product_id === r.product_id);
+            if (!orig) return false;
+            const maxQty = orig.quantity / (orig.pieces_per_unit || 1);
+            return Math.abs(r.return_qty - maxQty) < 0.0001;
+        }) && returnItems.length === allItems.length;
+
+        const newStatus = isFullReturn ? 'returned' : 'partial_return';
+        db.prepare('UPDATE purchase_orders SET status = ? WHERE id = ?').run(newStatus, id);
+
+        const vatIncluded = purchase.vat_included !== 0;
+        const vatRate     = getVatRate();
+        const returnDate  = new Date().toISOString().split('T')[0];
+
+        let netReturn, vatReturn;
+        if (vatIncluded) {
+            netReturn = roundMoney(returnValue / (1 + vatRate));
+            vatReturn = roundMoney(returnValue - netReturn);
+        } else {
+            netReturn = returnValue;
+            vatReturn = 0;
+        }
+
+        // Reversing Journal Entry (proportional)
+        const jeLines = [
+            { account_code: 2100, debit: returnValue, credit: 0,         description: `عكس ذمم دائنة (مرتجع جزئي): PO-${id}` },
+            { account_code: 1300, debit: 0,           credit: netReturn,  description: `عكس مخزون (مرتجع جزئي): #${id}` },
+        ];
+        if (vatReturn > 0) {
+            jeLines.push({ account_code: 2400, debit: 0, credit: vatReturn, description: `عكس ضريبة (مرتجع جزئي): PO-${id}` });
+        }
+        accounting.postJournalEntry({
+            entry_date:     returnDate,
+            reference_no:   `PRTN-PO-${id}`,
+            description:    `إرجاع جزئي مشتريات #${id}`,
+            entry_type:     'Auto',
+            reference_type: 'purchase_return',
+            reference_id:   String(id),
+            lines:          jeLines,
+            created_by:     1,
+        });
+
+        return { success: true, status: newStatus, returnValue };
     })();
 }
 
@@ -1048,7 +1315,7 @@ function saveSale(saleData) {
         
         db.prepare('UPDATE zatca_device SET current_icv = current_icv + 1 WHERE id = ?').run(device.id);
         const newIcv = db.prepare('SELECT current_icv FROM zatca_device WHERE id = ?').get(device.id).current_icv;
-        const prevHash = device.last_pih || '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=';
+        const prevHash = device.last_pih || 'X+zrZv/IbzjZUnhsbWlsecLbwjndTpG0ZynXOif7V+k=';
         const invoiceUUID = generateUUID();
 
         const saleTimestamp = (saleData.date && typeof saleData.date === 'string')
@@ -1059,15 +1326,43 @@ function saveSale(saleData) {
         const finalSubtotal = subtotal != null ? roundMoney(subtotal) : roundMoney(finalTotal / (1 + vatRate));
         const finalTax      = tax != null ? roundMoney(tax) : roundMoney(finalTotal - finalSubtotal);
 
+        let buyer = null;
+        if (customer_id) {
+            const cust = db.prepare('SELECT * FROM customers WHERE id=?').get(customer_id);
+            if (cust && cust.tax_id) {
+                buyer = { vatNo: cust.tax_id, name: cust.name, street: cust.na_street, building: cust.na_building, district: cust.na_district, city: cust.na_city, postal: cust.na_postal, country: cust.na_country };
+            }
+        }
+
         const settings = getSettings();
+        // [FIX-5] B2B buyer address hard gate for saveSale
+        if (buyer) {
+            const _bm3 = [];
+            if (!buyer.street   || !String(buyer.street).trim())   _bm3.push('street');
+            if (!buyer.building || !String(buyer.building).trim()) _bm3.push('building');
+            if (!buyer.district || !String(buyer.district).trim()) _bm3.push('district');
+            if (!buyer.city     || !String(buyer.city).trim())     _bm3.push('city');
+            if (!buyer.postal   || !String(buyer.postal).trim())   _bm3.push('postal');
+            if (_bm3.length > 0) {
+                throw new Error(
+                    `ZATCA_MISSING_BUYER_ADDRESS: عنوان المشتري ناقص (${_bm3.join(', ')}). ` +
+                    `يُرجى تحديث بيانات العميل بالعنوان الوطني الكامل قبل إصدار فاتورة B2B.`
+                );
+            }
+        }
+
+        // [FIX-3] BR-KSA-17: for credit note invoices pass reason for cbc:InstructionNote
         const xml = generateUBL21XML({
             invoice, icv: newIcv, timestamp: saleTimestamp, total: finalTotal, 
             items: items || [], uuid: invoiceUUID, prevHash, 
             seller: settings.business_name_ar || 'مؤسسة تجارية', 
-            vatNo: settings.vat_number || settings.tax_number || '300000000000003',
+            vatNo: settings.vat_number || settings.tax_number,
             vatRate, discount: Number(discount),
             typeCode: billingRef ? '381' : '388',
             billingRef: billingRef || null,
+            reason: billingRef ? (saleData.reason || 'تعديل على الفاتورة الأصلية') : null,
+            buyer,
+            paymentMethod: payment,
             crn: settings.crn,
             address: {
                 street: settings.address_street,
@@ -1079,25 +1374,10 @@ function saveSale(saleData) {
             }
         });
         
-        const invoiceHash = zatca.hashXML(xml);
-        let signedXml = xml;
-        let signatureBase64 = '';
-        
-        if (device.production_csid && device.production_cert_pem) {
-            signatureBase64 = zatca.signXMLHash(xml, device.private_key_pem);
-            const certBase64 = device.production_cert_pem.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/\n/g, '').replace(/\r/g, '');
-            const env = zatca.buildSignatureEnvelope(invoiceHash, signatureBase64, certBase64, saleTimestamp);
-            signedXml = xml.replace('<!-- UBLEXTENSIONS_PLACEHOLDER -->', env);
-            
-            const { pubKeyPem, certSignature } = zatca.extractCertDetails(device.production_cert_pem);
-            const tlv = zatca.generateZatcaTLV9(
-                settings.business_name_ar || 'مؤسسة تجارية', settings.vat_number || settings.tax_number || '300000000000003', saleTimestamp, finalTotal, finalTax,
-                invoiceHash, signatureBase64, pubKeyPem, certSignature
-            );
-            signedXml = signedXml.replace('<!-- QR_PLACEHOLDER -->', `<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">${tlv}</cbc:EmbeddedDocumentBinaryObject>`);
-        }
-
-        db.prepare('UPDATE zatca_device SET last_pih = ? WHERE id = ?').run(invoiceHash, device.id);
+        const { signedXml, invoiceHash } = zatca.signAndPackageInvoice({
+            xml, device, settings, timestamp: saleTimestamp,
+            total: finalTotal, tax: finalTax, db
+        });
 
         const saleResult = db.prepare(`
             INSERT INTO sales (invoice, timestamp, total_amount, subtotal, tax_amount, discount, payment_method,
@@ -1115,7 +1395,7 @@ function saveSale(saleData) {
         );
         const saleId = saleResult.lastInsertRowid;
         
-        const invoiceSubtype = billingRef ? '0100000' : '0200000';
+        const invoiceSubtype = buyer ? '0100000' : '0200000';
         db.prepare(`
             INSERT INTO zatca_queue (sale_id, invoice_number, icv, uuid, signed_xml, xml_hash, invoice_subtype)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -1161,6 +1441,13 @@ function saveSale(saleData) {
         let totalCOGS = 0;
         const history_stmt = db.prepare(`INSERT INTO stock_history (product_id, change_amount, reason, reference_id) VALUES (?,?,?,?)`);
 
+        // [FIX-BR-KSA-F-06-C19] Item name length validation (3–1000 chars)
+        for (const item of items) {
+            if (!item.Name || String(item.Name).trim().length < 3) {
+                throw new Error('BR-KSA-F-06-C19: Item name must be between 3 and 1000 characters.');
+            }
+        }
+
         for (const item of items) {
             if (!item.ID || item.IsService) {
                 db.prepare(`INSERT INTO sales_items (sale_id, product_id, item_name, item_price, quantity, item_note, modifiers_json) VALUES (?,?,?,?,?,?,?)`)
@@ -1199,34 +1486,13 @@ function saveSale(saleData) {
         }
         const finalCOGS = totalCOGS_p2 > 0 ? totalCOGS_p2 : totalCOGS;
 
-        if (finalCOGS > 0) {
-            recordTransaction([
-                { code: 5101, debit: finalCOGS, credit: 0 },
-                { code: 1201, debit: 0,         credit: finalCOGS }
-            ], `تكلفة بضاعة مباعة: ${invoice}`, invoice);
-            try {
-                accounting.postJournalEntry({
-                    entry_date:     new Date().toISOString().split('T')[0],
-                    reference_no:   `COGS-${invoice}`,
-                    description:    `تكلفة بضاعة مباعة: ${invoice}`,
-                    entry_type:     'Sale',
-                    reference_type: 'sale',
-                    reference_id:   String(saleId),
-                    lines: [
-                        { account_code: 5100, debit: finalCOGS, credit: 0 },
-                        { account_code: 1300, debit: 0,         credit: finalCOGS },
-                    ],
-                    created_by: staff_id || 1,
-                });
-            } catch(_) {}
-        }
+        // ── IP-1: Revenue / VAT Journal Entry (atomic — inside db.transaction) ──
+        const saleDate = new Date().toISOString().split('T')[0];
+        let drAcct = 1111;
+        if (payment === 'آجل' || payment === 'Credit') drAcct = 1200;
+        else if (payment && (payment.toLowerCase().includes('card') || payment.toLowerCase().includes('stc'))) drAcct = 1112;
 
-        try {
-            const saleDate = new Date().toISOString().split('T')[0];
-            let drAcct = 1111;
-            if (payment === 'آجل' || payment === 'Credit') drAcct = 1200;
-            else if (payment && (payment.toLowerCase().includes('card') || payment.toLowerCase().includes('stc'))) drAcct = 1112;
-
+        if (finalTotal > 0) {
             const revLines = [
                 { account_code: drAcct, debit: finalTotal,    credit: 0,             description: `مبيعات: ${invoice}` },
                 { account_code: 4100,   debit: 0,             credit: finalSubtotal, description: `إيراد مبيعات: ${invoice}` },
@@ -1236,36 +1502,52 @@ function saveSale(saleData) {
                 entry_date:     saleDate,
                 reference_no:   `SAL-${invoice}`,
                 description:    `مبيعات: ${invoice}`,
-                entry_type:     'Sale',
+                entry_type:     'Auto',
                 reference_type: 'sale',
                 reference_id:   String(saleId),
                 lines:          revLines,
                 created_by:     staff_id || 1,
             });
+        }
 
-            for (const item of items) {
-                if (!item.ID) continue;
-                const prod = db.prepare('SELECT tax_category, price FROM products WHERE id=?').get(item.ID);
-                if (!prod || prod.tax_category !== 'RC') continue;
-                const lineSubtotal = roundMoney(item.Price * item.Qty);
-                const lineVAT      = roundMoney(lineSubtotal * vatRate);
-                if (lineVAT <= 0) continue;
-                accounting.postJournalEntry({
-                    entry_date:     saleDate,
-                    reference_no:   `RC-${invoice}-${item.ID}`,
-                    description:    `ضريبة عكسية: ${item.Name} — ${invoice}`,
-                    entry_type:     'VAT',
-                    reference_type: 'sale',
-                    reference_id:   String(saleId),
-                    lines: [
-                        { account_code: 2400, debit: lineVAT, credit: 0,       description: 'ضريبة مدخلات (انعكاسية)' },
-                        { account_code: 2300, debit: 0,       credit: lineVAT, description: 'ضريبة مخرجات (انعكاسية)' },
-                    ],
-                    created_by: staff_id || 1,
-                });
-            }
-        } catch(jeErr) {
-            console.error('[P-013/P-018] JE posting error (non-fatal):', jeErr.message);
+        // Reverse-charge VAT per line item (RC products)
+        for (const item of items) {
+            if (!item.ID) continue;
+            const prod = db.prepare('SELECT tax_category FROM products WHERE id=?').get(item.ID);
+            if (!prod || prod.tax_category !== 'RC') continue;
+            const lineSubtotal = roundMoney(item.Price * item.Qty);
+            const lineVAT      = roundMoney(lineSubtotal * vatRate);
+            if (lineVAT <= 0) continue;
+            accounting.postJournalEntry({
+                entry_date:     saleDate,
+                reference_no:   `RC-${invoice}-${item.ID}`,
+                description:    `ضريبة عكسية: ${item.Name} — ${invoice}`,
+                entry_type:     'Auto',
+                reference_type: 'sale',
+                reference_id:   String(saleId),
+                lines: [
+                    { account_code: 2400, debit: lineVAT, credit: 0,       description: 'ضريبة مدخلات (انعكاسية)' },
+                    { account_code: 2300, debit: 0,       credit: lineVAT, description: 'ضريبة مخرجات (انعكاسية)' },
+                ],
+                created_by: staff_id || 1,
+            });
+        }
+
+        // ── IP-2: COGS Journal Entry (atomic — inside db.transaction) ──────────
+        if (finalCOGS > 0) {
+            accounting.postJournalEntry({
+                entry_date:     saleDate,
+                reference_no:   `COGS-${invoice}`,
+                description:    `تكلفة بضاعة مباعة: ${invoice}`,
+                entry_type:     'Auto',
+                reference_type: 'sale',
+                reference_id:   String(saleId),
+                lines: [
+                    { account_code: 5100, debit: finalCOGS, credit: 0 },
+                    { account_code: 1300, debit: 0,         credit: finalCOGS },
+                ],
+                created_by: staff_id || 1,
+            });
         }
 
         addAuditLog('SALE', `Invoice: ${invoice}, Total: ${finalTotal}, Payment: ${payment}, PointsRedeemed: ${redeemedPts}, COGS: ${finalCOGS.toFixed(2)}, CostingMethod: ${costingMethod}`);
@@ -1294,20 +1576,48 @@ function voidSale(invoiceId, reason = 'لم يُحدد') {
         if (device) {
             db.prepare('UPDATE zatca_device SET current_icv = current_icv + 1 WHERE id = ?').run(device.id);
             const newIcv = db.prepare('SELECT current_icv FROM zatca_device WHERE id = ?').get(device.id).current_icv;
-            const prevHash = device.last_pih || '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=';
+            const prevHash = device.last_pih || 'X+zrZv/IbzjZUnhsbWlsecLbwjndTpG0ZynXOif7V+k=';
             const uuid = generateUUID();
             const timestamp = new Date().toISOString();
             const settings = getSettings();
             
             const items = db.prepare('SELECT item_name as Name, quantity as Qty, item_price as Price FROM sales_items WHERE sale_id=?').all(sale.id);
             
+            let buyer = null;
+            if (sale.customer_id) {
+                const cust = db.prepare('SELECT * FROM customers WHERE id=?').get(sale.customer_id);
+                if (cust && cust.tax_id) {
+                    buyer = { vatNo: cust.tax_id, name: cust.name, street: cust.na_street, building: cust.na_building, district: cust.na_district, city: cust.na_city, postal: cust.na_postal, country: cust.na_country };
+                }
+            }
+
+            // [FIX-5] B2B buyer address hard gate for voidSale
+            if (buyer) {
+                const _bm = [];
+                if (!buyer.street   || !String(buyer.street).trim())   _bm.push('street');
+                if (!buyer.building || !String(buyer.building).trim()) _bm.push('building');
+                if (!buyer.district || !String(buyer.district).trim()) _bm.push('district');
+                if (!buyer.city     || !String(buyer.city).trim())     _bm.push('city');
+                if (!buyer.postal   || !String(buyer.postal).trim())   _bm.push('postal');
+                if (_bm.length > 0) {
+                    throw new Error(
+                        `ZATCA_MISSING_BUYER_ADDRESS: عنوان المشتري ناقص (${_bm.join(', ')}). ` +
+                        `يُرجى تحديث بيانات العميل بالعنوان الوطني الكامل قبل إصدار فاتورة B2B.`
+                    );
+                }
+            }
+
+            // [FIX-3] BR-KSA-17: pass reason for cbc:InstructionNote
             const xml = generateUBL21XML({
                 invoice: 'CN-' + invoiceId, icv: newIcv, timestamp, total, 
                 items: items, uuid, prevHash, 
                 seller: settings.business_name_ar || 'مؤسسة تجارية', 
-                vatNo: settings.vat_number || settings.tax_number || '300000000000003',
+                vatNo: settings.vat_number || settings.tax_number,
                 vatRate, discount: 0, typeCode: '381',
                 billingRef: invoiceId,
+                reason: reason || 'إلغاء الفاتورة الأصلية',
+                buyer,
+                paymentMethod: sale.payment_method,
                 crn: settings.crn,
                 address: {
                     street: settings.address_street,
@@ -1319,20 +1629,10 @@ function voidSale(invoiceId, reason = 'لم يُحدد') {
                 }
             });
             
-            const invoiceHash = zatca.hashXML(xml);
-            let signedXml = xml;
-            
-            if (device.production_csid && device.production_cert_pem) {
-                const signatureBase64 = zatca.signXMLHash(xml, device.private_key_pem);
-                const certBase64 = device.production_cert_pem.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/\n/g, '').replace(/\r/g, '');
-                const env = zatca.buildSignatureEnvelope(invoiceHash, signatureBase64, certBase64, timestamp);
-                signedXml = xml.replace('<!-- UBLEXTENSIONS_PLACEHOLDER -->', env);
-                const { pubKeyPem, certSignature } = zatca.extractCertDetails(device.production_cert_pem);
-                const tlv = zatca.generateZatcaTLV9(settings.business_name_ar, settings.vat_number || settings.tax_number, timestamp, total, taxVal, invoiceHash, signatureBase64, pubKeyPem, certSignature);
-                signedXml = signedXml.replace('<!-- QR_PLACEHOLDER -->', `<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">${tlv}</cbc:EmbeddedDocumentBinaryObject>`);
-            }
-            
-            db.prepare('UPDATE zatca_device SET last_pih = ? WHERE id = ?').run(invoiceHash, device.id);
+            const { signedXml, invoiceHash } = zatca.signAndPackageInvoice({
+                xml, device, settings, timestamp,
+                total, tax: taxVal, db
+            });
 
             const voidOrigSubtype = db.prepare(
                 'SELECT invoice_subtype FROM zatca_queue WHERE invoice_number = ? ORDER BY id DESC LIMIT 1'
@@ -1385,6 +1685,55 @@ function voidSale(invoiceId, reason = 'لم يُحدد') {
             { code: 4101,           debit: subtotalVal, credit: 0 },
             { code: 2201,           debit: taxVal,      credit: 0 }
         ], desc, invoiceId);
+
+        // ── IP-5: Revenue-reversal JE (inside this db.transaction, atomic) ──────
+        const voidDate = new Date().toISOString().split('T')[0];
+        let crAcct = 1111; // cash default
+        if (paymentMethod === 'آجل' || paymentMethod === 'Credit') crAcct = 1200;
+        else if (paymentMethod.toLowerCase().includes('card') || paymentMethod.toLowerCase().includes('stc')) crAcct = 1112;
+
+        // Reverse revenue + VAT
+        if (total > 0) {
+            accounting.postJournalEntry({
+                entry_date:     voidDate,
+                reference_no:   `VOID-${invoiceId}`,
+                description:    `إلغاء فاتورة: ${invoiceId} — ${reason}`,
+                entry_type:     'Auto',
+                reference_type: 'void',
+                reference_id:   String(sale.id),
+                lines: [
+                    { account_code: 4100, debit: subtotalVal, credit: 0,     description: `عكس إيراد: ${invoiceId}` },
+                    { account_code: 2300, debit: taxVal,      credit: 0,     description: `عكس ضريبة: ${invoiceId}` },
+                    { account_code: crAcct, debit: 0, credit: total,         description: `عكس دفع: ${invoiceId}` },
+                ],
+                created_by: 1,
+            });
+        }
+
+        // Reverse COGS if products had cost
+        const saleItems = db.prepare('SELECT * FROM sales_items WHERE sale_id=?').all(sale.id);
+        let totalCOGSReverse = 0;
+        for (const it of saleItems) {
+            if (it.product_id) {
+                const prod = db.prepare('SELECT cost FROM products WHERE id=?').get(it.product_id);
+                totalCOGSReverse += roundMoney((parseFloat(prod?.cost) || 0) * it.quantity);
+            }
+        }
+        if (totalCOGSReverse > 0) {
+            accounting.postJournalEntry({
+                entry_date:     voidDate,
+                reference_no:   `VOID-COGS-${invoiceId}`,
+                description:    `عكس تكلفة إلغاء: ${invoiceId}`,
+                entry_type:     'Auto',
+                reference_type: 'void',
+                reference_id:   String(sale.id),
+                lines: [
+                    { account_code: 1300, debit: totalCOGSReverse, credit: 0 },
+                    { account_code: 5100, debit: 0, credit: totalCOGSReverse },
+                ],
+                created_by: 1,
+            });
+        }
 
         addAuditLog('VOID_SALE', `Invoice: ${invoiceId}, Reason: ${reason}, PointsRestored: ${pointsToRestore}`);
     })();
@@ -2011,35 +2360,54 @@ function createReturn(invoiceId, returnItems) {
         }
         db.prepare('UPDATE zatca_device SET current_icv = current_icv + 1 WHERE id = ?').run(device.id);
         const newIcv = db.prepare('SELECT current_icv FROM zatca_device WHERE id = ?').get(device.id).current_icv;
-        const prevHash = device.last_pih || '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=';
+        const prevHash = device.last_pih || 'X+zrZv/IbzjZUnhsbWlsecLbwjndTpG0ZynXOif7V+k=';
         const uuid = generateUUID();
         const timestamp = new Date().toISOString();
         const settings = getSettings();
         
+        let buyer = null;
+        if (original.customer_id) {
+            const cust = db.prepare('SELECT * FROM customers WHERE id=?').get(original.customer_id);
+            if (cust && cust.tax_id) {
+                buyer = { vatNo: cust.tax_id, name: cust.name, street: cust.na_street, building: cust.na_building, district: cust.na_district, city: cust.na_city, postal: cust.na_postal, country: cust.na_country };
+            }
+        }
+
+        // [FIX-5] B2B buyer address hard gate for createReturn
+        if (buyer) {
+            const _bm2 = [];
+            if (!buyer.street   || !String(buyer.street).trim())   _bm2.push('street');
+            if (!buyer.building || !String(buyer.building).trim()) _bm2.push('building');
+            if (!buyer.district || !String(buyer.district).trim()) _bm2.push('district');
+            if (!buyer.city     || !String(buyer.city).trim())     _bm2.push('city');
+            if (!buyer.postal   || !String(buyer.postal).trim())   _bm2.push('postal');
+            if (_bm2.length > 0) {
+                throw new Error(
+                    `ZATCA_MISSING_BUYER_ADDRESS: عنوان المشتري ناقص (${_bm2.join(', ')}). ` +
+                    `يُرجى تحديث بيانات العميل بالعنوان الوطني الكامل قبل إصدار فاتورة B2B.`
+                );
+            }
+        }
+
+        // [FIX-3] BR-KSA-17: pass reason for cbc:InstructionNote
+        const returnReason = `مرتجع جزئي للفاتورة ${invoiceId}`;
         const xml = generateUBL21XML({
             invoice: returnInv, icv: newIcv, timestamp, total: returnTotal, 
             items: returnItems.map(ri => ({ Name: ri.name, Price: ri.price, Qty: ri.qty })), 
             uuid, prevHash, 
             seller: settings.business_name_ar || 'مؤسسة تجارية', 
-            vatNo: settings.vat_number || settings.tax_number || '300000000000003',
+            vatNo: settings.vat_number || settings.tax_number,
             vatRate, discount: 0, typeCode: '381',
-            billingRef: invoiceId
+            billingRef: invoiceId,
+            reason: returnReason,
+            buyer,
+            paymentMethod: original.payment_method
         });
         
-        const invoiceHash = zatca.hashXML(xml);
-        let signedXml = xml;
-        
-        if (device.production_csid && device.production_cert_pem) {
-            const signatureBase64 = zatca.signXMLHash(xml, device.private_key_pem);
-            const certBase64 = device.production_cert_pem.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/\n/g, '').replace(/\r/g, '');
-            const env = zatca.buildSignatureEnvelope(invoiceHash, signatureBase64, certBase64, timestamp);
-            signedXml = xml.replace('<!-- UBLEXTENSIONS_PLACEHOLDER -->', env);
-            const { pubKeyPem, certSignature } = zatca.extractCertDetails(device.production_cert_pem);
-            const tlv = zatca.generateZatcaTLV9(settings.business_name_ar, settings.vat_number || settings.tax_number, timestamp, returnTotal, returnTax, invoiceHash, signatureBase64, pubKeyPem, certSignature);
-            signedXml = signedXml.replace('<!-- QR_PLACEHOLDER -->', `<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">${tlv}</cbc:EmbeddedDocumentBinaryObject>`);
-        }
-        
-        db.prepare('UPDATE zatca_device SET last_pih = ? WHERE id = ?').run(invoiceHash, device.id);
+        const { signedXml, invoiceHash } = zatca.signAndPackageInvoice({
+            xml, device, settings, timestamp,
+            total: returnTotal, tax: returnTax, db
+        });
 
         const saleRes = db.prepare(`
             INSERT INTO sales (invoice, total_amount, subtotal, tax_amount, discount, payment_method,
@@ -2188,9 +2556,30 @@ function getSupplierStatement(supplierId) {
 }
 
 function recordSupplierPayment(data) {
-    const { supplier_id, amount, note } = data;
-    const result = db.prepare('INSERT INTO supplier_payments (supplier_id, amount, note) VALUES (?,?,?)').run(supplier_id, amount, note);
-    return { success: true, id: result.lastInsertRowid };
+    const { supplier_id, amount, note, payment_method = 'cash', purchase_order_id = null, created_by = 1 } = data;
+    return db.transaction(() => {
+        const result = db.prepare('INSERT INTO supplier_payments (supplier_id, amount, note, payment_date) VALUES (?,?,?, date(\'now\'))').run(supplier_id, amount, note || '');
+        const pmtId = result.lastInsertRowid;
+
+        // ── IP-4: AP Payment Journal Entry (atomic) ────────────────────
+        const creditAcct = (payment_method === 'bank' || payment_method === 'transfer' || payment_method === 'cheque') ? 1112 : 1111;
+        const supplierName = db.prepare('SELECT name FROM suppliers WHERE id=?').get(supplier_id)?.name || `مورد #${supplier_id}`;
+        accounting.postJournalEntry({
+            entry_date:     new Date().toISOString().split('T')[0],
+            reference_no:   `SUPP-PMT-${pmtId}`,
+            description:    `دفعة لمورد: ${supplierName}${purchase_order_id ? ` — PO-${purchase_order_id}` : ''}`,
+            entry_type:     'Auto',
+            reference_type: 'supplier_payment',
+            reference_id:   String(pmtId),
+            lines: [
+                { account_code: 2100,       debit: amount, credit: 0 },
+                { account_code: creditAcct, debit: 0,      credit: amount },
+            ],
+            created_by: created_by,
+        });
+
+        return { success: true, id: pmtId };
+    })();
 }
 
 function getCustomerStatementBasic(customerId) {
@@ -2324,7 +2713,8 @@ module.exports = {
     addAuditLog, getAuditLogs,
     // Purchases & Stock
     getStockHistory, addStockAdjustment, getPurchaseOrders, createPurchaseOrder,
-    receivePurchaseOrder, getPurchaseItems,
+    receivePurchaseOrder, getPurchaseItems, updatePurchaseOrder, deletePurchaseOrder,
+    returnPurchaseOrder, partialReturnPurchaseOrder,
     // Promotions
     getPromotions, savePromotion, deletePromotion, togglePromotion,
     recordWhatsAppShare,
@@ -2364,6 +2754,8 @@ module.exports = {
     createPayrollRun:          accountingP2.createPayrollRun,
     postPayrollRun:            accountingP2.postPayrollRun,
     getPayrollRuns:            accountingP2.getPayrollRuns,
+    disbursePayroll:           accountingP2.disbursePayroll,
+    postVATSettlement:         accountingP2.postVATSettlement,
     addEnhancedAuditLog:       accountingP2.addEnhancedAuditLog,
     getEnhancedAuditLogs:      accountingP2.getEnhancedAuditLogs,
     addInventoryBatch:         accountingP2.addInventoryBatch,

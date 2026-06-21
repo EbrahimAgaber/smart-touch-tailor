@@ -295,6 +295,7 @@ const db = require('./database.cjs');
 const syncEngine = require('./syncEngine.cjs');
 const zatcaPhase2 = require('./zatca_phase2.cjs');
 const zatcaReporter = require('./zatca_reporter.cjs');
+const compliance   = require('./compliance_sa.cjs');
 
 if (!app) { console.error('FATAL: Electron app object undefined.'); process.exit(1); }
 
@@ -482,6 +483,10 @@ function registerIpcHandlers() {
     ipcMain.handle('p2:createPayrollRun',       _gated((e, d) => { try { return db.createPayrollRun(d.month, d.overrides, d.createdBy); } catch(err) { return { success: false, error: err.message }; } }));
     ipcMain.handle('p2:postPayrollRun',         _gated((e, d) => { try { return db.postPayrollRun(d.runId, d.createdBy); } catch(err) { return { success: false, error: err.message }; } }));
     ipcMain.handle('p2:getPayrollRuns',         (e, d) => { try { return db.getPayrollRuns(d?.month); } catch(err) { return []; } });
+    // IP-6: Payroll Disbursement
+    ipcMain.handle('p2:disbursePayroll',        _gated((e, d) => { try { return db.disbursePayroll(d.runId, d.paymentMethod, d.createdBy); } catch(err) { return { success: false, error: err.message }; } }));
+    // IP-7: VAT Settlement
+    ipcMain.handle('p2:postVATSettlement',      _gated((e, d) => { try { return db.postVATSettlement(d.startDate, d.endDate, d.paymentDate, d.createdBy); } catch(err) { return { success: false, error: err.message }; } }));
     // Audit
     ipcMain.handle('p2:getEnhancedAuditLogs',   (e, f) => { try { return db.getEnhancedAuditLogs(f); } catch(err) { return []; } });
     // Inventory
@@ -498,6 +503,68 @@ function registerIpcHandlers() {
     ipcMain.handle('p2:getCostCentres',         ()     => { try { return db.getCostCentres(); } catch(err) { return []; } });
     ipcMain.handle('p2:saveCostCentre',         _gated((e, d) => { try { return db.saveCostCentre(d); } catch(err) { return { success: false, error: err.message }; } }));
     ipcMain.handle('p2:getBreakEvenInputs',     ()     => { try { return db.getBreakEvenInputs(); } catch(err) { return {}; } });
+
+    // ── Saudi Compliance IPC (GAP-01 → GAP-08) ───────────────────────────────────────
+    // GAP-01 EOSB
+    ipcMain.handle('compliance:calculateEOSB', (e, d) => { try { return compliance.calculateEOSB(d); } catch(err) { return { success: false, error: err.message }; } });
+    ipcMain.handle('compliance:postEOSB',      _gated((e, d) => { try { return compliance.postEOSBEntry(d.employeeId, d.createdBy); } catch(err) { return { success: false, error: err.message }; } }));
+    ipcMain.handle('compliance:getEOSBHistory',()     => { try { return compliance.getEOSBHistory(); } catch(err) { return []; } });
+    // GAP-02 WPS
+    ipcMain.handle('compliance:exportWPS', _gated(async (e, d) => {
+        try {
+            const sifContent = compliance.generateWPSSIF(d.runId);
+            const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+                defaultPath: `WPS_${d.runId || 'export'}_${new Date().toISOString().slice(0,10)}.sif`,
+                filters: [{ name: 'SIF File', extensions: ['sif'] }]
+            });
+            if (canceled || !filePath) return { success: false };
+            fs.writeFileSync(filePath, sifContent, 'utf8');
+            return { success: true, filePath };
+        } catch(err) { return { success: false, error: err.message }; }
+    }));
+    // GAP-03 VAT 311 XML
+    ipcMain.handle('compliance:exportVAT311', _gated(async (e, d) => {
+        try {
+            const xmlContent = compliance.generateVAT311XML(d.startDate, d.endDate);
+            const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+                defaultPath: `VAT311_${d.startDate}_${d.endDate}.xml`,
+                filters: [{ name: 'XML File', extensions: ['xml'] }]
+            });
+            if (canceled || !filePath) return { success: false };
+            fs.writeFileSync(filePath, xmlContent, 'utf8');
+            return { success: true, filePath };
+        } catch(err) { return { success: false, error: err.message }; }
+    }));
+    // GAP-04 AP Aging
+    ipcMain.handle('compliance:getAPAging',     (e, d) => { try { return compliance.getAPAgingReport(d?.asOfDate); } catch(err) { return { error: err.message }; } });
+    // GAP-05 Closing Wizard
+    ipcMain.handle('compliance:previewClose',   (e, d) => { try { return compliance.previewClosingWizard(d.periodId); } catch(err) { return { error: err.message }; } });
+    ipcMain.handle('compliance:executeClose',   _gated((e, d) => { try { return compliance.executeClosingWizard(d.periodId, d.createdBy); } catch(err) { return { success: false, error: err.message }; } }));
+    // GAP-06 Bank Import (legacy row-level import)
+    ipcMain.handle('compliance:getBankStatementLines', (e, d) => { try { return compliance.getBankStatementLines(d.bankAccountId, d.importId); } catch(err) { return []; } });
+    ipcMain.handle('compliance:matchStatementLine',    _gated((e, d) => { try { return compliance.matchStatementLine(d.lineId, d.journalEntryLineId); } catch(err) { return { success: false, error: err.message }; } }));
+    ipcMain.handle('compliance:getStatementImports',   (e, d) => { try { return compliance.getStatementImports(d?.bankAccountId); } catch(err) { return []; } });
+    // GAP-07 Retention
+    ipcMain.handle('compliance:getRetentionManifest',  ()     => { try { return compliance.getRetentionManifest(); } catch(err) { return { error: err.message }; } });
+    // GAP-08 Bank Statement CSV Ingestion
+    ipcMain.handle('compliance:importBankFile', _gated(async (e, d) => {
+        try {
+            // If no filePath provided, show native file picker
+            let filePath = d?.filePath;
+            if (!filePath) {
+                const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+                    title: 'اختر كشف حساب بنكي (CSV)',
+                    filters: [{ name: 'CSV', extensions: ['csv'] }],
+                    properties: ['openFile']
+                });
+                if (canceled || !filePaths.length) return { success: false };
+                filePath = filePaths[0];
+            }
+            return compliance.importBankStatement(d.bankAccountId, filePath);
+        } catch(err) { return { success: false, error: err.message }; }
+    }));
+    ipcMain.handle('compliance:autoMatchBankLines', _gated((e, d) => { try { return compliance.autoMatchBankLines(d.bankAccountId); } catch(err) { return { success: false, error: err.message }; } }));
+    // ─────────────────────────────────────────────────────────────────────────────
 
     // Gap-filling additions (P-003, P-014, P-021 extras)
     ipcMain.handle('p2:getAccountDrillDown',       (e, d) => { try { return db.p2.getAccountDrillDown(d.accountCode, d.startDate, d.endDate, d.limit); } catch(err) { return { error: err.message }; } });
@@ -550,7 +617,11 @@ function registerIpcHandlers() {
     ipcMain.handle('db:adjustStock',          _gated((e, d)  => db.addStockAdjustment(d)));
     ipcMain.handle('db:getPurchaseOrders',    ()      => db.getPurchaseOrders());
     ipcMain.handle('db:createPurchaseOrder',  _gated((e, d)  => db.createPurchaseOrder(d)));
+    ipcMain.handle('db:updatePurchaseOrder',  _gated((e, id, d) => db.updatePurchaseOrder(id, d)));
+    ipcMain.handle('db:deletePurchaseOrder',  _gated((e, id) => db.deletePurchaseOrder(id)));
     ipcMain.handle('db:receivePurchaseOrder', _gated((e, id) => db.receivePurchaseOrder(id)));
+    ipcMain.handle('db:returnPurchaseOrder',        _gated((e, id)          => db.returnPurchaseOrder(id)));
+    ipcMain.handle('db:partialReturnPurchaseOrder', _gated((e, id, items)   => db.partialReturnPurchaseOrder(id, items)));
     ipcMain.handle('db:getPurchaseItems',     (e, id) => db.getPurchaseItems(id));
     ipcMain.handle('db:createReturn',         _gated((e, d)  => db.createReturn(d.invoiceId, d.returnItems)));
 
@@ -826,37 +897,36 @@ function registerIpcHandlers() {
             const csidSecret = csidData.secret;
 
             const { generateUBL21XML } = require('./zatca_utils.cjs');
-            const { hashXML, signXMLHash, generateZatcaTLV9, buildSignatureEnvelope, extractCertDetails } = zatcaPhase2;
+            const { signInvoiceXML, generateZatcaTLV9, extractCertDetails, injectUBLExtensions, injectQRPayload } = zatcaPhase2;
             const settings = db.getSettings();
             const cryptoMod = require('crypto');
 
             const certPem = device.production_cert_pem || '';
             const { pubKeyPem, certSignature } = certPem ? extractCertDetails(certPem) : { pubKeyPem: '', certSignature: '' };
-            const certBase64 = certPem
-                ? certPem.replace(/-----BEGIN CERTIFICATE-----/, '').replace(/-----END CERTIFICATE-----/, '').replace(/[\n\r]/g, '')
-                : '';
 
             const runTest = async (label, invoiceData, apiType) => {
                 try {
                     const uuid = cryptoMod.randomUUID();
                     const xml = generateUBL21XML({ ...invoiceData, uuid, prevHash: '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=', icv: 999 });
-                    const xmlHash = hashXML(xml);
-                    const sig = signXMLHash(xml, device.private_key_pem, undefined, certPem);
-                    const tlv = generateZatcaTLV9(
-                        settings.business_name_ar || 'Test', settings.vat_number || '300000000000003',
-                        invoiceData.timestamp, invoiceData.total, '0', xmlHash, sig, pubKeyPem, certSignature
+                    // [FIX-SIM-EXPORT] signXMLHash()/buildSignatureEnvelope() never existed on
+                    // zatca_phase2.cjs's exports — use the real exported signInvoiceXML(), which
+                    // hashes, signs, and builds the XAdES envelope in a single call, then inject
+                    // via the same structural helpers used by signAndPackageInvoice().
+                    const { envelope, invoiceHashBase64, signatureBase64 } = signInvoiceXML(
+                        xml, device.private_key_pem, certPem, invoiceData.timestamp
                     );
-                    const envelope = buildSignatureEnvelope(xmlHash, sig, certBase64, invoiceData.timestamp, certPem);
-                    const signedXml = xml
-                        .replace('<!-- UBLEXTENSIONS_PLACEHOLDER -->', envelope)
-                        .replace('<!-- QR_PLACEHOLDER -->', '')
-                        .replace(/<cbc:EmbeddedDocumentBinaryObject mimeCode="text\/plain"><\/cbc:EmbeddedDocumentBinaryObject>/, `<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">${tlv}</cbc:EmbeddedDocumentBinaryObject>`);
+                    const tlv = generateZatcaTLV9(
+                        settings.business_name_ar, settings.vat_number,
+                        invoiceData.timestamp, invoiceData.total, '0', invoiceHashBase64, signatureBase64, pubKeyPem, certSignature
+                    );
+                    let signedXml = injectUBLExtensions(xml, envelope);
+                    signedXml = injectQRPayload(signedXml, tlv);
                     const xmlBase64 = Buffer.from(signedXml).toString('base64');
                     let response;
                     if (apiType === 'clearance') {
-                        response = await zatcaPhase2.clearInvoice(xmlHash, xmlBase64, uuid, csidToken, csidSecret, true);
+                        response = await zatcaPhase2.clearInvoice(invoiceHashBase64, xmlBase64, uuid, csidToken, csidSecret, true);
                     } else {
-                        response = await zatcaPhase2.reportInvoice(xmlHash, xmlBase64, uuid, csidToken, csidSecret, true);
+                        response = await zatcaPhase2.reportInvoice(invoiceHashBase64, xmlBase64, uuid, csidToken, csidSecret, true);
                     }
                     const passed = !response.error && (response.reportingStatus === 'REPORTED' || response.clearanceStatus === 'CLEARED' || response.validationResults?.status === 'PASS' || (!response.error && response.invoiceHash));
                     results.push({ label, passed, details: response.error ? (response.data || response) : (response.validationResults || { status: 'PASS' }) });
@@ -865,14 +935,21 @@ function registerIpcHandlers() {
                 }
             };
 
+            if (!settings.vat_number || !/^3\d{14}$/.test(settings.vat_number)) {
+                return { success: false, error: 'يجب ضبط رقم ضريبي صحيح (يبدأ بـ 3 ومكون من 15 رقم) في الإعدادات لإجراء المحاكاة.' };
+            }
+            if (!settings.business_name_ar) {
+                return { success: false, error: 'يجب ضبط اسم المؤسسة في الإعدادات.' };
+            }
+
             const ts = new Date().toISOString();
             const baseInvoice = {
                 invoice: `SIM-B2C-${Date.now()}`,
                 timestamp: ts,
                 total: '115.00',
                 items: [{ Name: 'Test Item', Qty: 1, Price: 115, Unit: 'PCE', tax_category: 'S' }],
-                seller: settings.business_name_ar || 'Test Seller',
-                vatNo: settings.vat_number || '300000000000003',
+                seller: settings.business_name_ar,
+                vatNo: settings.vat_number,
                 vatRate: 0.15,
             };
 
@@ -889,6 +966,14 @@ function registerIpcHandlers() {
                 billingRef: cryptoMod.randomUUID(),
                 total: '-115.00',
                 items: [{ Name: 'Return', Qty: -1, Price: 115, Unit: 'PCE', tax_category: 'S' }],
+            }, 'reporting');
+            await runTest('Debit Note 383 (Reporting)', {
+                ...baseInvoice,
+                invoice: `SIM-DN-${Date.now()}`,
+                typeCode: '383',
+                billingRef: cryptoMod.randomUUID(),
+                total: '115.00',
+                items: [{ Name: 'Adjustment', Qty: 1, Price: 115, Unit: 'PCE', tax_category: 'S' }],
             }, 'reporting');
 
             const allPassed = results.every(r => r.passed);
@@ -908,19 +993,45 @@ function registerIpcHandlers() {
                 device = db.getZatcaDevice();
             }
             const settings = db.getSettings();
+            if (!settings.vat_number || !/^3\d{14}$/.test(settings.vat_number)) {
+                return { success: false, error: 'يجب ضبط رقم ضريبي صحيح (يبدأ بـ 3 ومكون من 15 رقم) في الإعدادات.' };
+            }
+            if (!settings.business_name_ar) {
+                return { success: false, error: 'يجب ضبط اسم المؤسسة في الإعدادات.' };
+            }
             const isSandbox = settings.zatca_env === 'sandbox';
             const crypto = require('crypto');
             const pubKey = crypto.createPublicKey(device.private_key_pem);
             const pubKeyPem = pubKey.export({ type: 'spki', format: 'pem' });
             const { csrBase64, csrPem } = zatcaPhase2.generateCSR(
                 device.private_key_pem, pubKeyPem,
-                { EGS_SN: device.device_id || 'POS-01', UID: settings.vat_number || settings.tax_number || '300000000000003',
-                  ORG: settings.business_name_ar || 'مؤسسة', OU: 'Head Office', IND: 'Retail' }
+                { EGS_SN: device.device_id || 'POS-01', UID: settings.vat_number,
+                  ORG: settings.business_name_ar, 
+                  OU: settings.zatca_ou || 'Head Office', 
+                  IND: settings.zatca_ind || 'Retail' }
             );
             db.updateZatcaDevice({ id: device.id, csr_pem: csrPem });
             const compCsid = await zatcaPhase2.issueComplianceCSID(csrBase64, otp, isSandbox);
             if (compCsid.error) return { success: false, error: 'Compliance CSID Failed', details: compCsid.data };
             db.updateZatcaDevice({ id: device.id, compliance_csid: JSON.stringify(compCsid) });
+
+            // ── [MANDATE-3] Simulation-pass guarantee ───────────────────────────────
+            // ZATCA requires the EGS to submit and PASS the compliance test invoices
+            // (Standard B2B, Simplified B2C, Credit Note, Debit Note) against
+            // /compliance/invoices BEFORE /production/csids will issue a PCSID.
+            // Skipping this step causes production CSID issuance to be rejected
+            // (or — worse — silently issued against an EGS ZATCA considers untested).
+            const complianceCheck = await runComplianceInvoiceChecklist({
+                device, settings, compCsid, isSandbox,
+            });
+            if (!complianceCheck.allPassed) {
+                return {
+                    success: false,
+                    error: 'Compliance invoice checklist failed — production CSID was NOT requested.',
+                    details: complianceCheck.results,
+                };
+            }
+
             const prodCsid = await zatcaPhase2.issueProductionCSID(
                 compCsid.requestID || compCsid.requestId, compCsid.binarySecurityToken, compCsid.secret, isSandbox);
             if (prodCsid.error) return { success: false, error: 'Production CSID Failed', details: prodCsid.data };
@@ -1155,6 +1266,88 @@ async function window_api_saveSettings_stub(dbModule, data) {
     try { dbModule.saveSettings(data); } catch (err) { console.error('[saveSettings stub]', err); }
 }
 
+// ── [MANDATE-3] Compliance invoice checklist runner ────────────────────────────
+// Generates + signs the four mandatory test invoice types and submits each to
+// /compliance/invoices using the Compliance CSID credentials. ZATCA will not
+// issue a Production CSID until all four have returned a PASS validation result.
+// NOTE: uses zatcaPhase2.signInvoiceXML / injectUBLExtensions / injectQRPayload
+// (the functions actually exported by zatca_phase2.cjs). zatca:runSimulationTests
+// previously referenced the non-existent signXMLHash/buildSignatureEnvelope —
+// that has since been fixed to use the same signInvoiceXML()-based path.
+async function runComplianceInvoiceChecklist({ device, settings, compCsid, isSandbox }) {
+    const results = [];
+    const cryptoMod = require('crypto');
+    const { generateUBL21XML } = require('./zatca_utils.cjs');
+
+    const runOne = async (label, invoiceData) => {
+        try {
+            const uuid = cryptoMod.randomUUID();
+            // Compliance checks use a fixed, ZATCA-documented dummy PIH for the
+            // first invoice in the chain — production invoices use the real last_pih.
+            const xml = generateUBL21XML({
+                ...invoiceData,
+                uuid,
+                prevHash: '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=',
+                icv: 1,
+            });
+            // Compliance CSID has no production_cert_pem yet — sign against the
+            // compliance cert returned in binarySecurityToken.
+            const compCertPem = Buffer.from(compCsid.binarySecurityToken, 'base64').toString('ascii');
+            const { envelope, invoiceHashBase64 } = zatcaPhase2.signInvoiceXML(
+                xml, device.private_key_pem, compCertPem, invoiceData.timestamp
+            );
+            const signedXml = zatcaPhase2.injectUBLExtensions(xml, envelope);
+            const xmlBase64 = Buffer.from(signedXml).toString('base64');
+
+            const response = await zatcaPhase2.checkComplianceInvoice(
+                invoiceHashBase64, xmlBase64, uuid,
+                compCsid.binarySecurityToken, compCsid.secret, isSandbox
+            );
+            const passed = !response.error && (response.validationResults?.status === 'PASS' || response.reportingStatus === 'REPORTED' || response.clearanceStatus === 'CLEARED');
+            results.push({ label, passed, details: response.error ? (response.data || response) : (response.validationResults || { status: 'PASS' }) });
+        } catch (err) {
+            results.push({ label, passed: false, details: { error: err.message } });
+        }
+    };
+
+    const ts = new Date().toISOString();
+    const baseInvoice = {
+        invoice: `COMPLY-${Date.now()}`,
+        timestamp: ts,
+        total: '115.00',
+        items: [{ Name: 'Compliance Test Item', Qty: 1, Price: 115, Unit: 'PCE', tax_category: 'S' }],
+        seller: settings.business_name_ar,
+        vatNo: settings.vat_number,
+        vatRate: 0.15,
+    };
+
+    await runOne('B2C Simplified (Reporting)', { ...baseInvoice, invoice: `COMPLY-B2C-${Date.now()}` });
+    await runOne('B2B Standard (Clearance)', {
+        ...baseInvoice,
+        invoice: `COMPLY-B2B-${Date.now()}`,
+        typeCode: '0100000',
+        buyer: { vatNo: '300000000000004', name: 'Test Buyer', street: 'شارع', building: '1111', district: 'حي', city: 'الرياض', postal: '12345', country: 'SA' },
+    });
+    await runOne('Credit Note 381', {
+        ...baseInvoice,
+        invoice: `COMPLY-CN-${Date.now()}`,
+        typeCode: '381',
+        billingRef: cryptoMod.randomUUID(),
+        total: '-115.00',
+        items: [{ Name: 'Return', Qty: -1, Price: 115, Unit: 'PCE', tax_category: 'S' }],
+    });
+    await runOne('Debit Note 383', {
+        ...baseInvoice,
+        invoice: `COMPLY-DN-${Date.now()}`,
+        typeCode: '383',
+        billingRef: cryptoMod.randomUUID(),
+        total: '115.00',
+        items: [{ Name: 'Adjustment', Qty: 1, Price: 115, Unit: 'PCE', tax_category: 'S' }],
+    });
+
+    return { allPassed: results.every(r => r.passed), results };
+}
+
 function createMainWindow() {
     if (mainWindow) return;
     mainWindow = new BrowserWindow({
@@ -1178,6 +1371,7 @@ function createMainWindow() {
 app.whenReady().then(() => {
     db.initDatabase(app.getPath('userData'));
     syncEngine.initSyncEngine(db.getDbInstance());
+    compliance.initCompliance(db.getDbInstance());
     registerIpcHandlers();
     hardware.registerLabelIPC(db);   // ← Label Engine IPC (P2, P3, P7, P8, P9)
     createMainWindow();

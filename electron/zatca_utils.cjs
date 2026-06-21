@@ -32,14 +32,13 @@ const UNIT_CODE_MAP = {
     'طن':   'TNE',  'ton':  'TNE',
     'صندوق':'BX',   'box':  'BX',   'كرتون': 'CT',  'carton': 'CT',
     'حزمة': 'PK',   'pack': 'PK',
-    'دزينة':'DZN',  'dozen':'DZN',
+    'درزن':'DZN',  'dozen':'DZN',
 };
 
 function resolveUnitCode(unit) {
     if (!unit) return 'PCE';
     const key = String(unit).trim().toLowerCase();
     const result = UNIT_CODE_MAP[key] || UNIT_CODE_MAP[String(unit).trim()];
-    // [W-2] Warn on unmapped units so product managers can add them without digging through code.
     if (!result) {
         console.warn(`[ZATCA] UNIT_CODE_MAP: unmapped unit "${unit}", falling back to PCE. Add it to UNIT_CODE_MAP in zatca_utils.cjs.`);
         return 'PCE';
@@ -48,15 +47,12 @@ function resolveUnitCode(unit) {
 }
 
 // ── Tax category helpers ─────────────────────────────────────────────────────
-// [C-2] Map tax category to VAT rate and exemption reason
-// [W-1] RC (Reverse Charge) added as first-class category with VATEX-SA-RC code.
 const TAX_CATEGORY_CONFIG = {
-    'S':  { rate: null, /* use passed vatRate */ exemptionCode: null, exemptionReason: null },
-    'Z':  { rate: 0,    exemptionCode: 'VATEX-SA-29',  exemptionReason: null },
-    'E':  { rate: 0,    exemptionCode: 'VATEX-SA-30',  exemptionReason: null },
-    'O':  { rate: 0,    exemptionCode: 'VATEX-SA-OOS', exemptionReason: null },
-    // RC: Reverse Charge — tax rate is 0 on the invoice line; buyer self-accounts for VAT.
-    'RC': { rate: 0,    exemptionCode: 'VATEX-SA-RC',  exemptionReason: 'Reverse Charge' },
+    'S':  { rate: null, exemptionCode: null, exemptionReason: null },
+    'Z':  { rate: 0,    exemptionCode: 'VATEX-SA-29',  exemptionReason: 'Zero-rated supply per Article 29 of VAT Regulations' },
+    'E':  { rate: 0,    exemptionCode: 'VATEX-SA-30',  exemptionReason: 'Exempt supply per Article 30 of VAT Regulations' },
+    'O':  { rate: 0,    exemptionCode: 'VATEX-SA-OOS', exemptionReason: 'Not subject to VAT' },
+    'RC': { rate: 0,    exemptionCode: 'VATEX-SA-RC',  exemptionReason: 'Reverse Charge per Article 47 of VAT Regulations' },
 };
 
 // ── Main UBL 2.1 XML generator ───────────────────────────────────────────────
@@ -64,23 +60,7 @@ const TAX_CATEGORY_CONFIG = {
  * Generates a compliant ZATCA UBL 2.1 XML (unsigned).
  *
  * @param {object} invoiceData
- * @param {string}   invoiceData.invoice        Invoice number
- * @param {number}   invoiceData.icv            Integer counter (sequential)
- * @param {string}   invoiceData.timestamp      ISO-8601 datetime
- * @param {number}   invoiceData.total          Tax-inclusive total (SAR)
- * @param {Array}    invoiceData.items          Line items array
- * @param {string}   invoiceData.uuid           UUID v4
- * @param {string}   invoiceData.prevHash       Previous invoice hash (Base64 SHA-256)
- * @param {string}   invoiceData.seller         Business name in Arabic
- * @param {string}   invoiceData.vatNo          15-digit VAT/TIN number
- * @param {string}  [invoiceData.crn]           Commercial Registration Number
- * @param {number}  [invoiceData.vatRate]       Decimal VAT rate e.g. 0.15
- * @param {number}  [invoiceData.discount]      Header-level discount amount (SAR, tax-inclusive)
- * @param {object}  [invoiceData.buyer]         B2B buyer info
- * @param {string}  [invoiceData.typeCode]      388=Tax Invoice, 381=Credit Note, 383=Debit Note
- * @param {string}  [invoiceData.billingRef]    Original invoice ID (required for 381/383)
- * @param {object}  [invoiceData.address]       Seller address
- * @returns {string} Unsigned UBL 2.1 XML
+ * @param {string}  [invoiceData.reason]   Reason for issuance (mandatory for typeCode 381/383, BR-KSA-17)
  */
 function generateUBL21XML(invoiceData) {
     const {
@@ -92,6 +72,7 @@ function generateUBL21XML(invoiceData) {
         typeCode    = '388',
         billingRef  = null,
         address     = {},
+        reason      = null,
     } = invoiceData;
 
     const invoiceSubtype = buyer ? '0100000' : '0200000';
@@ -99,41 +80,88 @@ function generateUBL21XML(invoiceData) {
     const discountNum = parseFloat(discount || 0);
     const issueDate  = String(timestamp || '').split('T')[0];
     const issueTime  = (String(timestamp || '').split('T')[1] || '00:00:00').split('.')[0];
-    const safePrevHash = prevHash || '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=';
+    // [FIX-PIH-GENESIS] ZATCA genesis value = Base64(SHA-256("0")), NOT 32 zero bytes.
+    const safePrevHash = prevHash || 'X+zrZv/IbzjZUnhsbWlsecLbwjndTpG0ZynXOif7V+k=';
 
-    // Resolved address fields
+    // ── [FIX-014] Seller address validation — no placeholder fallbacks ─────────
     const addr = {
-        street:           address.street           || 'شارع الملك فهد',
-        building:         address.building         || '1234',
-        additional_street: address.additional_street || '',  // [C-5]
-        plot_id:          address.plot_id          || '',    // [C-5]
-        district:         address.district         || 'العليا',
-        city:             address.city             || 'الرياض',
-        postal:           address.postal           || '12345',
-        country:          address.country          || 'SA',
+        street:            address.street            || '',
+        building:          address.building          || '',
+        additional_street: address.additional_street || '',
+        plot_id:           address.plot_id           || '',
+        district:          address.district          || '',
+        city:              address.city              || '',
+        postal:            address.postal            || '',
+        country:           address.country           || 'SA',
     };
 
-    const tinNumber = escapeXml(vatNo || '300000000000003');
-    const crnNumber = escapeXml(crn || address.crn || vatNo || '300000000000003');
+    const missingFields = [];
+    if (!addr.street)   missingFields.push('الشارع (street)');
+    if (!addr.building) missingFields.push('رقم المبنى (building)');
+    if (!addr.district) missingFields.push('الحي (district)');
+    if (!addr.city)     missingFields.push('المدينة (city)');
+    if (!addr.postal)   missingFields.push('الرمز البريدي (postal)');
+
+    if (missingFields.length > 0) {
+        throw new Error(`ZATCA_MISSING_ADDRESS: حقول العنوان التالية مطلوبة: ${missingFields.join('، ')}. قم بإعدادها في الإعدادات.`);
+    }
+
+    if (!vatNo || !/^3\d{14}$/.test(vatNo)) {
+        throw new Error('ZATCA_MISSING_VAT: رقم ضريبة القيمة المضافة (VAT) غير مُعد أو غير صالح. يجب أن يكون 15 رقماً ويبدأ بـ 3. قم بإعداده في الإعدادات قبل إصدار الفواتير.');
+    }
+    const tinNumber = escapeXml(vatNo);
+
+    // ── [FIX-BR-KSA-F-08/F-13] CRN validation ───────────────────────────────
+    const rawCrn = crn || address.crn || '';
+    const validCrn = /^\d{10}$/.test(rawCrn) ? rawCrn : null;
+    if (rawCrn && !validCrn) {
+        console.warn(`[ZATCA] CRN "${rawCrn}" is not a valid 10-digit Saudi CRN — omitting from XML to avoid BR-KSA-F-08.`);
+    }
+    const crnNumber = validCrn ? escapeXml(validCrn) : null;
+
+    // ── [FIX-5] B2B buyer address hard gate ──────────────────────────────────
+    if (buyer) {
+        const buyerMissing = [];
+        if (!buyer.street  || !String(buyer.street).trim())   buyerMissing.push('street');
+        if (!buyer.building|| !String(buyer.building).trim()) buyerMissing.push('building');
+        if (!buyer.district|| !String(buyer.district).trim()) buyerMissing.push('district');
+        if (!buyer.city    || !String(buyer.city).trim())     buyerMissing.push('city');
+        if (!buyer.postal  || !String(buyer.postal).trim())   buyerMissing.push('postal');
+
+        if (buyerMissing.length > 0) {
+            throw new Error(
+                `ZATCA_MISSING_BUYER_ADDRESS: عنوان المشتري ناقص (${buyerMissing.join(', ')}). ` +
+                `يُرجى تحديث بيانات العميل بالعنوان الوطني الكامل قبل إصدار فاتورة B2B.`
+            );
+        }
+    }
 
     // ── [C-2] Per-line tax category support & multi-TaxSubtotal ─────────────
-    // Group lines by tax category
-    const categoryGroups = {}; // { 'S': {taxableAmount, taxAmount}, 'Z': {...}, ... }
+    const categoryGroups = {};
 
     const invoiceLines = items.map((item, idx) => {
         const qty          = Math.abs(item.Qty || item.quantity || 1);
         const unitPrice    = item.Price || item.item_price || 0;
         const lineDiscount = parseFloat(item.discount || item.Discount || 0);
-        const lineGross    = parseFloat(((unitPrice * qty) - lineDiscount).toFixed(2));
+
+        // [FIX-4] Retain full float precision for internal calculations
+        const rawLineGross = (unitPrice * qty) - lineDiscount;
+        const lineGross    = parseFloat(rawLineGross.toFixed(2));
 
         // Determine per-line tax category
         const taxCat       = (item.tax_category || item.TaxCategory || 'S').toUpperCase();
         const catConfig    = TAX_CATEGORY_CONFIG[taxCat] || TAX_CATEGORY_CONFIG['S'];
         const lineVatRate  = catConfig.rate !== null ? catConfig.rate : vatRate;
 
-        const lineTax      = parseFloat((lineGross * lineVatRate / (1 + lineVatRate)).toFixed(2));
-        const lineNet      = parseFloat((lineGross - lineTax).toFixed(2));
-        const unitNet      = parseFloat((unitPrice / (1 + lineVatRate)).toFixed(4));
+        // [FIX-4] High-precision unit net — full float, NOT pre-truncated
+        const rawUnitNet   = unitPrice / (1 + lineVatRate);
+
+        // [FIX-4] Line net derived from high-precision rawUnitNet × qty
+        const lineNet      = parseFloat((rawUnitNet * qty).toFixed(2));
+
+        // [FIX-4] Line tax back-derived from calculated lineGross − lineNet
+        const lineTax      = parseFloat((lineGross - lineNet).toFixed(2));
+
         const unitCode     = resolveUnitCode(item.Unit || item.unit || 'وحدة');
 
         // Accumulate into category groups
@@ -144,9 +172,11 @@ function generateUBL21XML(invoiceData) {
         categoryGroups[taxCat].taxAmount     += lineTax;
 
         // Build exemption reason XML if applicable
-        const exemptionXml = catConfig.exemptionCode
-            ? `\n                    <cbc:TaxExemptionReasonCode>${catConfig.exemptionCode}</cbc:TaxExemptionReasonCode>`
-              + (catConfig.exemptionReason ? `\n                    <cbc:TaxExemptionReason>${catConfig.exemptionReason}</cbc:TaxExemptionReason>` : '')
+        const itemExemptionCode = item.exemption_code || catConfig.exemptionCode;
+        const itemExemptionReason = item.exemption_reason || catConfig.exemptionReason;
+        const exemptionXml = itemExemptionCode
+            ? (itemExemptionReason ? `\n                    <cbc:TaxExemptionReason>${itemExemptionReason}</cbc:TaxExemptionReason>` : '')
+              + `\n                    <cbc:TaxExemptionReasonCode>${itemExemptionCode}</cbc:TaxExemptionReasonCode>`
             : '';
 
         const lineDiscountXml = lineDiscount > 0 ? `
@@ -155,9 +185,9 @@ function generateUBL21XML(invoiceData) {
             <cbc:AllowanceChargeReason>Discount</cbc:AllowanceChargeReason>
             <cbc:Amount currencyID="SAR">${lineDiscount.toFixed(2)}</cbc:Amount>
             <cac:TaxCategory>
-                <cbc:ID>${taxCat}</cbc:ID>
-                <cbc:Percent>${(lineVatRate * 100).toFixed(0)}</cbc:Percent>
-                <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+                <cbc:ID schemeID="UN/ECE 5305" schemeAgencyID="6">${taxCat}</cbc:ID>
+                <cbc:Percent>${(lineVatRate * 100).toFixed(2)}</cbc:Percent>
+                <cac:TaxScheme><cbc:ID schemeID="UN/ECE 5153" schemeAgencyID="6">VAT</cbc:ID></cac:TaxScheme>
             </cac:TaxCategory>
         </cac:AllowanceCharge>` : '';
 
@@ -166,30 +196,22 @@ function generateUBL21XML(invoiceData) {
         <cbc:ID>${idx + 1}</cbc:ID>
         <cbc:InvoicedQuantity unitCode="${unitCode}">${qty}</cbc:InvoicedQuantity>
         <cbc:LineExtensionAmount currencyID="SAR">${lineNet.toFixed(2)}</cbc:LineExtensionAmount>${lineDiscountXml}
+        <cac:TaxTotal>
+            <cbc:TaxAmount currencyID="SAR">${lineTax.toFixed(2)}</cbc:TaxAmount>
+            <cbc:RoundingAmount currencyID="SAR">${(lineNet + lineTax).toFixed(2)}</cbc:RoundingAmount>
+        </cac:TaxTotal>
         <cac:Item>
-            <cbc:Name>${escapeXml(item.Name || item.item_name || 'صنف')}</cbc:Name>
+            <cbc:Name>${escapeXml((item.Name || item.item_name || 'منتج عام').trim())}</cbc:Name>
             <cac:ClassifiedTaxCategory>
                 <cbc:ID>${taxCat}</cbc:ID>
-                <cbc:Percent>${(lineVatRate * 100).toFixed(0)}</cbc:Percent>${exemptionXml}
+                <cbc:Percent>${(lineVatRate * 100).toFixed(2)}</cbc:Percent>${exemptionXml}
                 <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
             </cac:ClassifiedTaxCategory>
         </cac:Item>
         <cac:Price>
-            <cbc:PriceAmount currencyID="SAR">${unitNet.toFixed(4)}</cbc:PriceAmount>
+            <cbc:PriceAmount currencyID="SAR">${rawUnitNet.toFixed(6)}</cbc:PriceAmount>
             <cbc:BaseQuantity unitCode="${unitCode}">1</cbc:BaseQuantity>
         </cac:Price>
-        <cac:TaxTotal>
-            <cbc:TaxAmount currencyID="SAR">${lineTax.toFixed(2)}</cbc:TaxAmount>
-            <cac:TaxSubtotal>
-                <cbc:TaxableAmount currencyID="SAR">${lineNet.toFixed(2)}</cbc:TaxableAmount>
-                <cbc:TaxAmount currencyID="SAR">${lineTax.toFixed(2)}</cbc:TaxAmount>
-                <cac:TaxCategory>
-                    <cbc:ID>${taxCat}</cbc:ID>
-                    <cbc:Percent>${(lineVatRate * 100).toFixed(0)}</cbc:Percent>${exemptionXml}
-                    <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
-                </cac:TaxCategory>
-            </cac:TaxSubtotal>
-        </cac:TaxTotal>
     </cac:InvoiceLine>`;
     }).join('');
 
@@ -201,8 +223,8 @@ function generateUBL21XML(invoiceData) {
     const taxSubtotalsXml = Object.entries(categoryGroups).map(([cat, g]) => {
         const catConfig    = g.config;
         const exemptionXml = catConfig.exemptionCode
-            ? `\n            <cbc:TaxExemptionReasonCode>${catConfig.exemptionCode}</cbc:TaxExemptionReasonCode>`
-              + (catConfig.exemptionReason ? `\n            <cbc:TaxExemptionReason>${catConfig.exemptionReason}</cbc:TaxExemptionReason>` : '')
+            ? (catConfig.exemptionReason ? `\n            <cbc:TaxExemptionReason>${catConfig.exemptionReason}</cbc:TaxExemptionReason>` : '')
+              + `\n            <cbc:TaxExemptionReasonCode>${catConfig.exemptionCode}</cbc:TaxExemptionReasonCode>`
             : '';
         return `
         <cac:TaxSubtotal>
@@ -210,16 +232,17 @@ function generateUBL21XML(invoiceData) {
             <cbc:TaxAmount currencyID="SAR">${g.taxAmount.toFixed(2)}</cbc:TaxAmount>
             <cac:TaxCategory>
                 <cbc:ID>${cat}</cbc:ID>
-                <cbc:Percent>${(g.vatRate * 100).toFixed(0)}</cbc:Percent>${exemptionXml}
+                <cbc:Percent>${(g.vatRate * 100).toFixed(2)}</cbc:Percent>${exemptionXml}
                 <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
             </cac:TaxCategory>
         </cac:TaxSubtotal>`;
     }).join('');
 
-    // Use passed total if items is empty or sums differ slightly (handles credit notes with pre-computed totals)
-    const totalNum = items.length > 0 ? totalInclusive : parseFloat(total || 0);
-    const taxTotal = items.length > 0 ? totalTaxAmount : parseFloat((totalNum * vatRate / (1 + vatRate)).toFixed(2));
-    const amountNoTax = parseFloat((totalNum - taxTotal).toFixed(2));
+    const sumOfLinesExtension = parseFloat(totalNetAmount.toFixed(2));
+    const taxExclusiveAmount   = parseFloat((sumOfLinesExtension - discountNum).toFixed(2));
+    const taxTotal             = parseFloat(totalTaxAmount.toFixed(2));
+    const taxInclusiveAmount   = parseFloat((taxExclusiveAmount + taxTotal).toFixed(2));
+    const totalNum             = taxInclusiveAmount;
 
     // ── BillingReference ─────────────────────────────────────────────────────
     const billingRefXml = billingRef ? `
@@ -229,8 +252,11 @@ function generateUBL21XML(invoiceData) {
         </cac:InvoiceDocumentReference>
     </cac:BillingReference>` : '';
 
-    // ── B2B buyer block ───────────────────────────────────────────────────────
-    const buyerXml = buyer ? `
+    // ── [FIX-016] B2B/B2C buyer block ────────────────────────────────────────
+    // NOTE: B2B address fields already validated above (FIX-5). No placeholders.
+    let buyerXml;
+    if (buyer) {
+        buyerXml = `
     <cac:AccountingCustomerParty>
         <cac:Party>
             <cac:PartyIdentification>
@@ -240,11 +266,11 @@ function generateUBL21XML(invoiceData) {
                 <cbc:Name>${escapeXml(buyer.name || 'عميل')}</cbc:Name>
             </cac:PartyName>
             <cac:PostalAddress>
-                <cbc:StreetName>${escapeXml(buyer.street || 'شارع')}</cbc:StreetName>
-                <cbc:BuildingNumber>${escapeXml(buyer.building || '1234')}</cbc:BuildingNumber>
-                <cbc:CitySubdivisionName>${escapeXml(buyer.district || 'حي')}</cbc:CitySubdivisionName>
-                <cbc:CityName>${escapeXml(buyer.city || 'الرياض')}</cbc:CityName>
-                <cbc:PostalZone>${escapeXml(buyer.postal || '12345')}</cbc:PostalZone>
+                <cbc:StreetName>${escapeXml(buyer.street)}</cbc:StreetName>
+                <cbc:BuildingNumber>${escapeXml(buyer.building)}</cbc:BuildingNumber>
+                <cbc:CitySubdivisionName>${escapeXml(buyer.district)}</cbc:CitySubdivisionName>
+                <cbc:CityName>${escapeXml(buyer.city)}</cbc:CityName>
+                <cbc:PostalZone>${escapeXml(buyer.postal)}</cbc:PostalZone>
                 <cac:Country>
                     <cbc:IdentificationCode>${escapeXml(buyer.country || 'SA')}</cbc:IdentificationCode>
                 </cac:Country>
@@ -253,8 +279,42 @@ function generateUBL21XML(invoiceData) {
                 <cbc:CompanyID>${escapeXml(buyer.vatNo || '')}</cbc:CompanyID>
                 <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
             </cac:PartyTaxScheme>
+            <cac:PartyLegalEntity>
+                <cbc:RegistrationName>${escapeXml(buyer.name || 'عميل')}</cbc:RegistrationName>
+            </cac:PartyLegalEntity>
         </cac:Party>
-    </cac:AccountingCustomerParty>` : '';
+    </cac:AccountingCustomerParty>`;
+    } else {
+        buyerXml = `
+    <cac:AccountingCustomerParty />`;
+    }
+
+    // ── Delivery block ────────────────────────────────────────────────────────
+    const deliveryXml = (buyer || invoiceData.deliveryDate) ? `
+    <cac:Delivery>
+        <cbc:ActualDeliveryDate>${invoiceData.deliveryDate || issueDate}</cbc:ActualDeliveryDate>
+    </cac:Delivery>` : '';
+
+    // ── PaymentMeans — BR-KSA-16 + [FIX-3] InstructionNote for 381/383 ──────
+    const PAYMENT_MEANS_MAP = {
+        'cash': '10',    'نقدي': '10',
+        'card': '48',    'بطاقة': '48',
+        'bank': '42',    'تحويل': '42',
+        'credit': '30',  'آجل': '30',
+        'mixed': '1',    'مختلط': '1',
+    };
+    const paymentMeansCode = PAYMENT_MEANS_MAP[(invoiceData.paymentMethod || 'cash').toLowerCase()] || '10';
+
+    // [FIX-3] BR-KSA-17: cbc:InstructionNote mandatory for credit/debit notes
+    const isCorrectionDoc = typeCode === '381' || typeCode === '383';
+    const instructionNoteXml = isCorrectionDoc
+        ? `\n        <cbc:InstructionNote>${escapeXml(reason || 'إلغاء أو تعديل الفاتورة الأصلية')}</cbc:InstructionNote>`
+        : '';
+
+    const paymentMeansXml = `
+    <cac:PaymentMeans>
+        <cbc:PaymentMeansCode>${paymentMeansCode}</cbc:PaymentMeansCode>${instructionNoteXml}
+    </cac:PaymentMeans>`;
 
     // ── Header-level discount block ───────────────────────────────────────────
     const discountXml = discountNum > 0 ? `
@@ -263,13 +323,12 @@ function generateUBL21XML(invoiceData) {
         <cbc:AllowanceChargeReason>Discount</cbc:AllowanceChargeReason>
         <cbc:Amount currencyID="SAR">${discountNum.toFixed(2)}</cbc:Amount>
         <cac:TaxCategory>
-            <cbc:ID>S</cbc:ID>
-            <cbc:Percent>${(vatRate * 100).toFixed(0)}</cbc:Percent>
-            <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+            <cbc:ID schemeID="UN/ECE 5305" schemeAgencyID="6">S</cbc:ID>
+            <cbc:Percent>${(vatRate * 100).toFixed(2)}</cbc:Percent>
+            <cac:TaxScheme><cbc:ID schemeID="UN/ECE 5153" schemeAgencyID="6">VAT</cbc:ID></cac:TaxScheme>
         </cac:TaxCategory>
     </cac:AllowanceCharge>` : '';
 
-    // [C-5] AdditionalStreetName & PlotIdentification
     const additionalStreetXml = addr.additional_street
         ? `\n                <cbc:AdditionalStreetName>${escapeXml(addr.additional_street)}</cbc:AdditionalStreetName>`
         : '';
@@ -282,7 +341,21 @@ function generateUBL21XML(invoiceData) {
          xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
          xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
          xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2">
-    <!-- UBLEXTENSIONS_PLACEHOLDER -->
+    <ext:UBLExtensions>
+        <ext:UBLExtension>
+            <cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID>
+            <ext:ExtensionURI>urn:oasis:names:specification:ubl:dsig:enveloped:xades</ext:ExtensionURI>
+            <ext:ExtensionContent>
+                <sig:UBLDocumentSignatures xmlns:sig="urn:oasis:names:specification:ubl:schema:xsd:CommonSignatureComponents-2">
+                    <sac:SignatureInformation xmlns:sac="urn:oasis:names:specification:ubl:schema:xsd:SignatureAggregateComponents-2" xmlns:sbc="urn:oasis:names:specification:ubl:schema:xsd:SignatureBasicComponents-2">
+                        <cbc:ID>urn:oasis:names:specification:ubl:signature:1</cbc:ID>
+                        <sbc:ReferencedSignatureID>urn:oasis:names:specification:ubl:signature:Invoice</sbc:ReferencedSignatureID>
+                        <ext:ExtensionContent/>
+                    </sac:SignatureInformation>
+                </sig:UBLDocumentSignatures>
+            </ext:ExtensionContent>
+        </ext:UBLExtension>
+    </ext:UBLExtensions>
     <cbc:ProfileID>reporting:1.0</cbc:ProfileID>
     <cbc:ID>${escapeXml(invoice)}</cbc:ID>
     <cbc:UUID>${escapeXml(uuid)}</cbc:UUID>
@@ -304,21 +377,17 @@ function generateUBL21XML(invoiceData) {
     <cac:AdditionalDocumentReference>
         <cbc:ID>QR</cbc:ID>
         <cac:Attachment>
-            <!-- QR_PLACEHOLDER -->
             <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain"></cbc:EmbeddedDocumentBinaryObject>
         </cac:Attachment>
     </cac:AdditionalDocumentReference>
     <cac:Signature>
         <cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID>
-        <cbc:SignatureMethod>urn:oasis:names:specification:ubl:dsig:enveloped:xades</cbc:SignatureMethod>
+        <cbc:SignatureMethodCode>urn:oasis:names:specification:ubl:dsig:enveloped:xades</cbc:SignatureMethodCode>
     </cac:Signature>
     <cac:AccountingSupplierParty>
         <cac:Party>
             <cac:PartyIdentification>
-                <cbc:ID schemeID="TIN">${tinNumber}</cbc:ID>
-            </cac:PartyIdentification>
-            <cac:PartyIdentification>
-                <cbc:ID schemeID="CRN">${crnNumber}</cbc:ID>
+                <cbc:ID schemeID="${crnNumber ? 'CRN' : 'TIN'}">${crnNumber || tinNumber}</cbc:ID>
             </cac:PartyIdentification>
             <cac:PartyName>
                 <cbc:Name>${escapeXml(seller || 'مؤسسة تجارية')}</cbc:Name>
@@ -337,17 +406,23 @@ function generateUBL21XML(invoiceData) {
                 <cbc:CompanyID>${tinNumber}</cbc:CompanyID>
                 <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
             </cac:PartyTaxScheme>
+            <cac:PartyLegalEntity>
+                <cbc:RegistrationName>${escapeXml(seller || '')}</cbc:RegistrationName>
+            </cac:PartyLegalEntity>
         </cac:Party>
-    </cac:AccountingSupplierParty>${buyerXml}${billingRefXml}${discountXml}
+    </cac:AccountingSupplierParty>${billingRefXml}${buyerXml}${deliveryXml}${paymentMeansXml}${discountXml}
+    <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="SAR">${taxTotal.toFixed(2)}</cbc:TaxAmount>
+    </cac:TaxTotal>
     <cac:TaxTotal>
         <cbc:TaxAmount currencyID="SAR">${taxTotal.toFixed(2)}</cbc:TaxAmount>${taxSubtotalsXml}
     </cac:TaxTotal>
     <cac:LegalMonetaryTotal>
-        <cbc:LineExtensionAmount currencyID="SAR">${amountNoTax.toFixed(2)}</cbc:LineExtensionAmount>
-        <cbc:TaxExclusiveAmount currencyID="SAR">${amountNoTax.toFixed(2)}</cbc:TaxExclusiveAmount>
-        <cbc:TaxInclusiveAmount currencyID="SAR">${totalNum.toFixed(2)}</cbc:TaxInclusiveAmount>
+        <cbc:LineExtensionAmount currencyID="SAR">${sumOfLinesExtension.toFixed(2)}</cbc:LineExtensionAmount>
+        <cbc:TaxExclusiveAmount currencyID="SAR">${taxExclusiveAmount.toFixed(2)}</cbc:TaxExclusiveAmount>
+        <cbc:TaxInclusiveAmount currencyID="SAR">${taxInclusiveAmount.toFixed(2)}</cbc:TaxInclusiveAmount>
         <cbc:AllowanceTotalAmount currencyID="SAR">${discountNum.toFixed(2)}</cbc:AllowanceTotalAmount>
-        <cbc:PayableAmount currencyID="SAR">${totalNum.toFixed(2)}</cbc:PayableAmount>
+        <cbc:PayableAmount currencyID="SAR">${taxInclusiveAmount.toFixed(2)}</cbc:PayableAmount>
     </cac:LegalMonetaryTotal>${invoiceLines}
 </Invoice>`.trim();
 }
@@ -382,6 +457,6 @@ module.exports = {
     generateUBL21XML,
     escapeXml,
     generateZatcaTLV,
-    generateZatcaTLV9: require('./zatca_phase2.cjs').generateZatcaTLV9, // [GAP-1] Phase 2 re-export
+    generateZatcaTLV9: require('./zatca_phase2.cjs').generateZatcaTLV9,
     resolveUnitCode,
 };

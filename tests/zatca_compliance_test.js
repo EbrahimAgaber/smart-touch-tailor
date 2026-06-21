@@ -146,6 +146,7 @@ console.log('Testing credit note UBL BillingReference...');
         vatNo: '300000000000003',
         typeCode: '381',
         billingRef: 'TEST-UUID-001',
+        address: { street: 'شارع', building: '1111', district: 'حي', city: 'الرياض', postal: '12345', country: 'SA' }
     });
 
     const doc = new DOMParser().parseFromString(xml, 'application/xml');
@@ -195,6 +196,7 @@ console.log('Testing RC tax category UBL output...');
         prevHash: '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=',
         seller: 'Test Seller',
         vatNo: '300000000000003',
+        address: { street: 'شارع', building: '1111', district: 'حي', city: 'الرياض', postal: '12345', country: 'SA' }
     });
 
     const doc = new DOMParser().parseFromString(xml, 'application/xml');
@@ -229,6 +231,62 @@ console.log('Testing resolveUnitCode mapping...');
         assert.strictEqual(result, expected, `resolveUnitCode('${input}') should return '${expected}' but got '${result}'`);
     }
     console.log('✓ resolveUnitCode mapping passed!');
+})();
+
+// ── Test 10: Address Validation (FIX-014) ────────────────────────────────────
+console.log('Testing Address validation...');
+(function testAddressValidation() {
+    let caughtError = false;
+    try {
+        generateUBL21XML({
+            invoice: 'TEST-002',
+            icv: 2,
+            timestamp: '2024-01-15T10:00:00Z',
+            total: 115,
+            items: [{ Name: 'Test', Qty: 1, Price: 115, Unit: 'PCE' }],
+            uuid: 'aaaabbbb-0000-0000-0000-000000000003',
+            seller: 'Test Seller',
+            vatNo: '300000000000003',
+            // NO ADDRESS
+        });
+    } catch (e) {
+        if (e.message.includes('ZATCA_MISSING_ADDRESS')) {
+            caughtError = true;
+        }
+    }
+    assert.ok(caughtError, 'Missing address should throw ZATCA_MISSING_ADDRESS error');
+    console.log('✓ Address validation passed!');
+})();
+
+// ── Test 11: PaymentMeans and Delivery Elements (FIX-002, FIX-003) ────────────
+console.log('Testing PaymentMeans and Delivery Elements...');
+(function testPaymentMeansAndDelivery() {
+    const { DOMParser } = require('@xmldom/xmldom');
+    const xpath = require('xpath');
+
+    const xml = generateUBL21XML({
+        invoice: 'TEST-003',
+        icv: 3,
+        timestamp: '2024-01-15T10:00:00Z',
+        total: 115,
+        items: [{ Name: 'Test', Qty: 1, Price: 115, Unit: 'PCE' }],
+        uuid: 'aaaabbbb-0000-0000-0000-000000000004',
+        seller: 'Test Seller',
+        vatNo: '300000000000003',
+        address: { street: 'شارع', building: '1111', district: 'حي', city: 'الرياض', postal: '12345', country: 'SA' },
+        paymentMethod: 'card'
+    });
+
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    
+    const deliveryDateNodes = xpath.select("//*[local-name()='Delivery']//*[local-name()='ActualDeliveryDate']", doc);
+    assert.ok(deliveryDateNodes.length > 0, 'Delivery/ActualDeliveryDate element must be present');
+    
+    const paymentMeansNodes = xpath.select("//*[local-name()='PaymentMeans']//*[local-name()='PaymentMeansCode']", doc);
+    assert.ok(paymentMeansNodes.length > 0, 'PaymentMeans/PaymentMeansCode element must be present');
+    assert.strictEqual(paymentMeansNodes[0].textContent.trim(), '48', 'PaymentMeansCode for card should be 48');
+    
+    console.log('✓ PaymentMeans and Delivery Elements passed!');
 })();
 
 console.log("=== All ZATCA compliance tests (original + new) passed! ===");

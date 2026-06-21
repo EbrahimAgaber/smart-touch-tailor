@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
+         xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2">
+    <ext:UBLExtensions>
+        <ext:UBLExtension>
+            <cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID>
+            <ext:ExtensionURI>urn:oasis:names:specification:ubl:dsig:enveloped:xades</ext:ExtensionURI>
+            <ext:ExtensionContent>
+                <sig:UBLDocumentSignatures xmlns:sig="urn:oasis:names:specification:ubl:schema:xsd:CommonSignatureComponents-2">
+                    <sac:SignatureInformation xmlns:sac="urn:oasis:names:specification:ubl:schema:xsd:SignatureAggregateComponents-2" xmlns:sbc="urn:oasis:names:specification:ubl:schema:xsd:SignatureBasicComponents-2">
+                        <cbc:ID>urn:oasis:names:specification:ubl:signature:1</cbc:ID>
+                        <sbc:ReferencedSignatureID>urn:oasis:names:specification:ubl:signature:Invoice</sbc:ReferencedSignatureID>
+                        <ext:ExtensionContent/>
+                    </sac:SignatureInformation>
+                </sig:UBLDocumentSignatures>
+            </ext:ExtensionContent>
+        </ext:UBLExtension>
+    </ext:UBLExtensions>
+    <cbc:ProfileID>reporting:1.0</cbc:ProfileID>
+    <cbc:ID>INV-1781890475930</cbc:ID>
+    <cbc:UUID>781d7268-77b3-4ab2-823a-10fe79341266</cbc:UUID>
+    <cbc:IssueDate>2026-06-19</cbc:IssueDate>
+    <cbc:IssueTime>17:34:35</cbc:IssueTime>
+    <cbc:InvoiceTypeCode name="0200000">388</cbc:InvoiceTypeCode>
+    <cbc:DocumentCurrencyCode>SAR</cbc:DocumentCurrencyCode>
+    <cbc:TaxCurrencyCode>SAR</cbc:TaxCurrencyCode>
+    <cac:AdditionalDocumentReference>
+        <cbc:ID>ICV</cbc:ID>
+        <cbc:UUID>76</cbc:UUID>
+    </cac:AdditionalDocumentReference>
+    <cac:AdditionalDocumentReference>
+        <cbc:ID>PIH</cbc:ID>
+        <cac:Attachment>
+            <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">iH7sTQjqOeEYutDtHf1bRqqIMoCnza+mh4BKvsRgrAM=</cbc:EmbeddedDocumentBinaryObject>
+        </cac:Attachment>
+    </cac:AdditionalDocumentReference>
+    <cac:AdditionalDocumentReference>
+        <cbc:ID>QR</cbc:ID>
+        <cac:Attachment>
+            <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain"></cbc:EmbeddedDocumentBinaryObject>
+        </cac:Attachment>
+    </cac:AdditionalDocumentReference>
+    <cac:Signature>
+        <cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID>
+        <cbc:SignatureMethodCode>urn:oasis:names:specification:ubl:dsig:enveloped:xades</cbc:SignatureMethodCode>
+    </cac:Signature>
+    <cac:AccountingSupplierParty>
+        <cac:Party>
+            <cac:PartyIdentification>
+                <cbc:ID schemeID="CRN">1010101010</cbc:ID>
+            </cac:PartyIdentification>
+            <cac:PartyName>
+                <cbc:Name>Whatssp</cbc:Name>
+            </cac:PartyName>
+            <cac:PostalAddress>
+                <cbc:StreetName>etyyui</cbc:StreetName>
+                <cbc:BuildingNumber>8434</cbc:BuildingNumber>
+                <cbc:CitySubdivisionName>asfgh</cbc:CitySubdivisionName>
+                <cbc:CityName>alula</cbc:CityName>
+                <cbc:PostalZone>34412</cbc:PostalZone>
+                <cac:Country>
+                    <cbc:IdentificationCode>SA</cbc:IdentificationCode>
+                </cac:Country>
+            </cac:PostalAddress>
+            <cac:PartyTaxScheme>
+                <cbc:CompanyID>300000000000003</cbc:CompanyID>
+                <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+            </cac:PartyTaxScheme>
+            <cac:PartyLegalEntity>
+                <cbc:RegistrationName>Whatssp</cbc:RegistrationName>
+            </cac:PartyLegalEntity>
+        </cac:Party>
+    </cac:AccountingSupplierParty>
+    <cac:AccountingCustomerParty />
+    <cac:PaymentMeans>
+        <cbc:PaymentMeansCode>10</cbc:PaymentMeansCode>
+    </cac:PaymentMeans>
+    <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="SAR">0.91</cbc:TaxAmount>
+    </cac:TaxTotal>
+    <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="SAR">0.91</cbc:TaxAmount>
+        <cac:TaxSubtotal>
+            <cbc:TaxableAmount currencyID="SAR">6.09</cbc:TaxableAmount>
+            <cbc:TaxAmount currencyID="SAR">0.91</cbc:TaxAmount>
+            <cac:TaxCategory>
+                <cbc:ID>S</cbc:ID>
+                <cbc:Percent>15.00</cbc:Percent>
+                <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+            </cac:TaxCategory>
+        </cac:TaxSubtotal>
+    </cac:TaxTotal>
+    <cac:LegalMonetaryTotal>
+        <cbc:LineExtensionAmount currencyID="SAR">6.09</cbc:LineExtensionAmount>
+        <cbc:TaxExclusiveAmount currencyID="SAR">6.09</cbc:TaxExclusiveAmount>
+        <cbc:TaxInclusiveAmount currencyID="SAR">7.00</cbc:TaxInclusiveAmount>
+        <cbc:AllowanceTotalAmount currencyID="SAR">0.00</cbc:AllowanceTotalAmount>
+        <cbc:PayableAmount currencyID="SAR">7.00</cbc:PayableAmount>
+    </cac:LegalMonetaryTotal>
+    <cac:InvoiceLine>
+        <cbc:ID>1</cbc:ID>
+        <cbc:InvoicedQuantity unitCode="PCE">1</cbc:InvoicedQuantity>
+        <cbc:LineExtensionAmount currencyID="SAR">6.09</cbc:LineExtensionAmount>
+        <cac:TaxTotal>
+            <cbc:TaxAmount currencyID="SAR">0.91</cbc:TaxAmount>
+            <cbc:RoundingAmount currencyID="SAR">7.00</cbc:RoundingAmount>
+        </cac:TaxTotal>
+        <cac:Item>
+            <cbc:Name>حليب مراعي 1 لتر</cbc:Name>
+            <cac:ClassifiedTaxCategory>
+                <cbc:ID>S</cbc:ID>
+                <cbc:Percent>15.00</cbc:Percent>
+                <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+            </cac:ClassifiedTaxCategory>
+        </cac:Item>
+        <cac:Price>
+            <cbc:PriceAmount currencyID="SAR">6.086957</cbc:PriceAmount>
+            <cbc:BaseQuantity unitCode="PCE">1</cbc:BaseQuantity>
+        </cac:Price>
+    </cac:InvoiceLine>
+</Invoice>

@@ -480,6 +480,7 @@ export default function Pos() {
       setLastInvoice({ 
         ...sale, 
         invoice: res.invoice || invoiceNum, 
+        saleId: res.saleId,
         customerName: selectedCustomer?.name,
         customerPhone: selectedCustomer?.phone,
         customer_id: selectedCustomer?.id,
@@ -572,6 +573,7 @@ export default function Pos() {
       const invoiceData = { 
         ...sale, 
         invoice: res.invoice || invoiceNum, 
+        saleId: res.saleId,
         customerName: selectedCustomer?.name,
         customerPhone: selectedCustomer?.phone,
         customer_id: selectedCustomer?.id,
@@ -1510,6 +1512,36 @@ export default function Pos() {
     // Use the printHTML IPC handler (hidden Electron BrowserWindow with webSecurity:false)
     // so that data:image/png QR code URLs render correctly without CSP blocking.
     // window.open() + document.write() causes broken images in Electron print windows.
+
+    // [FIX-4] B2B synchronous print gate — block raw printing of un-cleared B2B invoices.
+    // A B2B (Standard) invoice must be cleared by ZATCA (zatca_clearance_status === 'cleared')
+    // before it is allowed to leave the printer. We poll the backend (populated by the
+    // background ZATCA reporter/clearance poller) for a bounded time; if clearance does not
+    // arrive in time we refuse to print rather than emit a non-compliant raw invoice.
+    const isB2BInvoice = invoiceObj.invoiceType === 'standard' || !!(invoiceObj.customerTaxId || invoiceObj.customer_tax_id);
+    if (isB2BInvoice) {
+      if (!invoiceObj.saleId) {
+        alert('تعذر تأكيد مخالصة ZATCA لهذه الفاتورة B2B (معرف البيع غير متوفر) — لا يمكن الطباعة.');
+        return;
+      }
+      let cleared = false;
+      let attempts = 0;
+      const maxAttempts = 20; // ~30s @ 1.5s interval
+      showToast(t('pos.alerts.waiting_zatca_clearance') || 'بانتظار تأكيد المخالصة من ZATCA...');
+      while (!cleared && attempts < maxAttempts) {
+        try {
+          const statusRes = await window.api?.getClearanceStatus?.(invoiceObj.saleId);
+          if (statusRes?.status === 'cleared') { cleared = true; break; }
+        } catch (_) { /* keep polling */ }
+        attempts++;
+        await new Promise(r => setTimeout(r, 1500));
+      }
+      if (!cleared) {
+        alert('لا يمكن طباعة فاتورة B2B قبل تأكيد المخالصة (Clearance) من ZATCA. حاول مرة أخرى بعد قليل من قائمة المبيعات.');
+        return;
+      }
+    }
+
     if (window.api?.printHTML) {
       await window.api.printHTML(html);
     } else {

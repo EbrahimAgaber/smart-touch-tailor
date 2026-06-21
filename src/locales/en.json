@@ -524,6 +524,14 @@
       "preparing": "Preparing",
       "resume": "Resume Order"
     },
+    "customer": {
+      "quick_add_title": "Quick Add Customer",
+      "name_placeholder": "Customer name *",
+      "phone_placeholder": "Phone number",
+      "tax_id_placeholder": "Tax ID (optional)",
+      "name_required": "Customer name is required",
+      "save_and_select": "Save & Select"
+    },
     "whatsapp": {
       "title": "Send Invoice via WhatsApp",
       "phone_label": "Phone Number (with country code)",

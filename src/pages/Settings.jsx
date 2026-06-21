@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../components/ToastManager';
@@ -86,7 +86,7 @@ export default function Settings() {
     receipt_printer:'',
     dark_mode:'false',
     date_format:'hijri',
-    zatca_env:'sandbox',
+    zatca_env:'core',
     simulationTestsPassed: false,
   });
 
@@ -103,6 +103,24 @@ export default function Settings() {
   const [certExpiredModal, setCertExpiredModal] = useState(false);
   const [zatcaOtp, setZatcaOtp] = useState('');
   const resetOnboardingOnChange = v => { setZatcaOtp(v); if (onboardingStatus === 'error') setOnboardingStatus('idle'); };
+
+  // ── Hidden developer mode ───────────────────────────────────────────────
+  // Business users only ever see the Production (Core) track. 5 consecutive
+  // clicks on the ZATCA tab title within 1.5s of each other reveals the
+  // Sandbox / Simulation tracks for technical servicing.
+  const [showDevEnvironments, setShowDevEnvironments] = useState(false);
+  const devClickCountRef = useRef(0);
+  const devClickTimerRef = useRef(null);
+  const handleZatcaTitleClick = () => {
+    devClickCountRef.current += 1;
+    clearTimeout(devClickTimerRef.current);
+    if (devClickCountRef.current >= 5) {
+      setShowDevEnvironments(v => !v);
+      devClickCountRef.current = 0;
+      return;
+    }
+    devClickTimerRef.current = setTimeout(() => { devClickCountRef.current = 0; }, 1500);
+  };
   const [onboardingStatus, setOnboardingStatus] = useState('idle');
   const [onboardingError, setOnboardingError] = useState('');
   const [simTestStatus, setSimTestStatus] = useState('idle'); // idle | running | done
@@ -544,8 +562,15 @@ export default function Settings() {
               ══════════════════════════════════════════ */}
               {activeTab === 'zatca' && (
                 <div style={colGap}>
-                  <TabHeader icon={<Shield size={18}/>} title={t('settings.tabs.zatca')}
-                    desc={t('settings.zatca.desc')} />
+                  <div onClick={handleZatcaTitleClick} style={{ cursor:'default', userSelect:'none' }}>
+                    <TabHeader icon={<Shield size={18}/>} title={t('settings.tabs.zatca')}
+                      desc={t('settings.zatca.desc')} />
+                  </div>
+                  {showDevEnvironments && (
+                    <div style={{ padding:'8px 12px', background:'#eef2ff', border:'1px dashed #6366f1', borderRadius:'10px', fontSize:'11px', color:'#4338ca', fontWeight:'700' }}>
+                      🔧 وضع المطورين مفعّل — بيئات Sandbox / Simulation ظاهرة لأغراض الصيانة التقنية فقط.
+                    </div>
+                  )}
 
                   {/* Queue status card — always shown */}
                   <ZatcaQueueCard />
@@ -554,7 +579,7 @@ export default function Settings() {
                   <Card title={t('settings.zatca.env_title')} icon={<Server size={15}/>}>
                     <Field label={t('settings.zatca.choose_env')}>
                       <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
-                        {ZATCA_ENVS.map(env => {
+                        {ZATCA_ENVS.filter(env => showDevEnvironments || env.value === 'core').map(env => {
                           const active = form.zatca_env === env.value;
                           return (
                             <button key={env.value}
@@ -681,14 +706,15 @@ export default function Settings() {
                   {/* Device status / onboarding */}
                   {zatcaDevice?.production_csid ? (
                     <Card title={t('settings.zatca.device_status.title')} icon={<BadgeCheck size={15}/>}>
-                      <div style={{ padding:'14px', background:'#f0fdf4', borderRadius:'12px', border:'1px solid #bbf7d0', display:'flex', flexDirection:'column', gap:'10px' }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:'8px', color:'#15803d', fontWeight:'800', fontSize:'14px' }}>
-                          <CheckCircle2 size={20}/> {t('settings.zatca.device_status.connected')}
+                      <div style={{ padding:'20px', background:'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius:'16px', color:'white', boxShadow:'0 10px 25px -5px rgba(16, 185, 129, 0.4)', position:'relative', overflow:'hidden' }}>
+                        <div style={{ position:'absolute', top:'-20px', right:'-20px', opacity:0.1, transform:'scale(3)' }}><CheckCircle2 size={100}/></div>
+                        <div style={{ display:'flex', alignItems:'center', gap:'10px', fontWeight:'900', fontSize:'18px', marginBottom:'16px', position:'relative', zIndex:1 }}>
+                          <CheckCircle2 size={24}/> {t('settings.zatca.device_status.connected')}
                         </div>
-                        <div style={{ fontSize:'12px', color:'#166534', background:'#dcfce7', padding:'8px 12px', borderRadius:'8px', lineHeight:'1.7' }}>
-                          <strong>{t('settings.zatca.device_status.csid')}</strong> {zatcaDevice.device_id}<br/>
-                          <strong>{t('settings.zatca.device_status.icv')}</strong> {zatcaDevice.current_icv}<br/>
-                          <strong>{t('settings.zatca.device_status.last_sync')}</strong> {new Date(zatcaDevice.updated_at).toLocaleString('ar-SA')}
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', background:'rgba(255,255,255,0.15)', backdropFilter:'blur(10px)', padding:'16px', borderRadius:'12px', fontSize:'13px', position:'relative', zIndex:1, border:'1px solid rgba(255,255,255,0.2)' }}>
+                          <div><span style={{opacity:0.8, fontSize:'11px', display:'block'}}>{t('settings.zatca.device_status.csid')}</span> <strong>{zatcaDevice.device_id}</strong></div>
+                          <div><span style={{opacity:0.8, fontSize:'11px', display:'block'}}>{t('settings.zatca.device_status.icv')}</span> <strong>{zatcaDevice.current_icv}</strong></div>
+                          <div style={{gridColumn:'1/-1'}}><span style={{opacity:0.8, fontSize:'11px', display:'block'}}>{t('settings.zatca.device_status.last_sync')}</span> <strong dir="ltr">{new Date(zatcaDevice.updated_at).toLocaleString('ar-SA')}</strong></div>
                         </div>
                         {/* FIX 5: Certificate expiry countdown badge */}
                         {(() => {
@@ -696,9 +722,9 @@ export default function Settings() {
                           if (!expiryStr) return null;
                           const expiryDate = new Date(expiryStr);
                           const daysLeft = Math.ceil((expiryDate - Date.now()) / 86400000);
-                          const color = daysLeft < 10 ? '#dc2626' : daysLeft < 30 ? '#d97706' : '#15803d';
-                          const bg    = daysLeft < 10 ? '#fef2f2' : daysLeft < 30 ? '#fffbeb' : '#f0fdf4';
-                          const border= daysLeft < 10 ? '#fca5a5' : daysLeft < 30 ? '#fde68a' : '#bbf7d0';
+                          const isWarning = daysLeft < 30;
+                          const color = daysLeft < 10 ? '#ef4444' : daysLeft < 30 ? '#f59e0b' : 'white';
+                          const bg    = daysLeft < 30 ? 'white' : 'rgba(255,255,255,0.2)';
                           const icon  = daysLeft < 10 ? '🔴' : daysLeft < 30 ? '⚠️' : '✅';
                           const label = daysLeft <= 0
                             ? t('settings.zatca.device_status.cert_expired')
@@ -706,65 +732,88 @@ export default function Settings() {
                             ? t('settings.zatca.device_status.cert_expires_in').replace('{{daysLeft}}', daysLeft)
                             : t('settings.zatca.device_status.cert_valid_until').replace('{{date}}', expiryDate.toLocaleDateString('ar-SA'));
                           return (
-                            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', padding:'8px 12px', borderRadius:'10px', background: bg, border: `1px solid ${border}` }}>
-                              <span style={{ fontSize:'12px', fontWeight:700, color }}>{icon} {t('settings.zatca.device_status.cert_label')} {label}</span>
-                              <a
-                                href="https://zatca.gov.sa"
+                            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', padding:'12px 16px', borderRadius:'12px', background: bg, marginTop:'16px', border: `1px solid ${isWarning ? 'transparent' : 'rgba(255,255,255,0.3)'}`, position:'relative', zIndex:1, boxShadow: isWarning ? '0 4px 12px rgba(0,0,0,0.1)' : 'none' }}>
+                              <span style={{ fontSize:'13px', fontWeight:800, color: isWarning ? color : 'white', display:'flex', alignItems:'center', gap:'6px' }}>{icon} {t('settings.zatca.device_status.cert_label')} {label}</span>
+                              <button
                                 onClick={e => { e.preventDefault(); window.api?.openExternal?.('https://zatca.gov.sa'); }}
-                                style={{ fontSize:'11px', color, fontWeight:700, textDecoration:'underline', cursor:'pointer' }}
+                                style={{ background: isWarning ? color : 'rgba(255,255,255,0.2)', color: isWarning ? 'white' : 'white', border:'none', padding:'6px 12px', borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', transition:'all 0.2s' }}
+                                onMouseOver={e => e.currentTarget.style.transform='scale(1.05)'}
+                                onMouseOut={e => e.currentTarget.style.transform='scale(1)'}
                               >
                                 {t('settings.zatca.device_status.renew_cert')}
-                              </a>
+                              </button>
                             </div>
                           );
                         })()}
-                        <p style={{ fontSize:'11px', color:'#166534' }}>
+                        <p style={{ fontSize:'11px', color:'rgba(255,255,255,0.8)', marginTop:'12px', textAlign:'center', position:'relative', zIndex:1 }}>
                           {t('settings.zatca.device_status.auto_sync_desc')}
                         </p>
                       </div>
                     </Card>
                   ) : (
                     <Card title={t('settings.zatca.onboarding.title')} icon={<Key size={15}/>}>
-                      <div style={{ padding:'10px 12px', background:'#fffbeb', borderRadius:'10px', border:'1px solid #fde68a', fontSize:'12px', color:'#92400e', lineHeight:'1.6' }}>
-                        {t('settings.zatca.onboarding.warning')}
-                      </div>
+                      <div style={{ padding:'24px', background:'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)', borderRadius:'16px', color:'white', boxShadow:'0 15px 35px -10px rgba(15, 23, 42, 0.5)', position:'relative', overflow:'hidden' }}>
+                        <div style={{ position:'absolute', top:'-40px', right:'-40px', width:'150px', height:'150px', background:'radial-gradient(circle, rgba(59,130,246,0.3) 0%, transparent 70%)', filter:'blur(20px)' }}></div>
+                        <div style={{ position:'absolute', bottom:'-40px', left:'-40px', width:'150px', height:'150px', background:'radial-gradient(circle, rgba(139,92,246,0.3) 0%, transparent 70%)', filter:'blur(20px)' }}></div>
+                        
+                        <div style={{ padding:'12px 16px', background:'rgba(245, 158, 11, 0.1)', borderRadius:'12px', border:'1px solid rgba(245, 158, 11, 0.3)', fontSize:'13px', color:'#fcd34d', lineHeight:'1.6', marginBottom:'24px', display:'flex', gap:'12px', alignItems:'flex-start', position:'relative', zIndex:1 }}>
+                          <AlertTriangle size={20} style={{ flexShrink:0, marginTop:'2px' }}/>
+                          <div>{t('settings.zatca.onboarding.warning')}</div>
+                        </div>
 
-                      {/* Step guide */}
-                      <div style={{ display:'flex', flexDirection:'column', gap:'6px', padding:'4px 0' }}>
-                        {[
-                          { n:1, title: t('settings.zatca.onboarding.step1'), sub: t('settings.zatca.onboarding.step1_sub') },
-                          { n:2, title: t('settings.zatca.onboarding.step2'), sub: t('settings.zatca.onboarding.step2_sub') },
-                          { n:3, title: t('settings.zatca.onboarding.step3'), sub: t('settings.zatca.onboarding.step3_sub') },
-                        ].map((s, i, arr) => (
-                          <div key={s.n}>
-                            <div style={{ display:'flex', gap:'12px', alignItems:'flex-start' }}>
-                              <div style={{ width:'24px', height:'24px', borderRadius:'50%', background:'#eff6ff', color:'#2563eb', fontSize:'12px', fontWeight:'800', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:'2px' }}>{s.n}</div>
-                              <div>
-                                <div style={{ fontSize:'13px', fontWeight:'700', color:'var(--text-main)' }}>{s.title}</div>
-                                <div style={{ fontSize:'11px', color:'#64748b', marginTop:'2px' }}>{s.sub}</div>
+                        {/* Step guide */}
+                        <div style={{ display:'flex', flexDirection:'column', gap:'16px', padding:'10px 0', position:'relative', zIndex:1, marginBottom:'24px' }}>
+                          {[
+                            { n:1, title: t('settings.zatca.onboarding.step1'), sub: t('settings.zatca.onboarding.step1_sub'), color: '#3b82f6' },
+                            { n:2, title: t('settings.zatca.onboarding.step2'), sub: t('settings.zatca.onboarding.step2_sub'), color: '#8b5cf6' },
+                            { n:3, title: t('settings.zatca.onboarding.step3'), sub: t('settings.zatca.onboarding.step3_sub'), color: '#10b981' },
+                          ].map((s, i, arr) => (
+                            <div key={s.n} style={{ position:'relative' }}>
+                              <div style={{ display:'flex', gap:'16px', alignItems:'flex-start', background:'rgba(255,255,255,0.03)', padding:'12px', borderRadius:'12px', border:'1px solid rgba(255,255,255,0.05)', transition:'transform 0.2s', cursor:'default' }} onMouseOver={e=>e.currentTarget.style.transform='translateY(-2px)'} onMouseOut={e=>e.currentTarget.style.transform='translateY(0)'}>
+                                <div style={{ width:'32px', height:'32px', borderRadius:'50%', background:`${s.color}20`, color:s.color, fontSize:'14px', fontWeight:'900', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, border:`1px solid ${s.color}50`, boxShadow:`0 0 10px ${s.color}20` }}>{s.n}</div>
+                                <div>
+                                  <div style={{ fontSize:'14px', fontWeight:'800', color:'white', marginBottom:'4px' }}>{s.title}</div>
+                                  <div style={{ fontSize:'12px', color:'#94a3b8', lineHeight:'1.5' }}>{s.sub}</div>
+                                </div>
                               </div>
+                              {i < arr.length - 1 && <div style={{ position:'absolute', right:'23px', top:'44px', width:'2px', height:'16px', background:'rgba(255,255,255,0.1)' }}/>}
                             </div>
-                            {i < arr.length - 1 && <div style={{ width:'1px', height:'14px', background:'#e2e8f0', margin:'4px 0 4px 23px' }}/>}
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
 
-                      <IF label={t('settings.zatca.onboarding.otp_label')} value={zatcaOtp} onChange={resetOnboardingOnChange} placeholder={t('settings.zatca.onboarding.otp_placeholder')}/>
-                      <button onClick={handleOnboardZatca}
-                        disabled={onboardingStatus === 'loading' || !zatcaOtp}
-                        style={{ ...btnGreen, width:'100%', justifyContent:'center', padding:'12px', fontSize:'13px', opacity: (onboardingStatus==='loading' || !zatcaOtp) ? 0.6 : 1 }}>
-                        {onboardingStatus === 'loading' ? t('settings.zatca.onboarding.loading') : t('settings.zatca.onboarding.btn')}
-                      </button>
-                      {onboardingStatus === 'error' && (
-                        <div style={{ padding:'10px', background:'#fef2f2', borderRadius:'10px', fontSize:'11px', color:'#b91c1c' }}>
-                          {t('settings.zatca.onboarding.error')} {onboardingError}
+                        <div style={{ position:'relative', zIndex:1, background:'rgba(0,0,0,0.2)', padding:'16px', borderRadius:'16px', border:'1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ marginBottom:'12px', fontSize:'13px', fontWeight:'700', color:'#cbd5e1' }}>{t('settings.zatca.onboarding.otp_label')}</div>
+                          <div style={{ display:'flex', gap:'12px', alignItems:'center', flexWrap:'wrap' }}>
+                            <input 
+                              value={zatcaOtp} 
+                              onChange={e => resetOnboardingOnChange(e.target.value)} 
+                              placeholder={t('settings.zatca.onboarding.otp_placeholder')}
+                              style={{ flex:1, minWidth:'150px', padding:'14px 16px', borderRadius:'12px', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.05)', color:'white', fontSize:'15px', fontWeight:'600', outline:'none', transition:'border 0.2s' }}
+                              onFocus={e => e.currentTarget.style.borderColor='#3b82f6'}
+                              onBlur={e => e.currentTarget.style.borderColor='rgba(255,255,255,0.1)'}
+                            />
+                            <button onClick={handleOnboardZatca}
+                              disabled={onboardingStatus === 'loading' || !zatcaOtp}
+                              style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color:'white', border:'none', padding:'0 24px', height:'50px', borderRadius:'12px', fontSize:'14px', fontWeight:'800', cursor: (onboardingStatus==='loading' || !zatcaOtp) ? 'not-allowed' : 'pointer', opacity: (onboardingStatus==='loading' || !zatcaOtp) ? 0.5 : 1, transition:'all 0.2s', boxShadow:'0 4px 15px rgba(37, 99, 235, 0.3)' }}
+                              onMouseOver={e => { if(onboardingStatus!=='loading' && zatcaOtp) e.currentTarget.style.transform='translateY(-2px)'; }}
+                              onMouseOut={e => { if(onboardingStatus!=='loading' && zatcaOtp) e.currentTarget.style.transform='translateY(0)'; }}
+                            >
+                              {onboardingStatus === 'loading' ? <span style={{display:'flex', alignItems:'center', gap:'8px'}}><RefreshCw size={16} className="spin"/> {t('settings.zatca.onboarding.loading')}</span> : t('settings.zatca.onboarding.btn')}
+                            </button>
+                          </div>
+                          
+                          {onboardingStatus === 'error' && (
+                            <div style={{ padding:'12px 16px', background:'rgba(239, 68, 68, 0.1)', borderRight:'4px solid #ef4444', borderRadius:'8px', fontSize:'13px', color:'#fca5a5', marginTop:'16px', display:'flex', gap:'8px', alignItems:'center' }}>
+                              <AlertTriangle size={16}/> {t('settings.zatca.onboarding.error')} {onboardingError}
+                            </div>
+                          )}
+                          {onboardingStatus === 'success' && (
+                            <div style={{ padding:'12px 16px', background:'rgba(16, 185, 129, 0.1)', borderRight:'4px solid #10b981', borderRadius:'8px', fontSize:'13px', color:'#6ee7b7', marginTop:'16px', display:'flex', gap:'8px', alignItems:'center' }}>
+                              <CheckCircle2 size={16}/> ✅ نجاح! يرجى حفظ الإعدادات لحفظ البيئة.
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {onboardingStatus === 'success' && (
-                        <div style={{ padding:'10px', background:'#f0fdf4', borderRadius:'10px', fontSize:'11px', color:'#15803d' }}>
-                          ✅ نجاح! يرجى حفظ الإعدادات لحفظ البيئة.
-                        </div>
-                      )}
+                      </div>
                     </Card>
                   )}
                 </div>

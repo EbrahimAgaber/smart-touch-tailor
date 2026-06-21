@@ -524,6 +524,14 @@
       "preparing": "جاري التحضير",
       "resume": "استرجاع الطلب"
     },
+    "customer": {
+      "quick_add_title": "إضافة عميل سريع",
+      "name_placeholder": "اسم العميل *",
+      "phone_placeholder": "رقم الجوال",
+      "tax_id_placeholder": "الرقم الضريبي (اختياري)",
+      "name_required": "اسم العميل مطلوب",
+      "save_and_select": "حفظ واختيار"
+    },
     "whatsapp": {
       "title": "إرسال الفاتورة عبر واتساب",
       "phone_label": "رقم الهاتف (مع رمز الدولة)",

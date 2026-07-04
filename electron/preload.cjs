@@ -171,7 +171,7 @@ contextBridge.exposeInMainWorld('api', {
   onboardZatcaDevice:   (d)      => ipcRenderer.invoke('zatca:onboardDevice', d),
   getSignedXML:         (d)      => ipcRenderer.invoke('zatca:getSignedXML', d),
   getClearanceStatus:   (id)     => ipcRenderer.invoke('zatca:getClearanceStatus', id),
-  runSimulationTests:   ()       => ipcRenderer.invoke('zatca:runSimulationTests'),
+  runSimulationTests:   ()       => ipcRenderer.invoke('zatca:runComplianceChecks'),
   saveFile:             (d)      => ipcRenderer.invoke('dialog:saveFile', d),
 
   // ── Label Engine (P2, P3, P7, P8, P9) ─────────────────────────────────────

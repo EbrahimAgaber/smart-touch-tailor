@@ -1,0 +1,34 @@
+
+Saved to failed_invoice.xml
+Recent queue items: [
+  {
+    id: 40,
+    invoice_number: 'INV-1782939125664',
+    icv: 2,
+    status: 'rejected'
+  },
+  {
+    id: 39,
+    invoice_number: 'INV-1782932177491',
+    icv: 1,
+    status: 'rejected'
+  },
+  {
+    id: 38,
+    invoice_number: 'INV-1782931694013',
+    icv: 2,
+    status: 'archived_pre_fix'
+  },
+  {
+    id: 37,
+    invoice_number: 'INV-1782931258024',
+    icv: 1,
+    status: 'archived_pre_fix'
+  },
+  {
+    id: 36,
+    invoice_number: 'INV-1782928187764',
+    icv: 1,
+    status: 'archived_chain_reset_v2'
+  }
+]

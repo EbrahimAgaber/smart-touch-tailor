@@ -57,11 +57,13 @@
   },
   "author": "AL-Basma (ea.gaber10@gmail.com)",
   "dependencies": {
+    "@xmldom/xmldom": "^0.8.13",
     "axios": "^1.15.2",
     "better-sqlite3": "^9.6.0",
     "bwip-js": "^4.11.1",
     "cors": "^2.8.6",
     "electron-updater": "^6.8.3",
+    "elliptic": "^6.6.1",
     "express": "^5.2.1",
     "fuse.js": "^7.3.0",
     "i18next": "^26.3.1",
@@ -77,6 +79,7 @@
     "recharts": "^3.8.1",
     "sql.js": "^1.14.1",
     "xml-crypto": "^6.1.2",
+    "zatca-xml-js": "^0.1.9",
     "zustand": "^4.5.2"
   },
   "devDependencies": {

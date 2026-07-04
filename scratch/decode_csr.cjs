@@ -1,0 +1,1 @@
+﻿const fs = require('fs'); const b64 = fs.readFileSync('c:/my-pos/v2/zatca-einvoicing-sdk-Java-238-R3.4.8/generated-csr-20260623104638.csr', 'utf8'); fs.writeFileSync('scratch/official.csr', Buffer.from(b64.trim(), 'base64').toString('ascii'));

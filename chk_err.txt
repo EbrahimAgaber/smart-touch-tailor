@@ -1,0 +1,5 @@
+(node:24428) UnhandledPromiseRejectionWarning: Error: error:06000066:public key routines:OPENSSL_internal:DECODE_ERROR
+    at Sign.sign (node:internal/crypto/sig:128:29)
+    at C:\my-pos\v2\check_key_match.cjs:21:71
+(Use `electron --trace-warnings ...` to show where the warning was created)
+(node:24428) UnhandledPromiseRejectionWarning: Unhandled promise rejection. This error originated either by throwing inside of an async function without a catch block, or by rejecting a promise which was not handled with .catch(). To terminate the node process on unhandled promise rejection, use the CLI flag `--unhandled-rejections=strict` (see https://nodejs.org/api/cli.html#cli_unhandled_rejections_mode). (rejection id: 1)

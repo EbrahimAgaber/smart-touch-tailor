@@ -1,6 +1,6 @@
 const axios = require('axios');
 const db = require('./database.cjs');
-const { reportInvoice, clearInvoice } = require('./zatca_phase2.cjs');
+const { reportInvoice, clearInvoice } = require('./zatca_phase2_impl.cjs');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ZATCA BACKGROUND REPORTER
@@ -14,7 +14,7 @@ let isRunning = false;
 function _isHalted() {
     try {
         const database = db.getDbInstance();
-        const row = database.prepare("SELECT zatca_queue_halted FROM settings LIMIT 1").get();
+        const row = database.prepare("SELECT zatca_queue_halted FROM business_settings LIMIT 1").get();
         return row && row.zatca_queue_halted == 1;
     } catch (e) {
         return false;
@@ -25,8 +25,8 @@ function _setHalted(val) {
     try {
         const database = db.getDbInstance();
         // Ensure column exists (safe migration)
-        try { database.prepare("ALTER TABLE settings ADD COLUMN zatca_queue_halted INTEGER DEFAULT 0").run(); } catch (_) {}
-        database.prepare("UPDATE settings SET zatca_queue_halted = ?").run(val ? 1 : 0);
+        try { database.prepare("ALTER TABLE business_settings ADD COLUMN zatca_queue_halted INTEGER DEFAULT 0").run(); } catch (_) {}
+        database.prepare("UPDATE business_settings SET zatca_queue_halted = ?").run(val ? 1 : 0);
     } catch (e) {
         console.error('[ZATCA] Failed to persist halt flag:', e.message);
     }

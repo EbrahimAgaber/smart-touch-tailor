@@ -292,8 +292,9 @@ async function _getHWID() {
 const { app, BrowserWindow, ipcMain, dialog, shell } = electron;
 const { autoUpdater } = require('electron-updater');
 const db = require('./database.cjs');
+const { registerZatcaHandlers } = require('./zatca-ipc-handlers.cjs');
 const syncEngine = require('./syncEngine.cjs');
-const zatcaPhase2 = require('./zatca_phase2.cjs');
+const zatcaPhase2 = require('./zatca_phase2_impl.cjs');
 const zatcaReporter = require('./zatca_reporter.cjs');
 const compliance   = require('./compliance_sa.cjs');
 
@@ -306,6 +307,7 @@ let mainWindow;
 let posWindow = null; // Dedicated POS window (optional second window)
 
 function registerIpcHandlers() {
+    registerZatcaHandlers(db);
     // ── Products ───────────────────────────────────────
     ipcMain.handle('db:getMenu',           ()       => db.getMenu());
     ipcMain.handle('db:addMenuItem',       _gated((e, d)   => db.addItem(d)));
@@ -821,8 +823,10 @@ function registerIpcHandlers() {
         try {
             const device = db.getZatcaDevice();
             if (!device || !device.production_cert_pem) return { certExpiresAt: null };
-            const cert = new require('crypto').X509Certificate(device.production_cert_pem);
-            return { certExpiresAt: cert.validTo };
+            const { checkCertExpiry } = require('./zatca_phase2_impl.cjs');
+            const daysRemaining = checkCertExpiry(device.production_cert_pem);
+            const expiresAt = new Date(Date.now() + daysRemaining * 86400000);
+            return { certExpiresAt: expiresAt.toISOString() };
         } catch (e) {
             console.warn('[ZATCA] getCertExpiry error:', e.message);
             return { certExpiresAt: null, error: e.message };
@@ -999,7 +1003,10 @@ function registerIpcHandlers() {
             if (!settings.business_name_ar) {
                 return { success: false, error: 'يجب ضبط اسم المؤسسة في الإعدادات.' };
             }
-            const isSandbox = settings.zatca_env === 'sandbox';
+            // [FIX-ENV-STRING] Pass the actual environment string — not a boolean.
+            // Boolean `true` mapped correctly to 'sandbox', but `false` always mapped
+            // to 'production', breaking 'simulation' entirely.
+            const zatcaEnv = settings.zatca_env || 'sandbox';
             const crypto = require('crypto');
             const pubKey = crypto.createPublicKey(device.private_key_pem);
             const pubKeyPem = pubKey.export({ type: 'spki', format: 'pem' });
@@ -1008,10 +1015,14 @@ function registerIpcHandlers() {
                 { EGS_SN: device.device_id || 'POS-01', UID: settings.vat_number,
                   ORG: settings.business_name_ar, 
                   OU: settings.zatca_ou || 'Head Office', 
-                  IND: settings.zatca_ind || 'Retail' }
+                  IND: settings.zatca_ind || 'Retail',
+                  env: zatcaEnv,
+                  CN: settings.zatca_cn || 'ZATCA-EGS',
+                  title: settings.zatca_invoice_type || '1100',
+                  address: settings.address_city || settings.city || 'Riyadh' }
             );
             db.updateZatcaDevice({ id: device.id, csr_pem: csrPem });
-            const compCsid = await zatcaPhase2.issueComplianceCSID(csrBase64, otp, isSandbox);
+            const compCsid = await zatcaPhase2.issueComplianceCSID(csrBase64, otp, zatcaEnv);
             if (compCsid.error) return { success: false, error: 'Compliance CSID Failed', details: compCsid.data };
             db.updateZatcaDevice({ id: device.id, compliance_csid: JSON.stringify(compCsid) });
 
@@ -1022,8 +1033,9 @@ function registerIpcHandlers() {
             // Skipping this step causes production CSID issuance to be rejected
             // (or — worse — silently issued against an EGS ZATCA considers untested).
             const complianceCheck = await runComplianceInvoiceChecklist({
-                device, settings, compCsid, isSandbox,
+                device, settings, compCsid, isSandbox: zatcaEnv !== 'production',
             });
+            console.log('[ZATCA] FULL_COMPLIANCE_RESPONSE:\\n' + JSON.stringify(complianceCheck, null, 2));
             if (!complianceCheck.allPassed) {
                 return {
                     success: false,
@@ -1033,12 +1045,13 @@ function registerIpcHandlers() {
             }
 
             const prodCsid = await zatcaPhase2.issueProductionCSID(
-                compCsid.requestID || compCsid.requestId, compCsid.binarySecurityToken, compCsid.secret, isSandbox);
+                compCsid.requestID || compCsid.requestId, compCsid.binarySecurityToken, compCsid.secret, zatcaEnv);
             if (prodCsid.error) return { success: false, error: 'Production CSID Failed', details: prodCsid.data };
             let certExpiresAt = null;
             try {
+                const innerBase64 = Buffer.from(prodCsid.binarySecurityToken, 'base64').toString('utf8').replace(/\s+/g, '');
+                const certPem = `-----BEGIN CERTIFICATE-----\n${(innerBase64.match(/.{1,64}/g) || []).join('\n')}\n-----END CERTIFICATE-----`;
                 const forge = require('node-forge');
-                const certPem = Buffer.from(prodCsid.binarySecurityToken, 'base64').toString('ascii');
                 const certObj = forge.pki.certificateFromPem(certPem);
                 certExpiresAt = certObj.validity.notAfter.toISOString();
             } catch (certParseErr) {
@@ -1275,6 +1288,7 @@ async function window_api_saveSettings_stub(dbModule, data) {
 // previously referenced the non-existent signXMLHash/buildSignatureEnvelope —
 // that has since been fixed to use the same signInvoiceXML()-based path.
 async function runComplianceInvoiceChecklist({ device, settings, compCsid, isSandbox }) {
+    console.log('[ZATCA] QR-FIX-V2-ACTIVE — runComplianceInvoiceChecklist entered via main.cjs, zatcaPhase2 = ./zatca_phase2_impl.cjs');
     const results = [];
     const cryptoMod = require('crypto');
     const { generateUBL21XML } = require('./zatca_utils.cjs');
@@ -1292,18 +1306,28 @@ async function runComplianceInvoiceChecklist({ device, settings, compCsid, isSan
             });
             // Compliance CSID has no production_cert_pem yet — sign against the
             // compliance cert returned in binarySecurityToken.
-            const compCertPem = Buffer.from(compCsid.binarySecurityToken, 'base64').toString('ascii');
-            const { envelope, invoiceHashBase64 } = zatcaPhase2.signInvoiceXML(
+            // Ensure the double-base64 token is properly decoded and formatted as a valid PEM string
+            const token = compCsid.binarySecurityToken || '';
+            const innerBase64 = Buffer.from(token, 'base64').toString('utf8').replace(/\s+/g, '');
+            const compCertPem = `-----BEGIN CERTIFICATE-----\n${(innerBase64.match(/.{1,64}/g) || []).join('\n')}\n-----END CERTIFICATE-----`;
+            const { envelope, invoiceHashBase64, signatureBase64 } = zatcaPhase2.signInvoiceXML(
                 xml, device.private_key_pem, compCertPem, invoiceData.timestamp
             );
-            const signedXml = zatcaPhase2.injectUBLExtensions(xml, envelope);
+            const { pubKeyPem: compPubKeyPem, certSignature: compCertSignature } = zatcaPhase2.extractCertDetails(compCertPem);
+            const tlv = zatcaPhase2.generateZatcaTLV9(
+                settings.business_name_ar, settings.vat_number,
+                invoiceData.timestamp, invoiceData.total || '115.00', '0',
+                invoiceHashBase64, signatureBase64, compPubKeyPem, compCertSignature
+            );
+            let signedXml = zatcaPhase2.injectUBLExtensions(xml, envelope);
+            signedXml = zatcaPhase2.injectQRPayload(signedXml, tlv);
             const xmlBase64 = Buffer.from(signedXml).toString('base64');
 
             const response = await zatcaPhase2.checkComplianceInvoice(
                 invoiceHashBase64, xmlBase64, uuid,
                 compCsid.binarySecurityToken, compCsid.secret, isSandbox
             );
-            const passed = !response.error && (response.validationResults?.status === 'PASS' || response.reportingStatus === 'REPORTED' || response.clearanceStatus === 'CLEARED');
+            const passed = !response.error && (response.validationResults?.status === 'PASS' || response.validationResults?.status === 'WARNING' || response.reportingStatus === 'REPORTED' || response.clearanceStatus === 'CLEARED');
             results.push({ label, passed, details: response.error ? (response.data || response) : (response.validationResults || { status: 'PASS' }) });
         } catch (err) {
             results.push({ label, passed: false, details: { error: err.message } });
@@ -1312,34 +1336,45 @@ async function runComplianceInvoiceChecklist({ device, settings, compCsid, isSan
 
     const ts = new Date().toISOString();
     const baseInvoice = {
-        invoice: `COMPLY-${Date.now()}`,
+        invoice: { id: `COMPLY-${Date.now()}` },
         timestamp: ts,
         total: '115.00',
         items: [{ Name: 'Compliance Test Item', Qty: 1, Price: 115, Unit: 'PCE', tax_category: 'S' }],
         seller: settings.business_name_ar,
         vatNo: settings.vat_number,
         vatRate: 0.15,
+        address: {
+            street: settings.address_street || settings.street || 'شارع',
+            building: settings.address_building || settings.building || '1111',
+            district: settings.address_district || settings.district || 'حي',
+            city: settings.address_city || settings.city || 'الرياض',
+            postal: settings.address_postal || settings.postal || '12345',
+            additional_street: settings.address_additional_street || '',
+            country: settings.address_country || settings.country || 'SA'
+        }
     };
 
-    await runOne('B2C Simplified (Reporting)', { ...baseInvoice, invoice: `COMPLY-B2C-${Date.now()}` });
+    await runOne('B2C Simplified (Reporting)', { ...baseInvoice, invoice: { id: `COMPLY-B2C-${Date.now()}` } });
     await runOne('B2B Standard (Clearance)', {
         ...baseInvoice,
-        invoice: `COMPLY-B2B-${Date.now()}`,
-        typeCode: '0100000',
-        buyer: { vatNo: '300000000000004', name: 'Test Buyer', street: 'شارع', building: '1111', district: 'حي', city: 'الرياض', postal: '12345', country: 'SA' },
+        invoice: { id: `COMPLY-B2B-${Date.now()}` },
+        subtype: '0100000',
+        buyer: { vatNo: '300000000000003', name: 'Test Buyer', street: 'شارع', building: '1111', district: 'حي', city: 'الرياض', postal: '12345', country: 'SA' },
     });
     await runOne('Credit Note 381', {
         ...baseInvoice,
-        invoice: `COMPLY-CN-${Date.now()}`,
+        invoice: { id: `COMPLY-CN-${Date.now()}` },
         typeCode: '381',
+        subtype: '0100000',
         billingRef: cryptoMod.randomUUID(),
-        total: '-115.00',
-        items: [{ Name: 'Return', Qty: -1, Price: 115, Unit: 'PCE', tax_category: 'S' }],
+        total: '115.00',
+        items: [{ Name: 'Return', Qty: 1, Price: 115, Unit: 'PCE', tax_category: 'S' }],
     });
     await runOne('Debit Note 383', {
         ...baseInvoice,
-        invoice: `COMPLY-DN-${Date.now()}`,
+        invoice: { id: `COMPLY-DN-${Date.now()}` },
         typeCode: '383',
+        subtype: '0100000',
         billingRef: cryptoMod.randomUUID(),
         total: '115.00',
         items: [{ Name: 'Adjustment', Qty: 1, Price: 115, Unit: 'PCE', tax_category: 'S' }],

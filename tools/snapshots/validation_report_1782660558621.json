@@ -1,0 +1,1046 @@
+[
+  {
+    "type": "simplified",
+    "label": "Simplified Tax Invoice (B2C)",
+    "timestamp": "2026-06-28T15:29:18.472Z",
+    "unsigned": {
+      "path": "C:\\my-pos\\v2\\tools\\snapshots\\simplified_unsigned.xml",
+      "size_bytes": 5595
+    },
+    "signed": {
+      "path": "C:\\my-pos\\v2\\tools\\snapshots\\simplified_signed.xml",
+      "size_bytes": 4895
+    },
+    "hash": {
+      "base64": "0Q41oYxx+KM7e0ZuHNOiEm2LeO0snJ3ZeYyJYNmwwu8=",
+      "hex": "d10e35a18c71f8a33b7b466e1cd3a2126d8b78ed2c9c9dd9798c8960d9b0c2ef"
+    },
+    "qr": {
+      "base64": "ASjYtNix2YPYqSDYp9mE2KfYrtiq2KjYp9ixINmE2YTYqtis2KfYsdipAg8z…",
+      "decoded": {
+        "seller_name": "شركة الاختبار للتجارة",
+        "vat_number": "399999999900003",
+        "timestamp": "2026-06-28T15:29:18+03:00",
+        "total_with_vat": "575.00",
+        "vat_amount": "75.00",
+        "_total_tags": 5,
+        "_parsed_ok": true
+      }
+    },
+    "validation": {
+      "unsigned": {
+        "label": "unsigned",
+        "sigMode": "FULL_XADES",
+        "checks": [
+          {
+            "element": "cbc:ProfileID",
+            "label": "cbc:ProfileID",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cbc:ID",
+            "label": "Invoice Number",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:UUID",
+            "label": "UUID",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:IssueDate",
+            "label": "Issue Date",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:IssueTime",
+            "label": "Issue Time",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:InvoiceTypeCode",
+            "label": "InvoiceTypeCode",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:DocumentCurrencyCode",
+            "label": "cbc:DocumentCurrencyCode",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cbc:TaxCurrencyCode",
+            "label": "cbc:TaxCurrencyCode",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cac:AccountingSupplierParty",
+            "label": "Seller block",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:TaxTotal",
+            "label": "TaxTotal",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:LegalMonetaryTotal",
+            "label": "LegalMonetaryTotal",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:InvoiceLine",
+            "label": "InvoiceLine(s)",
+            "present": true,
+            "advisory": false
+          }
+        ],
+        "passed": 12,
+        "failed": 0,
+        "warnings": [],
+        "total": 12,
+        "score": 100,
+        "status": "PASS"
+      },
+      "signed": {
+        "label": "signed",
+        "sigMode": "TLV_ONLY",
+        "checks": [
+          {
+            "element": "cbc:ProfileID",
+            "label": "cbc:ProfileID",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cbc:ID",
+            "label": "Invoice Number",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:UUID",
+            "label": "UUID",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:IssueDate",
+            "label": "Issue Date",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:IssueTime",
+            "label": "Issue Time",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:InvoiceTypeCode",
+            "label": "InvoiceTypeCode",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:DocumentCurrencyCode",
+            "label": "cbc:DocumentCurrencyCode",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cbc:TaxCurrencyCode",
+            "label": "cbc:TaxCurrencyCode",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cac:AccountingSupplierParty",
+            "label": "Seller block",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:TaxTotal",
+            "label": "TaxTotal",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:LegalMonetaryTotal",
+            "label": "LegalMonetaryTotal",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:InvoiceLine",
+            "label": "InvoiceLine(s)",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "ext:UBLExtensions",
+            "label": "UBLExtensions (signature envelope)",
+            "present": false,
+            "advisory": true
+          },
+          {
+            "element": "ds:SignedInfo",
+            "label": "ds:SignedInfo",
+            "present": false,
+            "advisory": true
+          },
+          {
+            "element": "ds:SignatureValue",
+            "label": "ds:SignatureValue",
+            "present": false,
+            "advisory": true
+          },
+          {
+            "element": "xades:QualifyingProperties",
+            "label": "XAdES QualifyingProperties",
+            "present": false,
+            "advisory": true
+          },
+          {
+            "element": "cac:AdditionalDocumentReference",
+            "label": "AdditionalDocumentReference",
+            "present": true,
+            "advisory": true
+          },
+          {
+            "element": "QR Tag",
+            "present": true,
+            "label": "QR TLV Reference"
+          },
+          {
+            "element": "C14N 1.1 Algorithm",
+            "present": false,
+            "label": "C14N 1.1 in SignedInfo",
+            "advisory": true
+          }
+        ],
+        "passed": 14,
+        "failed": 0,
+        "warnings": [
+          "[offline-mode] UBLExtensions (signature envelope) absent (expected in full XAdES mode only)",
+          "[offline-mode] ds:SignedInfo absent (expected in full XAdES mode only)",
+          "[offline-mode] ds:SignatureValue absent (expected in full XAdES mode only)",
+          "[offline-mode] XAdES QualifyingProperties absent (expected in full XAdES mode only)",
+          "[offline-mode] C14N 1.1 absent (expected in full XAdES mode only)"
+        ],
+        "total": 14,
+        "score": 100,
+        "status": "WARN"
+      }
+    },
+    "cert": {
+      "available": false,
+      "days_remaining": null,
+      "expired": null,
+      "cert_hash": null
+    },
+    "errors": [],
+    "warnings": [],
+    "status": "WARN"
+  },
+  {
+    "type": "standard",
+    "label": "Standard Tax Invoice (B2B)",
+    "timestamp": "2026-06-28T15:29:18.511Z",
+    "unsigned": {
+      "path": "C:\\my-pos\\v2\\tools\\snapshots\\standard_unsigned.xml",
+      "size_bytes": 6849
+    },
+    "signed": {
+      "path": "C:\\my-pos\\v2\\tools\\snapshots\\standard_signed.xml",
+      "size_bytes": 6153
+    },
+    "hash": {
+      "base64": "AKZktACz+9pNxyVZsqh3G0/iqML8ND36k/j5BYhjGgQ=",
+      "hex": "00a664b400b3fbda4dc72559b2a8771b4fe2a8c2fc343dfa93f8f90588631a04"
+    },
+    "qr": {
+      "base64": "ASjYtNix2YPYqSDYp9mE2KfYrtiq2KjYp9ixINmE2YTYqtis2KfYsdipAg8z…",
+      "decoded": {
+        "seller_name": "شركة الاختبار للتجارة",
+        "vat_number": "399999999900003",
+        "timestamp": "2026-06-28T15:29:18+03:00",
+        "total_with_vat": "1150.00",
+        "vat_amount": "150.00",
+        "_total_tags": 5,
+        "_parsed_ok": true
+      }
+    },
+    "validation": {
+      "unsigned": {
+        "label": "unsigned",
+        "sigMode": "FULL_XADES",
+        "checks": [
+          {
+            "element": "cbc:ProfileID",
+            "label": "cbc:ProfileID",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cbc:ID",
+            "label": "Invoice Number",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:UUID",
+            "label": "UUID",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:IssueDate",
+            "label": "Issue Date",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:IssueTime",
+            "label": "Issue Time",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:InvoiceTypeCode",
+            "label": "InvoiceTypeCode",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:DocumentCurrencyCode",
+            "label": "cbc:DocumentCurrencyCode",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cbc:TaxCurrencyCode",
+            "label": "cbc:TaxCurrencyCode",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cac:AccountingSupplierParty",
+            "label": "Seller block",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:TaxTotal",
+            "label": "TaxTotal",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:LegalMonetaryTotal",
+            "label": "LegalMonetaryTotal",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:InvoiceLine",
+            "label": "InvoiceLine(s)",
+            "present": true,
+            "advisory": false
+          }
+        ],
+        "passed": 12,
+        "failed": 0,
+        "warnings": [],
+        "total": 12,
+        "score": 100,
+        "status": "PASS"
+      },
+      "signed": {
+        "label": "signed",
+        "sigMode": "TLV_ONLY",
+        "checks": [
+          {
+            "element": "cbc:ProfileID",
+            "label": "cbc:ProfileID",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cbc:ID",
+            "label": "Invoice Number",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:UUID",
+            "label": "UUID",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:IssueDate",
+            "label": "Issue Date",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:IssueTime",
+            "label": "Issue Time",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:InvoiceTypeCode",
+            "label": "InvoiceTypeCode",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:DocumentCurrencyCode",
+            "label": "cbc:DocumentCurrencyCode",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cbc:TaxCurrencyCode",
+            "label": "cbc:TaxCurrencyCode",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cac:AccountingSupplierParty",
+            "label": "Seller block",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:TaxTotal",
+            "label": "TaxTotal",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:LegalMonetaryTotal",
+            "label": "LegalMonetaryTotal",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:InvoiceLine",
+            "label": "InvoiceLine(s)",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "ext:UBLExtensions",
+            "label": "UBLExtensions (signature envelope)",
+            "present": false,
+            "advisory": true
+          },
+          {
+            "element": "ds:SignedInfo",
+            "label": "ds:SignedInfo",
+            "present": false,
+            "advisory": true
+          },
+          {
+            "element": "ds:SignatureValue",
+            "label": "ds:SignatureValue",
+            "present": false,
+            "advisory": true
+          },
+          {
+            "element": "xades:QualifyingProperties",
+            "label": "XAdES QualifyingProperties",
+            "present": false,
+            "advisory": true
+          },
+          {
+            "element": "cac:AdditionalDocumentReference",
+            "label": "AdditionalDocumentReference",
+            "present": true,
+            "advisory": true
+          },
+          {
+            "element": "QR Tag",
+            "present": true,
+            "label": "QR TLV Reference"
+          },
+          {
+            "element": "C14N 1.1 Algorithm",
+            "present": false,
+            "label": "C14N 1.1 in SignedInfo",
+            "advisory": true
+          }
+        ],
+        "passed": 14,
+        "failed": 0,
+        "warnings": [
+          "[offline-mode] UBLExtensions (signature envelope) absent (expected in full XAdES mode only)",
+          "[offline-mode] ds:SignedInfo absent (expected in full XAdES mode only)",
+          "[offline-mode] ds:SignatureValue absent (expected in full XAdES mode only)",
+          "[offline-mode] XAdES QualifyingProperties absent (expected in full XAdES mode only)",
+          "[offline-mode] C14N 1.1 absent (expected in full XAdES mode only)"
+        ],
+        "total": 14,
+        "score": 100,
+        "status": "WARN"
+      }
+    },
+    "cert": {
+      "available": false,
+      "days_remaining": null,
+      "expired": null,
+      "cert_hash": null
+    },
+    "errors": [],
+    "warnings": [],
+    "status": "WARN"
+  },
+  {
+    "type": "credit",
+    "label": "Credit Note (typeCode 381)",
+    "timestamp": "2026-06-28T15:29:18.542Z",
+    "unsigned": {
+      "path": "C:\\my-pos\\v2\\tools\\snapshots\\credit_unsigned.xml",
+      "size_bytes": 5850
+    },
+    "signed": {
+      "path": "C:\\my-pos\\v2\\tools\\snapshots\\credit_signed.xml",
+      "size_bytes": 5150
+    },
+    "hash": {
+      "base64": "sI7ba5XP1Uy2Tr+LdLjkn9bKaIrzZ+2LBi19pcHmgzA=",
+      "hex": "b08edb6b95cfd54cb64ebf8b74b8e49fd6ca688af367ed8b062d7da5c1e68330"
+    },
+    "qr": {
+      "base64": "ASjYtNix2YPYqSDYp9mE2KfYrtiq2KjYp9ixINmE2YTYqtis2KfYsdipAg8z…",
+      "decoded": {
+        "seller_name": "شركة الاختبار للتجارة",
+        "vat_number": "399999999900003",
+        "timestamp": "2026-06-28T15:29:18+03:00",
+        "total_with_vat": "115.00",
+        "vat_amount": "15.00",
+        "_total_tags": 5,
+        "_parsed_ok": true
+      }
+    },
+    "validation": {
+      "unsigned": {
+        "label": "unsigned",
+        "sigMode": "FULL_XADES",
+        "checks": [
+          {
+            "element": "cbc:ProfileID",
+            "label": "cbc:ProfileID",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cbc:ID",
+            "label": "Invoice Number",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:UUID",
+            "label": "UUID",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:IssueDate",
+            "label": "Issue Date",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:IssueTime",
+            "label": "Issue Time",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:InvoiceTypeCode",
+            "label": "InvoiceTypeCode",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:DocumentCurrencyCode",
+            "label": "cbc:DocumentCurrencyCode",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cbc:TaxCurrencyCode",
+            "label": "cbc:TaxCurrencyCode",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cac:AccountingSupplierParty",
+            "label": "Seller block",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:TaxTotal",
+            "label": "TaxTotal",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:LegalMonetaryTotal",
+            "label": "LegalMonetaryTotal",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:InvoiceLine",
+            "label": "InvoiceLine(s)",
+            "present": true,
+            "advisory": false
+          }
+        ],
+        "passed": 12,
+        "failed": 0,
+        "warnings": [],
+        "total": 12,
+        "score": 100,
+        "status": "PASS"
+      },
+      "signed": {
+        "label": "signed",
+        "sigMode": "TLV_ONLY",
+        "checks": [
+          {
+            "element": "cbc:ProfileID",
+            "label": "cbc:ProfileID",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cbc:ID",
+            "label": "Invoice Number",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:UUID",
+            "label": "UUID",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:IssueDate",
+            "label": "Issue Date",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:IssueTime",
+            "label": "Issue Time",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:InvoiceTypeCode",
+            "label": "InvoiceTypeCode",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:DocumentCurrencyCode",
+            "label": "cbc:DocumentCurrencyCode",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cbc:TaxCurrencyCode",
+            "label": "cbc:TaxCurrencyCode",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cac:AccountingSupplierParty",
+            "label": "Seller block",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:TaxTotal",
+            "label": "TaxTotal",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:LegalMonetaryTotal",
+            "label": "LegalMonetaryTotal",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:InvoiceLine",
+            "label": "InvoiceLine(s)",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "ext:UBLExtensions",
+            "label": "UBLExtensions (signature envelope)",
+            "present": false,
+            "advisory": true
+          },
+          {
+            "element": "ds:SignedInfo",
+            "label": "ds:SignedInfo",
+            "present": false,
+            "advisory": true
+          },
+          {
+            "element": "ds:SignatureValue",
+            "label": "ds:SignatureValue",
+            "present": false,
+            "advisory": true
+          },
+          {
+            "element": "xades:QualifyingProperties",
+            "label": "XAdES QualifyingProperties",
+            "present": false,
+            "advisory": true
+          },
+          {
+            "element": "cac:AdditionalDocumentReference",
+            "label": "AdditionalDocumentReference",
+            "present": true,
+            "advisory": true
+          },
+          {
+            "element": "QR Tag",
+            "present": true,
+            "label": "QR TLV Reference"
+          },
+          {
+            "element": "C14N 1.1 Algorithm",
+            "present": false,
+            "label": "C14N 1.1 in SignedInfo",
+            "advisory": true
+          }
+        ],
+        "passed": 14,
+        "failed": 0,
+        "warnings": [
+          "[offline-mode] UBLExtensions (signature envelope) absent (expected in full XAdES mode only)",
+          "[offline-mode] ds:SignedInfo absent (expected in full XAdES mode only)",
+          "[offline-mode] ds:SignatureValue absent (expected in full XAdES mode only)",
+          "[offline-mode] XAdES QualifyingProperties absent (expected in full XAdES mode only)",
+          "[offline-mode] C14N 1.1 absent (expected in full XAdES mode only)"
+        ],
+        "total": 14,
+        "score": 100,
+        "status": "WARN"
+      }
+    },
+    "cert": {
+      "available": false,
+      "days_remaining": null,
+      "expired": null,
+      "cert_hash": null
+    },
+    "errors": [],
+    "warnings": [],
+    "status": "WARN"
+  },
+  {
+    "type": "debit",
+    "label": "Debit Note (typeCode 383)",
+    "timestamp": "2026-06-28T15:29:18.574Z",
+    "unsigned": {
+      "path": "C:\\my-pos\\v2\\tools\\snapshots\\debit_unsigned.xml",
+      "size_bytes": 5825
+    },
+    "signed": {
+      "path": "C:\\my-pos\\v2\\tools\\snapshots\\debit_signed.xml",
+      "size_bytes": 5121
+    },
+    "hash": {
+      "base64": "31qg8tAsb+5GZos3E1csGlgMkgkvY5hpZQ4fuWLsjRU=",
+      "hex": "df5aa0f2d02c6fee46668b3713572c1a580c92092f639869650e1fb962ec8d15"
+    },
+    "qr": {
+      "base64": "ASjYtNix2YPYqSDYp9mE2KfYrtiq2KjYp9ixINmE2YTYqtis2KfYsdipAg8z…",
+      "decoded": {
+        "seller_name": "شركة الاختبار للتجارة",
+        "vat_number": "399999999900003",
+        "timestamp": "2026-06-28T15:29:18+03:00",
+        "total_with_vat": "57.50",
+        "vat_amount": "7.50",
+        "_total_tags": 5,
+        "_parsed_ok": true
+      }
+    },
+    "validation": {
+      "unsigned": {
+        "label": "unsigned",
+        "sigMode": "FULL_XADES",
+        "checks": [
+          {
+            "element": "cbc:ProfileID",
+            "label": "cbc:ProfileID",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cbc:ID",
+            "label": "Invoice Number",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:UUID",
+            "label": "UUID",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:IssueDate",
+            "label": "Issue Date",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:IssueTime",
+            "label": "Issue Time",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:InvoiceTypeCode",
+            "label": "InvoiceTypeCode",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:DocumentCurrencyCode",
+            "label": "cbc:DocumentCurrencyCode",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cbc:TaxCurrencyCode",
+            "label": "cbc:TaxCurrencyCode",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cac:AccountingSupplierParty",
+            "label": "Seller block",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:TaxTotal",
+            "label": "TaxTotal",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:LegalMonetaryTotal",
+            "label": "LegalMonetaryTotal",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:InvoiceLine",
+            "label": "InvoiceLine(s)",
+            "present": true,
+            "advisory": false
+          }
+        ],
+        "passed": 12,
+        "failed": 0,
+        "warnings": [],
+        "total": 12,
+        "score": 100,
+        "status": "PASS"
+      },
+      "signed": {
+        "label": "signed",
+        "sigMode": "TLV_ONLY",
+        "checks": [
+          {
+            "element": "cbc:ProfileID",
+            "label": "cbc:ProfileID",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cbc:ID",
+            "label": "Invoice Number",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:UUID",
+            "label": "UUID",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:IssueDate",
+            "label": "Issue Date",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:IssueTime",
+            "label": "Issue Time",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:InvoiceTypeCode",
+            "label": "InvoiceTypeCode",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cbc:DocumentCurrencyCode",
+            "label": "cbc:DocumentCurrencyCode",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cbc:TaxCurrencyCode",
+            "label": "cbc:TaxCurrencyCode",
+            "present": true,
+            "advisory": false,
+            "value_match": true
+          },
+          {
+            "element": "cac:AccountingSupplierParty",
+            "label": "Seller block",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:TaxTotal",
+            "label": "TaxTotal",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:LegalMonetaryTotal",
+            "label": "LegalMonetaryTotal",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "cac:InvoiceLine",
+            "label": "InvoiceLine(s)",
+            "present": true,
+            "advisory": false
+          },
+          {
+            "element": "ext:UBLExtensions",
+            "label": "UBLExtensions (signature envelope)",
+            "present": false,
+            "advisory": true
+          },
+          {
+            "element": "ds:SignedInfo",
+            "label": "ds:SignedInfo",
+            "present": false,
+            "advisory": true
+          },
+          {
+            "element": "ds:SignatureValue",
+            "label": "ds:SignatureValue",
+            "present": false,
+            "advisory": true
+          },
+          {
+            "element": "xades:QualifyingProperties",
+            "label": "XAdES QualifyingProperties",
+            "present": false,
+            "advisory": true
+          },
+          {
+            "element": "cac:AdditionalDocumentReference",
+            "label": "AdditionalDocumentReference",
+            "present": true,
+            "advisory": true
+          },
+          {
+            "element": "QR Tag",
+            "present": true,
+            "label": "QR TLV Reference"
+          },
+          {
+            "element": "C14N 1.1 Algorithm",
+            "present": false,
+            "label": "C14N 1.1 in SignedInfo",
+            "advisory": true
+          }
+        ],
+        "passed": 14,
+        "failed": 0,
+        "warnings": [
+          "[offline-mode] UBLExtensions (signature envelope) absent (expected in full XAdES mode only)",
+          "[offline-mode] ds:SignedInfo absent (expected in full XAdES mode only)",
+          "[offline-mode] ds:SignatureValue absent (expected in full XAdES mode only)",
+          "[offline-mode] XAdES QualifyingProperties absent (expected in full XAdES mode only)",
+          "[offline-mode] C14N 1.1 absent (expected in full XAdES mode only)"
+        ],
+        "total": 14,
+        "score": 100,
+        "status": "WARN"
+      }
+    },
+    "cert": {
+      "available": false,
+      "days_remaining": null,
+      "expired": null,
+      "cert_hash": null
+    },
+    "errors": [],
+    "warnings": [],
+    "status": "WARN"
+  }
+]

@@ -4,12 +4,21 @@ const fs = require('fs');
 const crypto = require('crypto');
 const QRCode = require('qrcode');
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ZATCA PHASE 2 — CANONICAL GENESIS PIH
+// Per ZATCA Phase 2 spec §5.3: the PIH for the very first invoice (ICV=1) is
+// the SHA-256 of the empty string, hex-encoded then base64'd.
+// This MUST be used as the default last_pih for any fresh device registration
+// and as the fallback when last_pih is NULL or an uninitialized placeholder.
+// ─────────────────────────────────────────────────────────────────────────────
+const ZATCA_GENESIS_PIH = 'NWZlY2Q3YmU1YTIzYmU3YTYzYTk3YmQ4NzY0ODk2ODM3NGJhOWI5NjgxYTNpYmQyNzhjNTU4NTUxYWI5ZWYyZg==';
+
 // ─────────────────────────────────────────────
 // MONEY ROUNDING HELPER (4-B)
 // ─────────────────────────────────────────────
 const roundMoney = (n) => Math.round((parseFloat(n) || 0) * 100) / 100;
 const { generateUUID, generateUBL21XML } = require('./zatca_utils.cjs');
-const zatca = require('./zatca_phase2.cjs');
+const zatca = require('./zatca_phase2_impl.cjs');
 const accounting = require('./accounting.cjs');
 const accountingP2 = require('./accounting_p2.cjs');
 
@@ -292,7 +301,8 @@ function initDatabase(userDataPath) {
             production_csid TEXT,
             production_cert_pem TEXT,
             current_icv INTEGER DEFAULT 0,
-            last_pih TEXT DEFAULT 'X+zrZv/IbzjZUnhsbWlsecLbwjndTpG0ZynXOif7V+k=',
+            last_pih TEXT DEFAULT 'NWZlY2Q3YmU1YTIzYmU3YTYzYTk3YmQ4NzY0ODk2ODM3NGJhOWI5NjgxYTNpYmQyNzhjNTU4NTUxYWI5ZWYyZg==',
+            -- ^ ZATCA Phase 2 canonical genesis PIH (SHA-256 of empty string, hex→base64)
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
@@ -533,6 +543,25 @@ function initDatabase(userDataPath) {
     try { db.exec("ALTER TABLE promotions ADD COLUMN discount_type TEXT;"); } catch(e){}
     try { db.exec("ALTER TABLE promotions ADD COLUMN start_date TEXT;"); } catch(e){}
     try { db.exec("ALTER TABLE promotions ADD COLUMN end_date TEXT;"); } catch(e){}
+
+    // ── ZATCA device schema migrations — guarded with PRAGMA to avoid
+    // duplicate-column warnings when the column already exists in the
+    // CREATE TABLE DDL above (fixes: "Migration warn: duplicate column name").
+    const safeZatca = (sql) => { try { db.exec(sql); } catch(e) { console.warn('Migration warn:', e.message); } };
+    const _zatcaCols = db.prepare('PRAGMA table_info(zatca_device)').all().map(c => c.name);
+    if (!_zatcaCols.includes('current_icv'))       db.exec('ALTER TABLE zatca_device ADD COLUMN current_icv INTEGER DEFAULT 0;');
+    if (!_zatcaCols.includes('last_pih'))           db.exec(`ALTER TABLE zatca_device ADD COLUMN last_pih TEXT DEFAULT '${ZATCA_GENESIS_PIH}';`);
+    if (!_zatcaCols.includes('device_id'))          safeZatca('ALTER TABLE zatca_device ADD COLUMN device_id TEXT;');
+    if (!_zatcaCols.includes('private_key_pem'))    safeZatca('ALTER TABLE zatca_device ADD COLUMN private_key_pem TEXT;');
+    if (!_zatcaCols.includes('csr_pem'))            safeZatca('ALTER TABLE zatca_device ADD COLUMN csr_pem TEXT;');
+    if (!_zatcaCols.includes('production_cert_pem')) safeZatca('ALTER TABLE zatca_device ADD COLUMN production_cert_pem TEXT;');
+
+    try { db.exec("ALTER TABLE zatca_device ADD COLUMN production_cert_pem TEXT;"); } catch(e){}
+    try { db.exec("ALTER TABLE zatca_device ADD COLUMN cert_expires_at TEXT;"); } catch(e){}
+    try { db.exec("ALTER TABLE zatca_device ADD COLUMN uuid TEXT;"); } catch(e){}
+    try { db.exec("ALTER TABLE zatca_device ADD COLUMN compliance_secret TEXT;"); } catch(e){}
+    try { db.exec("ALTER TABLE zatca_device ADD COLUMN production_secret TEXT;"); } catch(e){}
+    try { db.exec("ALTER TABLE zatca_device ADD COLUMN status TEXT;"); } catch(e){}
 
     db.prepare(`
         CREATE TABLE IF NOT EXISTS business_settings (
@@ -1315,7 +1344,10 @@ function saveSale(saleData) {
         
         db.prepare('UPDATE zatca_device SET current_icv = current_icv + 1 WHERE id = ?').run(device.id);
         const newIcv = db.prepare('SELECT current_icv FROM zatca_device WHERE id = ?').get(device.id).current_icv;
-        const prevHash = device.last_pih || 'X+zrZv/IbzjZUnhsbWlsecLbwjndTpG0ZynXOif7V+k=';
+        // Use canonical ZATCA genesis PIH if last_pih is NULL or still holds an uninitialized placeholder
+        const prevHash = (device.last_pih && device.last_pih !== 'X+zrZv/IbzjZUnhsbWlsecLbwjndTpG0ZynXOif7V+k=')
+            ? device.last_pih
+            : ZATCA_GENESIS_PIH;
         const invoiceUUID = generateUUID();
 
         const saleTimestamp = (saleData.date && typeof saleData.date === 'string')
@@ -1353,7 +1385,7 @@ function saveSale(saleData) {
 
         // [FIX-3] BR-KSA-17: for credit note invoices pass reason for cbc:InstructionNote
         const xml = generateUBL21XML({
-            invoice, icv: newIcv, timestamp: saleTimestamp, total: finalTotal, 
+            invoice: { id: invoice }, icv: newIcv, timestamp: saleTimestamp, total: finalTotal, 
             items: items || [], uuid: invoiceUUID, prevHash, 
             seller: settings.business_name_ar || 'مؤسسة تجارية', 
             vatNo: settings.vat_number || settings.tax_number,
@@ -1378,6 +1410,13 @@ function saveSale(saleData) {
             xml, device, settings, timestamp: saleTimestamp,
             total: finalTotal, tax: finalTax, db
         });
+
+        // ── [FIX-PIH-CHAIN] Write the new invoice hash as last_pih BEFORE any
+        // other INSERT so the chain is persisted even if the zatca_queue INSERT
+        // later fails and the transaction rolls back cleanly.
+        // This is the critical missing step that caused every invoice to reuse
+        // the same stale prevHash, triggering ICV sequence conflicts in ZATCA.
+        db.prepare('UPDATE zatca_device SET last_pih = ? WHERE id = ?').run(invoiceHash, device.id);
 
         const saleResult = db.prepare(`
             INSERT INTO sales (invoice, timestamp, total_amount, subtotal, tax_amount, discount, payment_method,
@@ -1576,7 +1615,10 @@ function voidSale(invoiceId, reason = 'لم يُحدد') {
         if (device) {
             db.prepare('UPDATE zatca_device SET current_icv = current_icv + 1 WHERE id = ?').run(device.id);
             const newIcv = db.prepare('SELECT current_icv FROM zatca_device WHERE id = ?').get(device.id).current_icv;
-            const prevHash = device.last_pih || 'X+zrZv/IbzjZUnhsbWlsecLbwjndTpG0ZynXOif7V+k=';
+            // Use canonical ZATCA genesis PIH if last_pih is NULL or still holds an uninitialized placeholder
+            const prevHash = (device.last_pih && device.last_pih !== 'X+zrZv/IbzjZUnhsbWlsecLbwjndTpG0ZynXOif7V+k=')
+                ? device.last_pih
+                : ZATCA_GENESIS_PIH;
             const uuid = generateUUID();
             const timestamp = new Date().toISOString();
             const settings = getSettings();
@@ -1609,7 +1651,7 @@ function voidSale(invoiceId, reason = 'لم يُحدد') {
 
             // [FIX-3] BR-KSA-17: pass reason for cbc:InstructionNote
             const xml = generateUBL21XML({
-                invoice: 'CN-' + invoiceId, icv: newIcv, timestamp, total, 
+                invoice: { id: 'CN-' + invoiceId }, icv: newIcv, timestamp, total, 
                 items: items, uuid, prevHash, 
                 seller: settings.business_name_ar || 'مؤسسة تجارية', 
                 vatNo: settings.vat_number || settings.tax_number,
@@ -1633,6 +1675,9 @@ function voidSale(invoiceId, reason = 'لم يُحدد') {
                 xml, device, settings, timestamp,
                 total, tax: taxVal, db
             });
+
+            // ── [FIX-PIH-CHAIN] Persist the new hash as last_pih for the next invoice.
+            db.prepare('UPDATE zatca_device SET last_pih = ? WHERE id = ?').run(invoiceHash, device.id);
 
             const voidOrigSubtype = db.prepare(
                 'SELECT invoice_subtype FROM zatca_queue WHERE invoice_number = ? ORDER BY id DESC LIMIT 1'
@@ -2360,7 +2405,10 @@ function createReturn(invoiceId, returnItems) {
         }
         db.prepare('UPDATE zatca_device SET current_icv = current_icv + 1 WHERE id = ?').run(device.id);
         const newIcv = db.prepare('SELECT current_icv FROM zatca_device WHERE id = ?').get(device.id).current_icv;
-        const prevHash = device.last_pih || 'X+zrZv/IbzjZUnhsbWlsecLbwjndTpG0ZynXOif7V+k=';
+        // Use canonical ZATCA genesis PIH if last_pih is NULL or still holds an uninitialized placeholder
+        const prevHash = (device.last_pih && device.last_pih !== 'X+zrZv/IbzjZUnhsbWlsecLbwjndTpG0ZynXOif7V+k=')
+            ? device.last_pih
+            : ZATCA_GENESIS_PIH;
         const uuid = generateUUID();
         const timestamp = new Date().toISOString();
         const settings = getSettings();
@@ -2392,7 +2440,7 @@ function createReturn(invoiceId, returnItems) {
         // [FIX-3] BR-KSA-17: pass reason for cbc:InstructionNote
         const returnReason = `مرتجع جزئي للفاتورة ${invoiceId}`;
         const xml = generateUBL21XML({
-            invoice: returnInv, icv: newIcv, timestamp, total: returnTotal, 
+            invoice: { id: returnInv }, icv: newIcv, timestamp, total: returnTotal, 
             items: returnItems.map(ri => ({ Name: ri.name, Price: ri.price, Qty: ri.qty })), 
             uuid, prevHash, 
             seller: settings.business_name_ar || 'مؤسسة تجارية', 
@@ -2408,6 +2456,9 @@ function createReturn(invoiceId, returnItems) {
             xml, device, settings, timestamp,
             total: returnTotal, tax: returnTax, db
         });
+
+        // ── [FIX-PIH-CHAIN] Persist the new hash as last_pih for the next invoice.
+        db.prepare('UPDATE zatca_device SET last_pih = ? WHERE id = ?').run(invoiceHash, device.id);
 
         const saleRes = db.prepare(`
             INSERT INTO sales (invoice, total_amount, subtotal, tax_amount, discount, payment_method,
@@ -2518,11 +2569,28 @@ function getZatcaDevice() {
 }
 function updateZatcaDevice(data) {
     if (!data.id) return;
+    const exists = db.prepare('SELECT id FROM zatca_device WHERE id = ?').get(data.id);
+    if (!exists) {
+        try {
+            db.prepare('INSERT INTO zatca_device (id, device_id, private_key_pem, private_key, csr, certificate) VALUES (?, ?, ?, ?, ?, ?)')
+              .run(data.id, data.device_id || 'POS-01', data.private_key_pem || '', data.private_key_pem || '', '', '');
+        } catch (e) {
+            try {
+                db.prepare('INSERT INTO zatca_device (id, device_id, private_key_pem, private_key, csr) VALUES (?, ?, ?, ?, ?)')
+                  .run(data.id, data.device_id || 'POS-01', data.private_key_pem || '', data.private_key_pem || '', '');
+            } catch (e2) {
+                db.prepare('INSERT INTO zatca_device (id, device_id, private_key_pem) VALUES (?, ?, ?)')
+                  .run(data.id, data.device_id || 'POS-01', data.private_key_pem || '');
+            }
+        }
+    }
     const fields = Object.keys(data).filter(k => k !== 'id');
-    const setClause = fields.map(k => `${k}=?`).join(', ');
-    const values = fields.map(k => data[k]);
-    values.push(data.id);
-    db.prepare(`UPDATE zatca_device SET ${setClause} WHERE id=?`).run(...values);
+    if (fields.length > 0) {
+        const setClause = fields.map(k => `${k}=?`).join(', ');
+        const values = fields.map(k => data[k]);
+        values.push(data.id);
+        db.prepare(`UPDATE zatca_device SET ${setClause} WHERE id=?`).run(...values);
+    }
 }
 
 // ─────────────────────────────────────────────

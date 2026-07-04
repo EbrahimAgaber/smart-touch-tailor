@@ -1,328 +1,167 @@
 const fs = require('fs');
 const path = require('path');
 
-const targetFile = 'c:\\my-pos\\v2\\electron\\database.cjs';
-let content = fs.readFileSync(targetFile, 'utf8');
+// 1. Patch database.cjs
+const dbPath = path.join(__dirname, 'electron', 'database.cjs');
+let dbCode = fs.readFileSync(dbPath, 'utf8');
 
-// 1. Imports
-content = content.replace(
-    `const { calculateInvoiceHash, generateUUID } = require('./zatca_utils.cjs');`,
-    `const { generateUUID, generateUBL21XML } = require('./zatca_utils.cjs');\nconst zatca = require('./zatca_phase2.cjs');`
-);
-
-// 2. Add Tables
-const tableInjectionPoint = 'FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE\n        );\n    `);';
-const newTables = `
-    db.exec(\`
-        CREATE TABLE IF NOT EXISTS zatca_device (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            device_id TEXT UNIQUE NOT NULL,
-            private_key_pem TEXT NOT NULL,
-            csr_pem TEXT,
-            compliance_csid TEXT,
-            production_csid TEXT,
-            production_cert_pem TEXT,
-            current_icv INTEGER DEFAULT 0,
-            last_pih TEXT DEFAULT 'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+// A. Init Database (Table creation + indexes)
+const initDbTarget = "unit TEXT DEFAULT 'وحدة'\n        );\n    `);";
+const initDbReplacement = `unit TEXT DEFAULT 'وحدة'
         );
     \`);
 
     db.exec(\`
-        CREATE TABLE IF NOT EXISTS zatca_queue (
+        CREATE TABLE IF NOT EXISTS global_catalog (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sale_id INTEGER NOT NULL,
-            invoice_number TEXT NOT NULL,
-            icv INTEGER NOT NULL,
-            uuid TEXT NOT NULL,
-            signed_xml TEXT NOT NULL,
-            xml_hash TEXT NOT NULL,
-            status TEXT DEFAULT 'pending',
-            zatca_response_json TEXT,
-            attempts INTEGER DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            submitted_at DATETIME,
-            FOREIGN KEY (sale_id) REFERENCES sales(id)
+            name TEXT NOT NULL UNIQUE,
+            category TEXT,
+            barcode TEXT,
+            unit TEXT
         );
+        CREATE INDEX IF NOT EXISTS idx_global_catalog_barcode ON global_catalog(barcode);
+        CREATE INDEX IF NOT EXISTS idx_global_catalog_cat_name ON global_catalog(category, name);
     \`);
-`;
-content = content.replace(tableInjectionPoint, tableInjectionPoint + newTables);
+    
+    // Auto-migrate catalog data on init
+    migrateGlobalCatalog();`;
+if (!dbCode.includes('CREATE TABLE IF NOT EXISTS global_catalog')) {
+    dbCode = dbCode.replace(initDbTarget, initDbReplacement);
+}
 
-// 3. Columns & Migrations
-content = content.replace(
-    `safe(\`ALTER TABLE sales ADD COLUMN zatca_status TEXT DEFAULT 'pending'\`);`,
-    `safe(\`ALTER TABLE sales ADD COLUMN zatca_status TEXT DEFAULT 'pending'\`);\n    safe(\`ALTER TABLE sales ADD COLUMN icv INTEGER\`);\n    try { db.prepare("UPDATE sales SET zatca_status = 'legacy' WHERE icv IS NULL AND status != 'legacy' AND zatca_status != 'legacy'").run(); } catch(e){}`
-);
-
-// 4. saveSale changes
-const saveSaleSearch = `        const lastSale = db.prepare('SELECT hash FROM sales ORDER BY id DESC LIMIT 1').get();
-        const prevHash = lastSale?.hash || 'NWZlY2ViYjdmM2VjNmIyZGVmZDRjOGYwZDA5M2EzNmVjMzcwNDNmYzY3OTZjNTY5MTY2YThmYTFhZTRjNmMxNg==';
-        const invoiceUUID = generateUUID();
-        // DATE-FIX: Use an explicit ISO Z-string so React (and any JS consumer)
-        // always parses it as UTC and converts to local time correctly.
-        // Older rows without the trailing 'Z' are still safe — JS treats those
-        // as local time, which is what they already stored.
-        const saleTimestamp = (saleData.date && typeof saleData.date === 'string')
-            ? saleData.date
-            : new Date().toISOString();
-
-        const invoiceHash = calculateInvoiceHash({ invoice, total, discount, timestamp: saleTimestamp, prevHash });
-
-        const finalTotal    = roundMoney(total);
-        const finalSubtotal = subtotal != null ? roundMoney(subtotal) : roundMoney(finalTotal / (1 + vatRate));
-        const finalTax      = tax != null ? roundMoney(tax) : roundMoney(finalTotal - finalSubtotal);
-
-        // FIX: Include loyalty_points_redeemed in the INSERT so it is persisted
-        // and can be read back by voidSale to restore the correct balance.
-        const saleResult = db.prepare(\`
-            INSERT INTO sales (invoice, timestamp, total_amount, subtotal, tax_amount, discount, payment_method,
-                paid, change_amount, payment_details_json, status, order_type, note,
-                customer_id, staff_id, uuid, hash, hash_chain, loyalty_points_redeemed,
-                discount_type, is_agreed_total)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        \`).run(
-            String(invoice),
-            String(saleTimestamp),
-            Number(finalTotal), 
-            Number(finalSubtotal), 
-            Number(finalTax), 
-            Number(discount), 
-            String(payment || 'Cash'),
-            Number(paid || 0), 
-            Number(change || 0), 
-            JSON.stringify(paymentDetails || []), 
-            String(saleStatus),
-            String(order_type), 
-            String(note || ''), 
-            customer_id ? Number(customer_id) : null, 
-            staff_id ? Number(staff_id) : null,
-            String(invoiceUUID), 
-            String(invoiceHash), 
-            String(prevHash), 
-            Number(redeemedPts),
-            String(discount_type || 'normal'), 
-            is_agreed_total ? 1 : 0
-        );
-        const saleId = saleResult.lastInsertRowid;`;
-
-const saveSaleReplace = `
-        let device = db.prepare('SELECT * FROM zatca_device LIMIT 1').get();
-        if (!device) {
-            const keys = zatca.generateDeviceKeyPair();
-            db.prepare(\`INSERT INTO zatca_device (device_id, private_key_pem) VALUES (?, ?)\`).run('POS-01', keys.privateKeyPem);
-            device = db.prepare('SELECT * FROM zatca_device LIMIT 1').get();
+// B. Replace editItem
+const editItemTarget = `function editItem(item) {
+    const metadataStr = item.Metadata ? JSON.stringify(item.Metadata) : null;
+    db.prepare(\`UPDATE products SET name=?, price=?, category=?, image=?, cost=?, barcode=?, supplier_id=?, is_service=?, unit=?, min_stock_level=?, bulk_unit_name=?, bulk_unit_size=?, metadata_json=? WHERE id=?\`)
+        .run(item.Name, item.Price, item.Category || 'عام', item.Image || '',
+             item.Cost || 0, item.Barcode || '', item.SupplierID || null,
+             item.IsService ? 1 : 0, item.Unit || 'وحدة', 
+             item.MinStockLevel || 0, item.BulkUnitName || '', item.BulkUnitSize || 1,
+             metadataStr,
+             item.ID);
+    addAuditLog('EDIT_PRODUCT', \`ID: \${item.ID}, Name: \${item.Name}\`);
+    return item;
+}`;
+const editItemReplacement = `function editItem(item) {
+    const tx = db.transaction(() => {
+        const current = db.prepare('SELECT stock FROM products WHERE id=?').get(item.ID);
+        const metadataStr = item.Metadata ? JSON.stringify(item.Metadata) : null;
+        
+        db.prepare(\`UPDATE products SET name=?, price=?, category=?, image=?, cost=?, stock=?, barcode=?, supplier_id=?, is_service=?, unit=?, min_stock_level=?, bulk_unit_name=?, bulk_unit_size=?, metadata_json=? WHERE id=?\`)
+            .run(item.Name, item.Price, item.Category || 'عام', item.Image || '',
+                 item.Cost || 0, item.Stock || 0, item.Barcode || '', item.SupplierID || null,
+                 item.IsService ? 1 : 0, item.Unit || 'وحدة', 
+                 item.MinStockLevel || 0, item.BulkUnitName || '', item.BulkUnitSize || 1,
+                 metadataStr,
+                 item.ID);
+                 
+        if (current && current.stock !== (item.Stock || 0)) {
+            const diff = (item.Stock || 0) - current.stock;
+            db.prepare('INSERT INTO stock_history (product_id, change_amount, reason, reference_id) VALUES (?,?,?,?)')
+              .run(item.ID, diff, 'adjustment', 'MenuAdmin Edit');
         }
         
-        db.prepare('UPDATE zatca_device SET current_icv = current_icv + 1 WHERE id = ?').run(device.id);
-        const newIcv = device.current_icv;
-        const prevHash = device.last_pih || 'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==';
-        const invoiceUUID = generateUUID();
+        addAuditLog('EDIT_PRODUCT', \`ID: \${item.ID}, Name: \${item.Name}\`);
+    });
+    tx();
+    
+    // Broadcast change if there are browser windows (assumes global.mainWindow)
+    if (global.mainWindow) {
+        global.mainWindow.webContents.send('products:changed');
+    }
+    return item;
+}`;
+if (dbCode.includes(editItemTarget)) {
+    dbCode = dbCode.replace(editItemTarget, editItemReplacement);
+}
 
-        const saleTimestamp = (saleData.date && typeof saleData.date === 'string')
-            ? saleData.date
-            : new Date().toISOString();
-
-        const finalTotal    = roundMoney(total);
-        const finalSubtotal = subtotal != null ? roundMoney(subtotal) : roundMoney(finalTotal / (1 + vatRate));
-        const finalTax      = tax != null ? roundMoney(tax) : roundMoney(finalTotal - finalSubtotal);
-
-        const settings = getSettings();
-        const xml = generateUBL21XML({
-            invoice, icv: newIcv, timestamp: saleTimestamp, total: finalTotal, 
-            items: items || [], uuid: invoiceUUID, prevHash, 
-            seller: settings.business_name_ar || 'مؤسسة تجارية', 
-            vatNo: settings.tax_number || '300000000000003',
-            vatRate, discount: Number(discount), typeCode: '388'
-        });
-        
-        const invoiceHash = zatca.hashXML(xml);
-        let signedXml = xml;
-        let signatureBase64 = '';
-        
-        if (!device.production_csid || !device.production_cert_pem) {
-            throw new Error('ZATCA_MISSING_CREDENTIALS: Certificate and CSID are required to sign the invoice. Please onboard the device.');
-        }
-        signatureBase64 = zatca.signXMLHash(invoiceHash, device.private_key_pem);
-        const certBase64 = device.production_cert_pem.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/\\n/g, '').replace(/\\r/g, '');
-        const env = zatca.buildSignatureEnvelope(invoiceHash, signatureBase64, certBase64, saleTimestamp, device.production_cert_pem);
-        signedXml = xml.replace('<!-- UBLEXTENSIONS_PLACEHOLDER -->', env);
-        
-        const { pubKeyPem, certSignature } = zatca.extractCertDetails(device.production_cert_pem);
-        const tlv = zatca.generateZatcaTLV9(
-            settings.business_name_ar || 'مؤسسة تجارية', settings.tax_number || '300000000000003', saleTimestamp, finalTotal, finalTax,
-            invoiceHash, signatureBase64, pubKeyPem, certSignature
-        );
-        signedXml = signedXml.replace('<!-- QR_PLACEHOLDER -->', \`<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">\${tlv}</cbc:EmbeddedDocumentBinaryObject>\`);
-
-        db.prepare('UPDATE zatca_device SET last_pih = ? WHERE id = ?').run(invoiceHash, device.id);
-
-        const saleResult = db.prepare(\`
-            INSERT INTO sales (invoice, timestamp, total_amount, subtotal, tax_amount, discount, payment_method,
-                paid, change_amount, payment_details_json, status, order_type, note,
-                customer_id, staff_id, uuid, hash, hash_chain, loyalty_points_redeemed,
-                discount_type, is_agreed_total, icv, zatca_status)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        \`).run(
-            String(invoice), String(saleTimestamp), Number(finalTotal), Number(finalSubtotal), Number(finalTax), Number(discount), 
-            String(payment || 'Cash'), Number(paid || 0), Number(change || 0), JSON.stringify(paymentDetails || []), 
-            String(saleStatus), String(order_type), String(note || ''), 
-            customer_id ? Number(customer_id) : null, staff_id ? Number(staff_id) : null,
-            String(invoiceUUID), String(invoiceHash), String(prevHash), Number(redeemedPts),
-            String(discount_type || 'normal'), is_agreed_total ? 1 : 0, newIcv, 'pending'
-        );
-        const saleId = saleResult.lastInsertRowid;
-        
-        db.prepare(\`
-            INSERT INTO zatca_queue (sale_id, invoice_number, icv, uuid, signed_xml, xml_hash)
-            VALUES (?, ?, ?, ?, ?, ?)
-        \`).run(saleId, invoice, newIcv, invoiceUUID, signedXml, invoiceHash);
-`;
-
-content = content.replace(saveSaleSearch, saveSaleReplace);
-
-// 5. voidSale changes (credit note generation)
-const voidSaleSearch = `db.prepare('UPDATE sales SET status=? WHERE invoice=?').run('void', invoiceId);`;
-const voidSaleReplace = `db.prepare('UPDATE sales SET status=? WHERE invoice=?').run('void', invoiceId);
-        
-        // ZATCA Phase 2: Generate Credit Note
-        let device = db.prepare('SELECT * FROM zatca_device LIMIT 1').get();
-        if (device) {
-            db.prepare('UPDATE zatca_device SET current_icv = current_icv + 1 WHERE id = ?').run(device.id);
-            const newIcv = device.current_icv + 1; // using db triggers would be safer but this is fine in tx
-            const prevHash = device.last_pih || 'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==';
-            const uuid = generateUUID();
-            const timestamp = new Date().toISOString();
-            const settings = getSettings();
-            
-            // Reconstruct items from DB
-            const items = db.prepare('SELECT item_name as Name, quantity as Qty, item_price as Price FROM sales_items WHERE sale_id=?').all(sale.id);
-            
-            const xml = generateUBL21XML({
-                invoice: 'CN-' + invoiceId, icv: newIcv, timestamp, total, 
-                items: items, uuid, prevHash, 
-                seller: settings.business_name_ar || 'مؤسسة تجارية', 
-                vatNo: settings.tax_number || '300000000000003',
-                vatRate, discount: 0, typeCode: '381'
-            });
-            
-            const invoiceHash = zatca.hashXML(xml);
-            let signedXml = xml;
-            
-            if (!device.production_csid || !device.production_cert_pem) {
-                throw new Error('ZATCA_MISSING_CREDENTIALS: Certificate and CSID are required to sign the invoice. Please onboard the device.');
+// C. Add Catalog Methods at bottom before module.exports
+const catalogMethods = `
+function migrateGlobalCatalog() {
+    try {
+        const data = require('./globalCatalogData.cjs');
+        if (!data || !data.length) return;
+        const insert = db.prepare('INSERT OR IGNORE INTO global_catalog (name, category, barcode, unit) VALUES (?,?,?,?)');
+        const tx = db.transaction(() => {
+            for (const row of data) {
+                insert.run(row.name, row.category, row.barcode || null, row.unit || 'وحدة / قطعة (PCE)');
             }
-            const signatureBase64 = zatca.signXMLHash(invoiceHash, device.private_key_pem);
-            const certBase64 = device.production_cert_pem.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/\\n/g, '').replace(/\\r/g, '');
-            const env = zatca.buildSignatureEnvelope(invoiceHash, signatureBase64, certBase64, timestamp, device.production_cert_pem);
-            signedXml = xml.replace('<!-- UBLEXTENSIONS_PLACEHOLDER -->', env);
-            const { pubKeyPem, certSignature } = zatca.extractCertDetails(device.production_cert_pem);
-            const tlv = zatca.generateZatcaTLV9(settings.business_name_ar, settings.tax_number, timestamp, total, taxVal, invoiceHash, signatureBase64, pubKeyPem, certSignature);
-            signedXml = signedXml.replace('<!-- QR_PLACEHOLDER -->', \`<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">\${tlv}</cbc:EmbeddedDocumentBinaryObject>\`);
-            
-            db.prepare('UPDATE zatca_device SET last_pih = ? WHERE id = ?').run(invoiceHash, device.id);
-            db.prepare(\`
-                INSERT INTO zatca_queue (sale_id, invoice_number, icv, uuid, signed_xml, xml_hash)
-                VALUES (?, ?, ?, ?, ?, ?)
-            \`).run(sale.id, 'CN-' + invoiceId, newIcv, uuid, signedXml, invoiceHash);
-        }`;
-content = content.replace(voidSaleSearch, voidSaleReplace);
-
-// 6. createReturn changes
-const createReturnSearch = `        const saleRes = db.prepare(\`
-            INSERT INTO sales (invoice, total_amount, subtotal, tax_amount, discount, payment_method,
-                paid, change_amount, payment_details_json, status, order_type, note, customer_id, staff_id, uuid, hash, hash_chain)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        \`).run(returnInv, -returnTotal, -returnSub, -returnTax, 0,
-            original.payment_method, -returnTotal, 0, '[]',
-            'return', 'return', \`مرتجع: \${invoiceId}\`,
-            original.customer_id, original.staff_id,
-            generateUUID(), 'RETURN', original.hash);
-        const saleId = saleRes.lastInsertRowid;`;
-
-const createReturnReplace = `
-        let device = db.prepare('SELECT * FROM zatca_device LIMIT 1').get();
-        if (!device) {
-            const keys = zatca.generateDeviceKeyPair();
-            db.prepare(\`INSERT INTO zatca_device (device_id, private_key_pem) VALUES (?, ?)\`).run('POS-01', keys.privateKeyPem);
-            device = db.prepare('SELECT * FROM zatca_device LIMIT 1').get();
-        }
-        db.prepare('UPDATE zatca_device SET current_icv = current_icv + 1 WHERE id = ?').run(device.id);
-        const newIcv = device.current_icv + 1;
-        const prevHash = device.last_pih || 'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==';
-        const uuid = generateUUID();
-        const timestamp = new Date().toISOString();
-        const settings = getSettings();
-        
-        const xml = generateUBL21XML({
-            invoice: returnInv, icv: newIcv, timestamp, total: returnTotal, 
-            items: returnItems.map(ri => ({ Name: ri.name, Price: ri.price, Qty: ri.qty })), 
-            uuid, prevHash, 
-            seller: settings.business_name_ar || 'مؤسسة تجارية', 
-            vatNo: settings.tax_number || '300000000000003',
-            vatRate, discount: 0, typeCode: '381'
         });
-        
-        const invoiceHash = zatca.hashXML(xml);
-        let signedXml = xml;
-        
-        if (!device.production_csid || !device.production_cert_pem) {
-            throw new Error('ZATCA_MISSING_CREDENTIALS: Certificate and CSID are required to sign the invoice. Please onboard the device.');
-        }
-        const signatureBase64 = zatca.signXMLHash(invoiceHash, device.private_key_pem);
-        const certBase64 = device.production_cert_pem.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/\\n/g, '').replace(/\\r/g, '');
-        const env = zatca.buildSignatureEnvelope(invoiceHash, signatureBase64, certBase64, timestamp, device.production_cert_pem);
-        signedXml = xml.replace('<!-- UBLEXTENSIONS_PLACEHOLDER -->', env);
-        const { pubKeyPem, certSignature } = zatca.extractCertDetails(device.production_cert_pem);
-        const tlv = zatca.generateZatcaTLV9(settings.business_name_ar, settings.tax_number, timestamp, returnTotal, returnTax, invoiceHash, signatureBase64, pubKeyPem, certSignature);
-        signedXml = signedXml.replace('<!-- QR_PLACEHOLDER -->', \`<cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">\${tlv}</cbc:EmbeddedDocumentBinaryObject>\`);
-        
-        db.prepare('UPDATE zatca_device SET last_pih = ? WHERE id = ?').run(invoiceHash, device.id);
-
-        const saleRes = db.prepare(\`
-            INSERT INTO sales (invoice, total_amount, subtotal, tax_amount, discount, payment_method,
-                paid, change_amount, payment_details_json, status, order_type, note, customer_id, staff_id, uuid, hash, hash_chain, icv, zatca_status)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        \`).run(returnInv, -returnTotal, -returnSub, -returnTax, 0,
-            original.payment_method, -returnTotal, 0, '[]',
-            'return', 'return', \`مرتجع: \${invoiceId}\`,
-            original.customer_id, original.staff_id,
-            uuid, invoiceHash, prevHash, newIcv, 'pending');
-        const saleId = saleRes.lastInsertRowid;
-        
-        db.prepare(\`
-            INSERT INTO zatca_queue (sale_id, invoice_number, icv, uuid, signed_xml, xml_hash)
-            VALUES (?, ?, ?, ?, ?, ?)
-        \`).run(saleId, returnInv, newIcv, uuid, signedXml, invoiceHash);
-`;
-
-content = content.replace(createReturnSearch, createReturnReplace);
-
-// 7. Add zatca_device methods
-const getDeviceStatus = `
-// ─────────────────────────────────────────────
-// ZATCA API Integration
-// ─────────────────────────────────────────────
-function getZatcaDevice() {
-    return db.prepare('SELECT * FROM zatca_device LIMIT 1').get() || null;
-}
-function updateZatcaDevice(data) {
-    if (!data.id) return;
-    const fields = Object.keys(data).filter(k => k !== 'id');
-    const setClause = fields.map(k => \`\${k}=?\`).join(', ');
-    const values = fields.map(k => data[k]);
-    values.push(data.id);
-    db.prepare(\`UPDATE zatca_device SET \${setClause} WHERE id=?\`).run(...values);
+        tx();
+        console.log('Global catalog migrated successfully.');
+    } catch (e) {
+        console.error('Failed to migrate global catalog:', e);
+    }
 }
 
-module.exports = {
+function getGlobalCatalog(filters = {}) {
+    let query = 'SELECT * FROM global_catalog WHERE 1=1';
+    let params = [];
+    if (filters.category && filters.category !== 'الكل') {
+        query += ' AND category = ?';
+        params.push(filters.category);
+    }
+    if (filters.search) {
+        query += ' AND (name LIKE ? OR barcode = ?)';
+        params.push('%' + filters.search + '%', filters.search);
+    }
+    query += ' LIMIT 100';
+    return db.prepare(query).all(...params);
+}
+
+function getGlobalCatalogCategories() {
+    return db.prepare('SELECT category, COUNT(*) as count FROM global_catalog GROUP BY category ORDER BY count DESC').all();
+}
 `;
-content = content.replace('module.exports = {', getDeviceStatus);
+if (!dbCode.includes('function migrateGlobalCatalog')) {
+    dbCode = dbCode.replace('module.exports = {', catalogMethods + '\nmodule.exports = {');
+}
 
-content = content.replace(
-    `getMenu, addItem, editItem, deleteItem, updateStock, updateProductCost,`,
-    `getZatcaDevice, updateZatcaDevice,\n    getMenu, addItem, editItem, deleteItem, updateStock, updateProductCost,`
-);
+// D. Export methods
+if (!dbCode.includes('getGlobalCatalog, getGlobalCatalogCategories')) {
+    dbCode = dbCode.replace('getReceiptQR,', 'getReceiptQR, getGlobalCatalog, getGlobalCatalogCategories, migrateGlobalCatalog,');
+}
 
-fs.writeFileSync(targetFile, content);
-console.log('Database patched');
+fs.writeFileSync(dbPath, dbCode, 'utf8');
+
+// 2. Patch preload.cjs
+const preloadPath = path.join(__dirname, 'electron', 'preload.cjs');
+let preloadCode = fs.readFileSync(preloadPath, 'utf8');
+if (!preloadCode.includes('getGlobalCatalogCategories:')) {
+    preloadCode = preloadCode.replace(
+        "importCSV:            (p)      => ipcRenderer.invoke('db:importCSV', p),",
+        `importCSV:            (p)      => ipcRenderer.invoke('db:importCSV', p),
+  getGlobalCatalog:     (f)      => ipcRenderer.invoke('db:getGlobalCatalog', f),
+  getGlobalCatalogCategories: () => ipcRenderer.invoke('db:getGlobalCatalogCategories'),`
+    );
+    // Add product change listener
+    if (!preloadCode.includes('onProductsChanged:')) {
+        preloadCode = preloadCode.replace(
+            "const { contextBridge, ipcRenderer } = require('electron');",
+            "const { contextBridge, ipcRenderer } = require('electron');"
+        ).replace(
+            "importCSV:            (p)      => ipcRenderer.invoke('db:importCSV', p),",
+            `importCSV:            (p)      => ipcRenderer.invoke('db:importCSV', p),
+  onProductsChanged:    (cb)     => ipcRenderer.on('products:changed', cb),`
+        );
+    }
+    fs.writeFileSync(preloadPath, preloadCode, 'utf8');
+}
+
+// 3. Patch main.cjs
+const mainPath = path.join(__dirname, 'electron', 'main.cjs');
+let mainCode = fs.readFileSync(mainPath, 'utf8');
+if (!mainCode.includes("ipcMain.handle('db:getGlobalCatalog'")) {
+    mainCode = mainCode.replace(
+        "ipcMain.handle('db:importCSV', async (e, path) => await db.importProductsFromCSV(path));",
+        `ipcMain.handle('db:importCSV', async (e, path) => await db.importProductsFromCSV(path));
+    ipcMain.handle('db:getGlobalCatalog', async (e, filters) => await db.getGlobalCatalog(filters));
+    ipcMain.handle('db:getGlobalCatalogCategories', async () => await db.getGlobalCatalogCategories());`
+    );
+    if (!mainCode.includes('global.mainWindow = mainWindow;')) {
+        mainCode = mainCode.replace("mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));",
+            "global.mainWindow = mainWindow;\n    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));");
+    }
+    fs.writeFileSync(mainPath, mainCode, 'utf8');
+}
+console.log('Backend patched successfully.');

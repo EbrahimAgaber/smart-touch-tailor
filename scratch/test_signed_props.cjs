@@ -1,0 +1,1 @@
+﻿const fs = require('fs'); const crypto = require('crypto'); const xml = fs.readFileSync('c:/my-pos/v2/zatca-einvoicing-sdk-Java-238-R3.4.8/Standard_Invoice_signed.xml', 'utf8'); const m = xml.match(/<xades:SignedProperties[\\s\\S]*?<\/xades:SignedProperties>/); const hash1 = crypto.createHash('sha256').update(m[0]).digest('base64'); console.log('Raw match hash:', hash1);

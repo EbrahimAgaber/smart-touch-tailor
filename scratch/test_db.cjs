@@ -1,0 +1,1 @@
+﻿const { app } = require('electron'); app.whenReady().then(() => { const db = require('../electron/database.cjs'); db.initDatabase(app.getPath('userData')); console.log(JSON.stringify(db.getDbInstance().prepare('SELECT * FROM business_settings').all(), null, 2)); process.exit(0); });

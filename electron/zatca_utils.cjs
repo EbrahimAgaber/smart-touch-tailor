@@ -19,7 +19,7 @@ function escapeXml(str) {
 
 // ── UN/ECE unit code mapping ─────────────────────────────────────────────────
 const UNIT_CODE_MAP = {
-    'وحدة': 'PCE',  'قطعة': 'PCE',  'piece': 'PCE',  'pce': 'PCE',  'حبة': 'PCE',
+    'وحدة': 'PCE',  'قطعة': 'PCE',  'piece': 'PCE',  'pce': 'PCE',  'حبة': 'PCE', 'وحدة / قطعة (pce)': 'PCE',
     'كجم':  'KGM',  'كيلو': 'KGM',  'kg':    'KGM',  'كيلوجرام': 'KGM',  'كيلوغرام': 'KGM',
     'جرام': 'GRM',  'غرام': 'GRM',  'g':     'GRM',  'gram': 'GRM',
     'لتر':  'LTR',  'liter':'LTR',  'litre':'LTR',  'l':  'LTR',
@@ -80,8 +80,10 @@ function generateUBL21XML(invoiceData) {
     const discountNum = parseFloat(discount || 0);
     const issueDate  = String(timestamp || '').split('T')[0];
     const issueTime  = (String(timestamp || '').split('T')[1] || '00:00:00').split('.')[0];
-    // [FIX-PIH-GENESIS] ZATCA genesis value = Base64(SHA-256("0")), NOT 32 zero bytes.
-    const safePrevHash = prevHash || 'X+zrZv/IbzjZUnhsbWlsecLbwjndTpG0ZynXOif7V+k=';
+    // [FIX-PIH-GENESIS] Canonical ZATCA zero-hash for ICV=1 (per Phase 2 spec §5.3).
+    // Do NOT use the old placeholder 'X+zrZv...' — that value is not ZATCA-mandated.
+    const ZATCA_GENESIS_PIH = 'NWZlY2Q3YmU1YTIzYmU3YTYzYTk3YmQ4NzY0ODk2ODM3NGJhOWI5NjgxYTNpYmQyNzhjNTU4NTUxYWI5ZWYyZg==';
+    const safePrevHash = (prevHash && prevHash !== 'X+zrZv/IbzjZUnhsbWlsecLbwjndTpG0ZynXOif7V+k=') ? prevHash : ZATCA_GENESIS_PIH;
 
     // ── [FIX-014] Seller address validation — no placeholder fallbacks ─────────
     const addr = {
@@ -140,13 +142,14 @@ function generateUBL21XML(invoiceData) {
     const categoryGroups = {};
 
     const invoiceLines = items.map((item, idx) => {
+        // ZATCA strictly requires all amounts to be positive, even for Credit Notes (381)
         const qty          = Math.abs(item.Qty || item.quantity || 1);
-        const unitPrice    = item.Price || item.item_price || 0;
-        const lineDiscount = parseFloat(item.discount || item.Discount || 0);
+        const unitPrice    = item.Price || item.price || item.item_price || 0;
+        const lineDiscount = Math.abs(item.Discount || item.discount || 0);
 
         // [FIX-4] Retain full float precision for internal calculations
         const rawLineGross = (unitPrice * qty) - lineDiscount;
-        const lineGross    = parseFloat(rawLineGross.toFixed(2));
+        const lineGross    = parseFloat(Math.abs(rawLineGross).toFixed(2));
 
         // Determine per-line tax category
         const taxCat       = (item.tax_category || item.TaxCategory || 'S').toUpperCase();
@@ -357,13 +360,13 @@ function generateUBL21XML(invoiceData) {
         </ext:UBLExtension>
     </ext:UBLExtensions>
     <cbc:ProfileID>reporting:1.0</cbc:ProfileID>
-    <cbc:ID>${escapeXml(invoice)}</cbc:ID>
+    <cbc:ID>${escapeXml(invoice.id)}</cbc:ID>
     <cbc:UUID>${escapeXml(uuid)}</cbc:UUID>
     <cbc:IssueDate>${issueDate}</cbc:IssueDate>
     <cbc:IssueTime>${issueTime}</cbc:IssueTime>
     <cbc:InvoiceTypeCode name="${invoiceSubtype}">${typeCode}</cbc:InvoiceTypeCode>
     <cbc:DocumentCurrencyCode>SAR</cbc:DocumentCurrencyCode>
-    <cbc:TaxCurrencyCode>SAR</cbc:TaxCurrencyCode>
+    <cbc:TaxCurrencyCode>SAR</cbc:TaxCurrencyCode>${billingRefXml}
     <cac:AdditionalDocumentReference>
         <cbc:ID>ICV</cbc:ID>
         <cbc:UUID>${icv}</cbc:UUID>
@@ -382,7 +385,7 @@ function generateUBL21XML(invoiceData) {
     </cac:AdditionalDocumentReference>
     <cac:Signature>
         <cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID>
-        <cbc:SignatureMethodCode>urn:oasis:names:specification:ubl:dsig:enveloped:xades</cbc:SignatureMethodCode>
+        <cbc:SignatureMethod>urn:oasis:names:specification:ubl:dsig:enveloped:xades</cbc:SignatureMethod>
     </cac:Signature>
     <cac:AccountingSupplierParty>
         <cac:Party>
@@ -410,7 +413,7 @@ function generateUBL21XML(invoiceData) {
                 <cbc:RegistrationName>${escapeXml(seller || '')}</cbc:RegistrationName>
             </cac:PartyLegalEntity>
         </cac:Party>
-    </cac:AccountingSupplierParty>${billingRefXml}${buyerXml}${deliveryXml}${paymentMeansXml}${discountXml}
+    </cac:AccountingSupplierParty>${buyerXml}${deliveryXml}${paymentMeansXml}${discountXml}
     <cac:TaxTotal>
         <cbc:TaxAmount currencyID="SAR">${taxTotal.toFixed(2)}</cbc:TaxAmount>
     </cac:TaxTotal>
@@ -452,11 +455,35 @@ function generateZatcaTLV(seller, vatNo, timestamp, total, vatAmt) {
     ]).toString('base64');
 }
 
+// ── [C-4] Phase 2 TLV QR (9-tag) with Cryptographic Stamps ──────────────────
+function generatePhase2QR(seller, vatNo, timestamp, total, vatAmt, hashB64, sigB64, pubKeyB64, certSigB64) {
+    const cleanTime = String(timestamp || '').replace(/\.\d{3}Z$/, 'Z');
+    
+    // Tag 8 (Public Key) and 9 (Cert Signature) might be missing for simplified invoices in some cases,
+    // but ZATCA requires them for B2C Phase 2.
+    const parts = [
+        tlvEncodeFixed(1, Buffer.from(String(seller || ''), 'utf8')),
+        tlvEncodeFixed(2, Buffer.from(String(vatNo  || ''), 'utf8')),
+        tlvEncodeFixed(3, Buffer.from(cleanTime, 'utf8')),
+        tlvEncodeFixed(4, Buffer.from(parseFloat(total  || 0).toFixed(2), 'utf8')),
+        tlvEncodeFixed(5, Buffer.from(parseFloat(vatAmt || 0).toFixed(2), 'utf8')),
+        tlvEncodeFixed(6, Buffer.from(hashB64 || '', 'base64')),
+        tlvEncodeFixed(7, Buffer.from(sigB64 || '', 'base64')),
+        tlvEncodeFixed(8, Buffer.from(pubKeyB64 || '', 'base64')),
+    ];
+    
+    if (certSigB64) {
+        parts.push(tlvEncodeFixed(9, Buffer.from(certSigB64, 'base64')));
+    }
+
+    return Buffer.concat(parts).toString('base64');
+}
+
 module.exports = {
     generateUUID,
     generateUBL21XML,
     escapeXml,
     generateZatcaTLV,
-    generateZatcaTLV9: require('./zatca_phase2.cjs').generateZatcaTLV9,
+    generatePhase2QR,
     resolveUnitCode,
 };

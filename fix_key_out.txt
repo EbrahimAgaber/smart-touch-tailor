@@ -1,0 +1,2 @@
+
+Successfully updated private key in DB to match the Fatoora certificate.

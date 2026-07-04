@@ -1,0 +1,17 @@
+<xades:SignedProperties xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" Id="xadesSignedProperties">
+                                        <xades:SignedSignatureProperties>
+                                            <xades:SigningTime>2026-06-25T18:58:49</xades:SigningTime>
+                                            <xades:SigningCertificate>
+                                                <xades:Cert>
+                                                    <xades:CertDigest>
+                                                        <ds:DigestMethod xmlns:ds="http://www.w3.org/2000/09/xmldsig#" Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+                                                        <ds:DigestValue xmlns:ds="http://www.w3.org/2000/09/xmldsig#">MmY5MmY5N2FjNWY2ZTIzMmU0Mzc3MDMxZTY0ZGM1N2U5YmUzMDBkZmMzOGJmZmI1N2Q0NmNhMGM4OGQ5Mzg0Mw==</ds:DigestValue>
+                                                    </xades:CertDigest>
+                                                    <xades:IssuerSerial>
+                                                        <ds:X509IssuerName xmlns:ds="http://www.w3.org/2000/09/xmldsig#">CN=Test-ZATCA, O=Smart Touch POS, C=SA</ds:X509IssuerName>
+                                                        <ds:X509SerialNumber xmlns:ds="http://www.w3.org/2000/09/xmldsig#">1</ds:X509SerialNumber>
+                                                    </xades:IssuerSerial>
+                                                </xades:Cert>
+                                            </xades:SigningCertificate>
+                                        </xades:SignedSignatureProperties>
+                                    </xades:SignedProperties>

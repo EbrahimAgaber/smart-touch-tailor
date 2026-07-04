@@ -1,6 +1,33 @@
 const crypto = require('crypto');
 const forge  = require('node-forge');
+const asn1   = forge.asn1;
 const axios  = require('axios');
+const path   = require('path');
+const EC     = require('elliptic').ec;
+const ec     = new EC('secp256k1');
+
+// ── Private Key Extraction Helper ─────────────────────────────────────────────
+function extractPrivateKeyHex(pem) {
+    const msg = forge.pem.decode(pem)[0];
+    const asn1Obj = forge.asn1.fromDer(msg.body);
+    if (asn1Obj.value[1].type === forge.asn1.Type.SEQUENCE && asn1Obj.value[2].type === forge.asn1.Type.OCTETSTRING) {
+        // PKCS#8 format
+        const ecPrivateKeyAsn1 = forge.asn1.fromDer(asn1Obj.value[2].value);
+        return forge.util.bytesToHex(ecPrivateKeyAsn1.value[1].value);
+    } else if (asn1Obj.value[1].type === forge.asn1.Type.OCTETSTRING) {
+        // SEC1 format
+        return forge.util.bytesToHex(asn1Obj.value[1].value);
+    }
+    throw new Error('Unsupported PEM format for EC private key');
+}
+
+function signEcdsaSha256(dataBuffer, privateKeyPem) {
+    const dHex = extractPrivateKeyHex(privateKeyPem);
+    const hash = crypto.createHash('sha256').update(dataBuffer).digest();
+    const keyPair = ec.keyFromPrivate(dHex, 'hex');
+    const signatureDerArray = keyPair.sign(hash).toDER();
+    return Buffer.from(signatureDerArray);
+}
 
 // ── [C4] ZATCA environment URL map ────────────────────────────────────────────
 const ZATCA_URLS = {
@@ -255,10 +282,10 @@ function c14nWithInheritedNS(el) {
         node = node.parentNode;
     }
 
-    // Serialise with C14N 1.1, providing the ancestor map so all in-scope
+    // Serialise with C14N 1.1, providing an empty ancestor map so all in-scope
     // namespaces get rendered on the root element of the subtree.
     const out = [];
-    _c14n11SerialiseElement(el, ancestorNs, out);
+    _c14n11SerialiseElement(el, new Map(), out);
     return out.join('');
 }
 
@@ -319,14 +346,63 @@ function canonicalizeInvoiceXML(xmlString) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Key pair generation ───────────────────────────────────────────────────────
+// NOTE: Electron's BoringSSL strips secp256k1 support entirely — even
+// crypto.generateKeyPairSync('ec', { namedCurve: 'secp256k1' }) throws
+// UNKNOWN_GROUP. We generate the keypair in pure-JS via `elliptic` then
+// DER-encode it to standard PKCS#8 (private) and SPKI (public) PEM so the
+// rest of the pipeline (forge ASN.1 builder, openssl, DB storage) is unaffected.
 function generateDeviceKeyPair() {
-    const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', {
-        namedCurve: 'secp256k1',
-        publicKeyEncoding:  { type: 'spki',  format: 'pem' },
-        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-    });
-    return { privateKeyPem: privateKey, publicKeyPem: publicKey };
+    const keyPair = ec.genKeyPair();
+    const dHex = keyPair.getPrivate('hex').padStart(64, '0');
+    const pubPoint = keyPair.getPublic();
+    const uncompressedHex = pubPoint.encode('hex', false); // 04 || x || y
+
+    const dBuf = Buffer.from(dHex, 'hex');
+    const pubBuf = Buffer.from(uncompressedHex, 'hex');
+    const _asn1 = forge.asn1;
+
+    // ECPrivateKey (RFC 5915) — wraps d scalar + public point
+    const ecPrivateKey = _asn1.create(_asn1.Class.UNIVERSAL, _asn1.Type.SEQUENCE, true, [
+        _asn1.create(_asn1.Class.UNIVERSAL, _asn1.Type.INTEGER, false, String.fromCharCode(0x01)),
+        _asn1.create(_asn1.Class.UNIVERSAL, _asn1.Type.OCTETSTRING, false,
+            forge.util.createBuffer(dBuf).getBytes()),
+        _asn1.create(_asn1.Class.CONTEXT_SPECIFIC, 1, true, [
+            _asn1.create(_asn1.Class.UNIVERSAL, _asn1.Type.BITSTRING, false,
+                String.fromCharCode(0x00) + forge.util.createBuffer(pubBuf).getBytes()),
+        ]),
+    ]);
+    const ecPrivateKeyDer = _asn1.toDer(ecPrivateKey).getBytes();
+
+    // PKCS#8 PrivateKeyInfo
+    const pkcs8 = _asn1.create(_asn1.Class.UNIVERSAL, _asn1.Type.SEQUENCE, true, [
+        _asn1.create(_asn1.Class.UNIVERSAL, _asn1.Type.INTEGER, false, String.fromCharCode(0x00)),
+        _asn1.create(_asn1.Class.UNIVERSAL, _asn1.Type.SEQUENCE, true, [
+            _asn1.create(_asn1.Class.UNIVERSAL, _asn1.Type.OID, false,
+                _asn1.oidToDer('1.2.840.10045.2.1').getBytes()),  // ecPublicKey
+            _asn1.create(_asn1.Class.UNIVERSAL, _asn1.Type.OID, false,
+                _asn1.oidToDer('1.3.132.0.10').getBytes()),        // secp256k1
+        ]),
+        _asn1.create(_asn1.Class.UNIVERSAL, _asn1.Type.OCTETSTRING, false, ecPrivateKeyDer),
+    ]);
+
+    // SPKI SubjectPublicKeyInfo
+    const spki = _asn1.create(_asn1.Class.UNIVERSAL, _asn1.Type.SEQUENCE, true, [
+        _asn1.create(_asn1.Class.UNIVERSAL, _asn1.Type.SEQUENCE, true, [
+            _asn1.create(_asn1.Class.UNIVERSAL, _asn1.Type.OID, false,
+                _asn1.oidToDer('1.2.840.10045.2.1').getBytes()),
+            _asn1.create(_asn1.Class.UNIVERSAL, _asn1.Type.OID, false,
+                _asn1.oidToDer('1.3.132.0.10').getBytes()),
+        ]),
+        _asn1.create(_asn1.Class.UNIVERSAL, _asn1.Type.BITSTRING, false,
+            String.fromCharCode(0x00) + forge.util.createBuffer(pubBuf).getBytes()),
+    ]);
+
+    const privateKeyPem = forge.pem.encode({ type: 'PRIVATE KEY', body: _asn1.toDer(pkcs8).getBytes() });
+    const publicKeyPem  = forge.pem.encode({ type: 'PUBLIC KEY',  body: _asn1.toDer(spki).getBytes()  });
+
+    return { privateKeyPem, publicKeyPem };
 }
+
 
 // ── CSR generation — pure in-memory, no OpenSSL / temp files ──────────────────
 //
@@ -341,20 +417,21 @@ function generateDeviceKeyPair() {
 function generateCSR(privateKeyPem, publicKeyPem, info) {
     const asn1 = forge.asn1;
 
-    let templateName;
+    let templateName = 'ZATCA-Code-Signing';
     const resolvedEnv = _resolveEnv(info.environment || info.isSandbox);
     if (resolvedEnv === 'sandbox') {
         templateName = 'TESTZATCA-Code-Signing';
     } else if (resolvedEnv === 'simulation') {
         templateName = 'PREZATCA-Code-Signing';
-    } else {
-        templateName = 'ZATCA-Code-Signing';
     }
 
     const ORG    = info.ORG    || 'Smart Touch POS';
     const OU     = info.OU     || 'Main Branch';
     const CN     = info.CN     || 'ZATCA-EGS';
-    const EGS_SN = info.EGS_SN || '1-SmartTouch|2-POS|3-001';
+    let EGS_SN = info.EGS_SN || '1-SmartTouch|2-POS|3-001';
+    if (!EGS_SN.includes('|')) {
+        EGS_SN = `1-SmartTouch|2-POS|3-${EGS_SN}`;
+    }
     const UID    = info.UID    || '310000000000003';
     const IND    = info.IND    || 'Retail';
 
@@ -432,9 +509,7 @@ function generateCSR(privateKeyPem, publicKeyPem, info) {
     const criDer = Buffer.from(asn1.toDer(cri).getBytes(), 'binary');
 
     // ── Sign the CRI with the device's secp256k1 private key (ECDSA-SHA256) ───
-    const signer = crypto.createSign('SHA256');
-    signer.update(criDer);
-    const derSignature = signer.sign(privateKeyPem); // already DER-encoded ECDSA sig
+    const derSignature = signEcdsaSha256(criDer, privateKeyPem); // already DER-encoded ECDSA sig
 
     // ecdsa-with-SHA256 = 1.2.840.10045.4.3.2 (no parameters for EC sig algs)
     const signatureAlgorithm = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
@@ -570,29 +645,56 @@ function signInvoiceXML(xmlString, privateKeyPem, certPem, timestamp) {
         .replace(/-----BEGIN CERTIFICATE-----/g, '')
         .replace(/-----END CERTIFICATE-----/g, '')
         .replace(/[\n\r]/g, '');
-    const certHashB64 = crypto.createHash('sha256').update(cleanCertBase64, 'base64').digest('base64');
+    const certHashHex = crypto.createHash('sha256').update(cleanCertBase64, 'utf8').digest('hex');
+    const certHashB64 = Buffer.from(certHashHex, 'utf8').toString('base64');
 
     let issuerName = '';
     let serialNumber = '';
     try {
-        const x509 = new crypto.X509Certificate(certPem);
+        const forge = require('node-forge');
+        const der = forge.util.decode64(cleanCertBase64);
+        const obj = forge.asn1.fromDer(der, false); // strict=false to ignore trailing padding
+        const tbs = obj.value[0];
+        
+        let idx = 0;
+        if (tbs.value[idx].tagClass === forge.asn1.Class.CONTEXT_SPECIFIC) {
+            idx++; // skip version
+        }
+        const serialObj = tbs.value[idx++];
+        const serialHex = forge.util.bytesToHex(serialObj.value);
+        idx++; // skip signature
+        const issuerSeq = tbs.value[idx++];
+
+        const rdns = [];
+        const oidMap = { '2.5.4.3': 'CN', '2.5.4.6': 'C', '2.5.4.7': 'L', '2.5.4.8': 'ST', '2.5.4.10': 'O', '2.5.4.11': 'OU' };
+        for (const set of issuerSeq.value) {
+            for (const seq of set.value) {
+                const oid = forge.asn1.derToOid(seq.value[0].value);
+                const valObj = seq.value[1];
+                let val = valObj.value;
+                if (valObj.type === forge.asn1.Type.UTF8) {
+                    val = forge.util.decodeUtf8(val);
+                }
+                rdns.push(`${oidMap[oid] || oid}=${val}`);
+            }
+        }
+        const issuerString = rdns.reverse().join(', ');
+
         const escapeXml = (s) => String(s)
             .replace(/&/g, '&amp;').replace(/</g, '&lt;')
             .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 
-        issuerName = escapeXml(
-            x509.issuer.split('\n').reverse().join(', ')
-        );
-        serialNumber = BigInt('0x' + x509.serialNumber.replace(/:/g, '')).toString(10);
+        issuerName = escapeXml(issuerString);
+        serialNumber = BigInt('0x' + serialHex).toString(10);
     } catch (e) {
-        console.warn('[ZATCA XAdES] Could not parse X509 for IssuerSerial:', e.message);
+        console.warn('[ZATCA XAdES] Could not parse X509 for IssuerSerial (ASN.1 Walk):', e.message);
     }
 
     const signingTime = String(timestamp || new Date().toISOString()).replace(/\.\d{3}Z$/, 'Z');
 
-    const dummyEnvelope = `
-    <ext:UBLExtensions>
+    const dummyEnvelope = `<ext:UBLExtensions>
         <ext:UBLExtension>
+            <cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID>
             <ext:ExtensionURI>urn:oasis:names:specification:ubl:dsig:enveloped:xades</ext:ExtensionURI>
             <ext:ExtensionContent>
                 <sig:UBLDocumentSignatures xmlns:sig="urn:oasis:names:specification:ubl:schema:xsd:CommonSignatureComponents-2" xmlns:sac="urn:oasis:names:specification:ubl:schema:xsd:SignatureAggregateComponents-2" xmlns:sbc="urn:oasis:names:specification:ubl:schema:xsd:SignatureBasicComponents-2">
@@ -661,10 +763,19 @@ function signInvoiceXML(xmlString, privateKeyPem, certPem, timestamp) {
     const docStr = injectUBLExtensions(xmlString, dummyEnvelope);
     const doc = new DOMParser().parseFromString(docStr, 'application/xml');
 
-    // [FIX-2] Use C14N 1.1 for SignedProperties hash
-    const signedPropsNode = xpath.select("//*[local-name()='SignedProperties']", doc)[0];
-    const c14nSignedProps = c14nWithInheritedNS(signedPropsNode);
-    const signedPropsHashB64 = crypto.createHash('sha256').update(c14nSignedProps, 'utf8').digest('base64');
+    let signedPropsForHashing = dummyEnvelope.substring(
+        dummyEnvelope.indexOf('<xades:SignedProperties Id="xadesSignedProperties">'),
+        dummyEnvelope.indexOf('</xades:SignedProperties>') + '</xades:SignedProperties>'.length
+    );
+    signedPropsForHashing = signedPropsForHashing
+        .replace('<xades:SignedProperties Id="xadesSignedProperties">', '<xades:SignedProperties xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" Id="xadesSignedProperties">')
+        .replace('<ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>', '<ds:DigestMethod xmlns:ds="http://www.w3.org/2000/09/xmldsig#" Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>')
+        .replace('<ds:DigestValue>', '<ds:DigestValue xmlns:ds="http://www.w3.org/2000/09/xmldsig#">')
+        .replace('<ds:X509IssuerName>', '<ds:X509IssuerName xmlns:ds="http://www.w3.org/2000/09/xmldsig#">')
+        .replace('<ds:X509SerialNumber>', '<ds:X509SerialNumber xmlns:ds="http://www.w3.org/2000/09/xmldsig#">');
+
+    const signedPropsHashHex = crypto.createHash('sha256').update(signedPropsForHashing, 'utf8').digest('hex');
+    const signedPropsHashB64 = Buffer.from(signedPropsHashHex, 'utf8').toString('base64');
 
     const digestValueNodes = xpath.select(
         "//*[local-name()='Reference' and @URI='#xadesSignedProperties']/*[local-name()='DigestValue']",
@@ -677,11 +788,9 @@ function signInvoiceXML(xmlString, privateKeyPem, certPem, timestamp) {
     // [FIX-2] Use C14N 1.1 for SignedInfo serialisation before ECDSA signing
     const signedInfoNode = xpath.select("//*[local-name()='SignedInfo']", doc)[0];
     const c14nSignedInfo = c14nWithInheritedNS(signedInfoNode);
-    const sign = crypto.createSign('SHA256');
-    sign.update(c14nSignedInfo, 'utf8');
-    const derSignature = sign.sign({ key: privateKeyPem });
-    const p1363Buf = derToP1363(derSignature);
-    const signatureBase64 = p1363Buf.toString('base64');
+    
+    const derSignature = signEcdsaSha256(Buffer.from(c14nSignedInfo, 'utf8'), privateKeyPem);
+    const signatureBase64 = derSignature.toString('base64');
 
     const envelope = dummyEnvelope
         .replace('__SIGNED_PROPS_HASH__', signedPropsHashB64)
@@ -705,27 +814,23 @@ function generateZatcaTLV9(seller, vatNo, timestamp, total, vatAmt, xmlHash, ecd
         return Buffer.concat([Buffer.from([tag]), lenBuf, valueBuf]);
     };
 
-    let pubKeyDer = Buffer.alloc(0);
-    try {
-        if (pubKeyPem) {
-            const b64 = pubKeyPem
-                .replace(/-----BEGIN PUBLIC KEY-----/g, '')
-                .replace(/-----END PUBLIC KEY-----/g, '')
-                .replace(/[\n\r]/g, '');
-            pubKeyDer = Buffer.from(b64, 'base64');
-        }
-    } catch (e) { /* leave empty */ }
+    const cleanTime = String(timestamp || '').replace(/\.\d{3}Z$/, '').replace(/Z$/, '');
 
     const tags = [
         tlvEncode(1, Buffer.from(String(seller || ''), 'utf8')),
         tlvEncode(2, Buffer.from(String(vatNo  || ''), 'utf8')),
-        tlvEncode(3, Buffer.from(String(timestamp || ''), 'utf8')),
+        tlvEncode(3, Buffer.from(cleanTime, 'utf8')),
         tlvEncode(4, Buffer.from(parseFloat(total  || 0).toFixed(2), 'utf8')),
         tlvEncode(5, Buffer.from(parseFloat(vatAmt || 0).toFixed(2), 'utf8')),
     ];
-    if (xmlHash)       tags.push(tlvEncode(6, Buffer.from(xmlHash, 'base64')));
-    if (ecdsaSig)      tags.push(tlvEncode(7, Buffer.from(ecdsaSig, 'base64')));
-    if (pubKeyDer.length > 0) tags.push(tlvEncode(8, pubKeyDer));
+    if (xmlHash)       tags.push(tlvEncode(6, Buffer.from(String(xmlHash), 'utf8')));
+    if (ecdsaSig)      tags.push(tlvEncode(7, Buffer.from(String(ecdsaSig), 'utf8')));
+    
+    if (pubKeyPem) {
+        const pkB64 = pubKeyPem.replace(/-----BEGIN PUBLIC KEY-----/g, '').replace(/-----END PUBLIC KEY-----/g, '').replace(/[\n\r]/g, '');
+        tags.push(tlvEncode(8, Buffer.from(pkB64, 'base64')));
+    }
+    
     if (certSignature) tags.push(tlvEncode(9, Buffer.from(certSignature, 'base64')));
 
     return Buffer.concat(tags).toString('base64');
@@ -778,26 +883,40 @@ function checkCertExpiry(certPem) {
     }
 }
 
-// ── Certificate detail extraction ─────────────────────────────────────────────
 function extractCertDetails(certPem) {
     try {
-        const x509 = new crypto.X509Certificate(certPem);
-        const pubKeyPem = x509.publicKey.export({ type: 'spki', format: 'pem' });
-        const certDer = x509.raw;
-
+        const b64 = certPem
+            .replace(/-----BEGIN CERTIFICATE-----/g, '')
+            .replace(/-----END CERTIFICATE-----/g, '')
+            .replace(/[\n\r]/g, '');
+        
+        const certDer = Buffer.from(b64, 'base64');
         const asn1Obj = forge.asn1.fromDer(forge.util.createBuffer(certDer.toString('binary')));
 
-        const signatureValue = asn1Obj.value[2];
-        let rawBytes = signatureValue.value;
+        let pubKeyPem = '';
+        try {
+            const tbsCertificate = asn1Obj.value[0];
+            const spki = tbsCertificate.value[6];
+            const spkiDer = forge.asn1.toDer(spki).getBytes();
+            const spkiB64 = Buffer.from(spkiDer, 'binary').toString('base64');
+            pubKeyPem = '-----BEGIN PUBLIC KEY-----\n' + (spkiB64.match(/.{1,64}/g) || []).join('\n') + '\n-----END PUBLIC KEY-----\n';
+        } catch (e) {
+            console.error('[ZATCA] extractCertDetails SPKI parse error:', e.message);
+        }
 
-        if (typeof rawBytes === 'string') {
-            rawBytes = Buffer.from(rawBytes, 'binary');
+        const signatureValue = asn1Obj.value[2];
+        let certSignature = '';
+        if (Array.isArray(signatureValue.value)) {
+            // node-forge auto-parsed the BIT STRING contents into ASN.1 objects
+            const innerDer = forge.asn1.toDer(signatureValue.value[0]).getBytes();
+            certSignature = Buffer.from(innerDer, 'binary').toString('base64');
+        } else {
+            let rawBytes = Buffer.from(signatureValue.value, 'binary');
             if (signatureValue.type === forge.asn1.Type.BITSTRING && rawBytes[0] === 0x00) {
                 rawBytes = rawBytes.slice(1);
             }
+            certSignature = Buffer.from(rawBytes).toString('base64');
         }
-
-        const certSignature = Buffer.from(rawBytes).toString('base64');
         return { pubKeyPem, certSignature };
     } catch (e) {
         console.error('[ZATCA] extractCertDetails error:', e.message);

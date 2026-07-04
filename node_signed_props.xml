@@ -1,0 +1,17 @@
+<xades:SignedProperties Id="xadesSignedProperties">
+                                        <xades:SignedSignatureProperties>
+                                            <xades:SigningTime>2026-07-01T22:34:34</xades:SigningTime>
+                                            <xades:SigningCertificate>
+                                                <xades:Cert>
+                                                    <xades:CertDigest>
+                                                        <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+                                                        <ds:DigestValue>NTNmOGMwZGU0OGU4NGFlYzFhMDFhZTI0YmRhN2Q5ODU3MzYwZDkyOGUzYTYwMTI5YjE1NWJmNjQ5NDVmMTljMw==</ds:DigestValue>
+                                                    </xades:CertDigest>
+                                                    <xades:IssuerSerial>
+                                                        <ds:X509IssuerName>CN=Test-ZATCA, O=Smart Touch POS, C=SA</ds:X509IssuerName>
+                                                        <ds:X509SerialNumber>1</ds:X509SerialNumber>
+                                                    </xades:IssuerSerial>
+                                                </xades:Cert>
+                                            </xades:SigningCertificate>
+                                        </xades:SignedSignatureProperties>
+                                    </xades:SignedProperties>

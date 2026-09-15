@@ -9,6 +9,7 @@ export const useCartStore = create(
       promosReady: false,
       promoDiscount: 0,
       appliedPromos: [],
+      manualPromosApplied: [], // array of promo IDs
       selectedCustomer: null,
 
       // ── NEW: item-level data ───────────────────────────────────────────────
@@ -49,8 +50,19 @@ export const useCartStore = create(
         }
       },
 
+      toggleManualPromo: (promoId) => {
+        set((state) => {
+          const manual = state.manualPromosApplied || [];
+          const next = manual.includes(promoId) 
+            ? manual.filter(id => id !== promoId) 
+            : [...manual, promoId];
+          return { manualPromosApplied: next };
+        });
+        get().recalculateTotals();
+      },
+
       // ── ADD ITEM ──────────────────────────────────────────────────────────
-      addItem: (item, modsArr = [], note = '') => {
+      addItem: (item, modsArr = [], note = '', qty = 1) => {
         if (!item) return;
         const effectiveMods = (modsArr && modsArr.length > 0) ? modsArr : (item.Modifiers || []);
         const modKey    = effectiveMods.map(m => m.id).sort().join(',');
@@ -62,10 +74,10 @@ export const useCartStore = create(
           const newOrder = [...(state.order || [])];
           const existingIdx = newOrder.findIndex(o => o.variant === variantId);
           if (existingIdx > -1) {
-            newOrder[existingIdx] = { ...newOrder[existingIdx], Qty: newOrder[existingIdx].Qty + 1 };
+            newOrder[existingIdx] = { ...newOrder[existingIdx], Qty: newOrder[existingIdx].Qty + qty };
           } else {
             newOrder.push({
-              ID: item.ID, Name: item.Name, Price: basePrice, Qty: 1,
+              ID: item.ID, Name: item.Name, Price: basePrice, Qty: qty,
               Barcode: item.Barcode || '',
               Modifiers: effectiveMods, Note: note || '',
               Metadata: item.Metadata || {}, IsService: item.IsService || false,
@@ -184,7 +196,7 @@ export const useCartStore = create(
       clearCart: () => {
         set((state) => ({ 
           lastClearedCart: [...state.order],
-          order: [], subtotal: 0, tax: 0, total: 0, promoDiscount: 0, appliedPromos: [], itemDiscounts: {}, itemNotes: {} 
+          order: [], subtotal: 0, tax: 0, total: 0, promoDiscount: 0, appliedPromos: [], manualPromosApplied: [], itemDiscounts: {}, itemNotes: {} 
         }));
       },
 
@@ -198,11 +210,13 @@ export const useCartStore = create(
 
       // ── RECALCULATE TOTALS ─────────────────────────────────────────────────
       recalculateTotals: () => {
-        const { order = [], promotions = [], itemDiscounts = {} } = get();
+        const { order = [], promotions = [], itemDiscounts = {}, manualPromosApplied = [] } = get();
         const vatRate = parseFloat(window.__vatRate__ || 0.15);
 
         let promoTotalDiscount = 0;
         let applied = [];
+        
+        const isApplicable = (p) => (p.apply_mode !== 'MANUAL') || (manualPromosApplied.includes(p.id));
 
         order.forEach(item => {
           let itemDiscount = 0;
@@ -215,12 +229,12 @@ export const useCartStore = create(
           }
 
           if (promotions && promotions.length > 0) {
-            const bulk = promotions.find(p => p.type === 'BULK' && p.buy_product_id === item.ID && item.Qty >= p.buy_qty);
+            const bulk = promotions.find(p => p.type === 'BULK' && p.buy_product_id === item.ID && item.Qty >= p.buy_qty && isApplicable(p));
             if (bulk) {
               const bulkDisc = (item.Price * item.Qty) * (bulk.discount_value / 100);
               if (bulkDisc > itemDiscount) { itemDiscount = bulkDisc; applied.push({ name: bulk.name, amount: bulkDisc }); }
             }
-            const bogo = promotions.find(p => p.type === 'BOGO' && p.buy_product_id === item.ID && item.Qty >= p.buy_qty);
+            const bogo = promotions.find(p => p.type === 'BOGO' && p.buy_product_id === item.ID && item.Qty >= p.buy_qty && isApplicable(p));
             if (bogo) {
               const freeUnits = Math.floor(item.Qty / bogo.buy_qty) * bogo.get_qty;
               const bogoVal   = freeUnits * item.Price;
@@ -234,7 +248,7 @@ export const useCartStore = create(
         const grossBeforePromo = order.reduce((s, item) => s + (item.Price * item.Qty), 0);
 
         if (promotions && promotions.length > 0) {
-          const totalPromos = promotions.filter(p => p.type === 'TOTAL' && grossBeforePromo >= p.min_spend);
+          const totalPromos = promotions.filter(p => p.type === 'TOTAL' && grossBeforePromo >= p.min_spend && isApplicable(p));
           let bestVal = 0, bestPromo = null;
           for (const p of totalPromos) {
             const val = p.discount_type === 'pct' ? (grossBeforePromo * (p.discount_value / 100)) : p.discount_value;

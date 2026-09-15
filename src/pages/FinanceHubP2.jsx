@@ -32,7 +32,10 @@ const sar = (n, showSign = false) => {
   return fmt;
 };
 const sarColor = (n) => parseFloat(n) >= 0 ? '#10b981' : '#ef4444';
-const today = () => new Date().toISOString().split('T')[0];
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 const monthStart = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`; };
 const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
 
@@ -932,45 +935,147 @@ function VATReturnTab({ api }) {
   const [data, setData]   = useState(null);
   const [loading, setLoading] = useState(false);
   const [range, setRange] = useState({ startDate: monthStart(), endDate: today() });
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(async () => {
+    if (!api?.getVATReturnBoxes) return;
     setLoading(true);
-    const r = await api.getVATReturnBoxes(range);
-    setData(r);
+    try {
+      const r = await api.getVATReturnBoxes(range);
+      if (r && r.error) {
+        console.error('VAT Return load error:', r.error);
+        setData(null);
+      } else {
+        setData(r);
+      }
+    } catch (e) {
+      console.error('VAT Return load failed:', e);
+      setData(null);
+    }
     setLoading(false);
   }, [range, api]);
 
   useEffect(() => { load(); }, [load]);
 
-  const Box = ({ num, label, amount, vat, highlight }) => (
-    <div style={{ background: highlight ? '#eff6ff' : '#f8fafc', border: `1px solid ${highlight ? '#bfdbfe' : '#e2e8f0'}`, borderRadius: '10px', padding: '14px', marginBottom: '8px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#94a3b8' }}>الخانة {num}</span>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>{label}</div>
-        </div>
-        <div style={{ textAlign: 'left' }}>
-          {amount !== undefined && <div style={{ fontSize: '14px', fontFamily: 'monospace', fontWeight: '700' }}>{sar(amount)} ر.س</div>}
-          {vat !== undefined && <div style={{ fontSize: '12px', color: '#8b5cf6', fontFamily: 'monospace' }}>ضريبة: {sar(vat)} ر.س</div>}
+  // Quick period presets
+  const setPreset = (key) => {
+    const d = new Date();
+    let s, e;
+    if (key === 'thisMonth') {
+      s = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+      e = today();
+    } else if (key === 'lastMonth') {
+      const pm = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+      s = `${pm.getFullYear()}-${String(pm.getMonth()+1).padStart(2,'0')}-01`;
+      e = `${pm.getFullYear()}-${String(pm.getMonth()+1).padStart(2,'0')}-${new Date(pm.getFullYear(), pm.getMonth()+1, 0).getDate()}`;
+    } else if (key === 'q1') { s = `${d.getFullYear()}-01-01`; e = `${d.getFullYear()}-03-31`; }
+    else if (key === 'q2') { s = `${d.getFullYear()}-04-01`; e = `${d.getFullYear()}-06-30`; }
+    else if (key === 'q3') { s = `${d.getFullYear()}-07-01`; e = `${d.getFullYear()}-09-30`; }
+    else if (key === 'q4') { s = `${d.getFullYear()}-10-01`; e = `${d.getFullYear()}-12-31`; }
+    setRange({ startDate: s, endDate: e });
+  };
+
+  const handleExportXML = async () => {
+    if (!window.api?.compliance?.exportVAT311) {
+      alert('خدمة تصدير الإقرار الضريبي غير متاحة');
+      return;
+    }
+    setExporting(true);
+    try {
+      const res = await window.api.compliance.exportVAT311(range);
+      if (res?.success) {
+        alert(`تم حفظ ملف الإقرار الضريبي XML بنجاح:\n${res.filePath}`);
+      } else if (res?.error) {
+        alert(`فشل تصدير ملف الإقرار الضريبي:\n${res.error}`);
+      }
+    } catch (e) {
+      alert(`خطأ أثناء تصدير XML:\n${e.message}`);
+    }
+    setExporting(false);
+  };
+
+  // If API is not available, show clear error
+  if (!api?.getVATReturnBoxes) {
+    return (
+      <div style={{ ...S.card, textAlign: 'center', padding: '60px 20px', border: '1.5px dashed #fecaca' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+        <div style={{ fontSize: '18px', fontWeight: '900', color: '#dc2626', marginBottom: '8px' }}>الإقرار الضريبي غير متاح حالياً</div>
+        <div style={{ fontSize: '13px', color: '#64748b', lineHeight: '1.8', maxWidth: '440px', margin: '0 auto' }}>
+          تعذر الاتصال بمحرك المحاسبة المتقدمة (P2).<br/>
+          تأكد من أن التطبيق يعمل بشكل صحيح وأن جميع الخدمات تم تحميلها.
         </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  // Styled row for ZATCA box
+  const BoxRow = ({ num, labelAr, labelEn, amount, vat, isTotal, isResult }) => {
+    const bg = isResult ? (vat < 0 ? '#ecfdf5' : '#fef2f2') : isTotal ? '#f8fafc' : 'white';
+    const borderColor = isResult ? (vat < 0 ? '#bbf7d0' : '#fecaca') : isTotal ? '#e2e8f0' : '#f1f5f9';
+    return (
+      <div style={{
+        display: 'grid', gridTemplateColumns: '50px 1fr 160px 160px',
+        alignItems: 'center', padding: '14px 18px', background: bg,
+        border: `1px solid ${borderColor}`, borderRadius: '10px', marginBottom: '6px',
+        transition: 'transform 0.15s, box-shadow 0.15s',
+      }}>
+        <div style={{
+          width: '32px', height: '32px', borderRadius: '8px',
+          background: isResult ? (vat < 0 ? '#10b981' : '#ef4444') : '#3b82f6',
+          color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '12px', fontWeight: '900', fontFamily: 'monospace'
+        }}>{num}</div>
+        <div style={{ paddingRight: '12px' }}>
+          <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>{labelAr}</div>
+          <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '600' }}>{labelEn}</div>
+        </div>
+        <div style={{ textAlign: 'left', fontSize: '14px', fontWeight: '800', fontFamily: "'Inter', monospace", color: '#374151' }}>
+          {amount !== undefined ? `${sar(amount)} ر.س` : '—'}
+        </div>
+        <div style={{ textAlign: 'left', fontSize: '14px', fontWeight: '800', fontFamily: "'Inter', monospace", color: isResult ? (vat < 0 ? '#059669' : '#dc2626') : '#8b5cf6' }}>
+          {vat !== undefined ? `${sar(Math.abs(vat))} ر.س` : '—'}
+        </div>
+      </div>
+    );
+  };
+
+  const netVAT = data ? parseFloat(data.box9_vat_due || 0) : 0;
+  const outputVAT = data ? parseFloat(data.box1_standard_vat || 0) : 0;
+  const inputVAT = data ? parseFloat(data.box5_input_vat || 0) : 0;
+  const maxBar = Math.max(outputVAT, inputVAT, 1);
 
   return (
     <div>
+      {/* Controls */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div><span style={S.label}>من</span><input type="date" value={range.startDate} onChange={e => setRange(r => ({...r, startDate: e.target.value}))} style={{ ...S.input, width: '150px' }}/></div>
         <div><span style={S.label}>إلى</span><input type="date" value={range.endDate} onChange={e => setRange(r => ({...r, endDate: e.target.value}))} style={{ ...S.input, width: '150px' }}/></div>
         <button onClick={load} style={S.btn()}><RefreshCw size={13}/> تحديث</button>
-        <div style={{ marginRight: 'auto' }}>
+
+        {/* Period presets */}
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+          {[['thisMonth','الشهر الحالي'],['lastMonth','الشهر الماضي'],['q1','ر1'],['q2','ر2'],['q3','ر3'],['q4','ر4']].map(([k,l]) => (
+            <button key={k} onClick={() => setPreset(k)} style={{
+              padding: '5px 10px', borderRadius: '6px', border: '1px solid #e2e8f0',
+              background: 'white', color: '#64748b', fontSize: '11px', fontWeight: '700',
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}>{l}</button>
+          ))}
+        </div>
+
+        <div style={{ marginRight: 'auto', display: 'flex', gap: '8px' }}>
+          {window.api?.compliance?.exportVAT311 && (
+            <button onClick={handleExportXML} disabled={exporting} style={{ ...S.btn('#059669'), opacity: exporting ? 0.5 : 1 }}>
+              <FileText size={13}/> {exporting ? 'جاري التصدير...' : 'تصدير XML للهيئة'}
+            </button>
+          )}
           <ExportToolbar
             getRows={() => data ? [
               ['Box 1 — مبيعات 15%', sar(data.box1_standard_amount), sar(data.box1_standard_vat)],
               ['Box 2 — مبيعات صفر', sar(data.box2_zero_rated), '0.00'],
               ['Box 3 — مبيعات معفاة', sar(data.box3_exempt), '0.00'],
-              ['Box 9 — مشتريات 15%', sar(data.box9_purchase_amount), sar(data.box9_purchase_vat)],
-              ['Box 13 — صافي الضريبة', '', sar(data.box13_net_vat)],
+              ['Box 5 — مشتريات 15%', sar(data.box5_input_amount), sar(data.box5_input_vat)],
+              ['Box 9 — صافي الضريبة', '', sar(data.box9_vat_due)],
             ] : []}
             headers={['البند','المبلغ','ضريبة القيمة المضافة']}
             sheetName="إقرار ضريبة" filename={`vat_return_${range.startDate}_${range.endDate}.xlsx`}
@@ -979,28 +1084,110 @@ function VATReturnTab({ api }) {
       </div>
 
       {loading && <Loading />}
+
+      {/* Zero-state when no data */}
+      {!loading && !data && (
+        <div style={{ ...S.card, textAlign: 'center', padding: '60px 20px', border: '1.5px dashed #e2e8f0' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+          <div style={{ fontSize: '16px', fontWeight: '800', color: '#374151', marginBottom: '8px' }}>لا توجد بيانات ضريبية في هذه الفترة</div>
+          <div style={{ fontSize: '13px', color: '#94a3b8', lineHeight: '1.8' }}>
+            تأكد من وجود مبيعات أو مصروفات مسجلة في الفترة من <strong>{range.startDate}</strong> إلى <strong>{range.endDate}</strong>
+          </div>
+        </div>
+      )}
+
       {!loading && data && (
-        <div style={{ maxWidth: '600px' }}>
-          <div style={{ fontSize: '16px', fontWeight: '900', marginBottom: '16px', color: '#0f172a' }}>إقرار ضريبة القيمة المضافة — ZATCA</div>
+        <div style={{ maxWidth: '820px' }}>
+          {/* Header */}
+          <div style={{
+            background: 'linear-gradient(135deg, #1e3a5f, #0f172a)', color: 'white',
+            padding: '24px 28px', borderRadius: '16px 16px 0 0',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+          }}>
+            <div>
+              <div style={{ fontSize: '18px', fontWeight: '900', letterSpacing: '0.02em' }}>إقرار ضريبة القيمة المضافة</div>
+              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>VAT Return — ZATCA Form</div>
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: '11px', color: '#64748b' }}>الفترة الضريبية</div>
+              <div style={{ fontSize: '13px', fontWeight: '700', fontFamily: 'monospace' }}>{range.startDate} → {range.endDate}</div>
+            </div>
+          </div>
 
-          <div style={{ fontSize: '13px', fontWeight: '700', color: '#64748b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>المبيعات</div>
-          <Box num={1} label="المبيعات الخاضعة للضريبة (15%)" amount={data.box1_standard_amount} vat={data.box1_standard_vat} highlight />
-          <Box num={2} label="المبيعات معدومة الضريبة" amount={data.box2_zero_rated} />
-          <Box num={3} label="المبيعات المعفاة" amount={data.box3_exempt} />
-          <Box num={4} label="إجمالي المبيعات" amount={data.box4_total_sales} highlight />
+          <div style={{ background: 'white', border: '1px solid #e2e8f0', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '24px' }}>
+            {/* Column Headers */}
+            <div style={{ display: 'grid', gridTemplateColumns: '50px 1fr 160px 160px', padding: '8px 18px', marginBottom: '8px' }}>
+              <div style={{ fontSize: '10px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase' }}>الخانة</div>
+              <div style={{ fontSize: '10px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase' }}>البيان</div>
+              <div style={{ fontSize: '10px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', textAlign: 'left' }}>المبلغ</div>
+              <div style={{ fontSize: '10px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', textAlign: 'left' }}>الضريبة</div>
+            </div>
 
-          <div style={{ fontSize: '13px', fontWeight: '700', color: '#64748b', marginBottom: '8px', marginTop: '16px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>المشتريات</div>
-          <Box num={5} label="المشتريات الخاضعة للضريبة" amount={data.box5_input_amount} vat={data.box5_input_vat} highlight />
+            {/* Sales Section */}
+            <div style={{ fontSize: '12px', fontWeight: '800', color: '#3b82f6', marginBottom: '8px', padding: '8px 18px', background: '#eff6ff', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '14px' }}>📤</span> المبيعات / Sales
+            </div>
+            <BoxRow num="1" labelAr="المبيعات الخاضعة للضريبة بالنسبة الأساسية" labelEn="Standard Rated Sales (15%)" amount={data.box1_standard_amount} vat={data.box1_standard_vat} />
+            <BoxRow num="2" labelAr="المبيعات الخاضعة لنسبة الصفر" labelEn="Zero-Rated Domestic Sales" amount={data.box2_zero_rated} vat={0} />
+            <BoxRow num="3" labelAr="المبيعات المعفاة" labelEn="Exempt Sales" amount={data.box3_exempt} vat={0} />
+            <BoxRow num="4" labelAr="إجمالي المبيعات" labelEn="Total Sales" amount={data.box4_total_sales} isTotal />
 
-          <div style={{ background: data.is_refund ? '#fef3c7' : '#f0fdf4', border: `1px solid ${data.is_refund ? '#fcd34d' : '#bbf7d0'}`, borderRadius: '12px', padding: '20px', marginTop: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: '12px', color: '#64748b' }}>الخانة 9 — {data.is_refund ? 'ضريبة مستردة' : 'ضريبة مستحقة'}</div>
-                <div style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a', marginTop: '2px' }}>صافي ضريبة القيمة المضافة</div>
+            {/* Purchases Section */}
+            <div style={{ fontSize: '12px', fontWeight: '800', color: '#10b981', marginBottom: '8px', marginTop: '16px', padding: '8px 18px', background: '#ecfdf5', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '14px' }}>📥</span> المشتريات / Purchases
+            </div>
+            <BoxRow num="5" labelAr="المشتريات الخاضعة للضريبة بالنسبة الأساسية" labelEn="Standard Rated Purchases (15%)" amount={data.box5_input_amount} vat={data.box5_input_vat} />
+
+            {/* Visual VAT Gauge */}
+            <div style={{ margin: '20px 0', padding: '18px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: '#64748b', marginBottom: '12px' }}>مقارنة ضريبة المخرجات والمدخلات</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#ef4444' }}>المخرجات</span>
+                    <span style={{ fontSize: '12px', fontWeight: '800', color: '#ef4444', fontFamily: 'monospace' }}>{sar(outputVAT)}</span>
+                  </div>
+                  <div style={{ height: '8px', background: '#fee2e2', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', background: 'linear-gradient(90deg, #ef4444, #f87171)', borderRadius: '4px', width: `${(outputVAT / maxBar) * 100}%`, transition: 'width 0.5s ease' }} />
+                  </div>
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#10b981' }}>المدخلات</span>
+                    <span style={{ fontSize: '12px', fontWeight: '800', color: '#10b981', fontFamily: 'monospace' }}>{sar(inputVAT)}</span>
+                  </div>
+                  <div style={{ height: '8px', background: '#d1fae5', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', background: 'linear-gradient(90deg, #10b981, #34d399)', borderRadius: '4px', width: `${(inputVAT / maxBar) * 100}%`, transition: 'width 0.5s ease' }} />
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: '28px', fontWeight: '900', fontFamily: 'monospace', color: data.is_refund ? '#d97706' : '#10b981' }}>
-                {sar(Math.abs(data.box9_vat_due))} ر.س
-                {data.is_refund && <span style={{ fontSize: '14px', marginRight: '8px', color: '#d97706' }}>(مبلغ مسترد)</span>}
+            </div>
+
+            {/* Net Result — Box 9 */}
+            <BoxRow num="9" labelAr={netVAT >= 0 ? 'صافي ضريبة القيمة المضافة المستحقة' : 'صافي ضريبة القيمة المضافة المستردة'} labelEn={netVAT >= 0 ? 'Net VAT Due' : 'Net VAT Refundable'} amount={undefined} vat={data.box9_vat_due} isResult />
+
+            {/* Big Result Banner */}
+            <div style={{
+              marginTop: '16px', padding: '24px', borderRadius: '14px',
+              background: data.is_refund ? 'linear-gradient(135deg, #fef3c7, #fffbeb)' : 'linear-gradient(135deg, #f0fdf4, #ecfdf5)',
+              border: `1.5px solid ${data.is_refund ? '#fcd34d' : '#86efac'}`,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>
+                  {data.is_refund ? '💰 مبلغ مسترد لصالح المنشأة' : netVAT > 0 ? '💳 ضريبة مستحقة الدفع للهيئة' : '⚖️ لا ضريبة مستحقة'}
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                  الخانة 9 — صافي ضريبة القيمة المضافة
+                </div>
+              </div>
+              <div style={{
+                fontSize: '36px', fontWeight: '900', fontFamily: "'Inter', monospace",
+                color: data.is_refund ? '#d97706' : netVAT > 0 ? '#dc2626' : '#059669',
+                direction: 'ltr'
+              }}>
+                {sar(Math.abs(data.box9_vat_due))}
+                <span style={{ fontSize: '16px', fontWeight: '600', color: '#94a3b8', marginLeft: '4px' }}>ر.س</span>
               </div>
             </div>
           </div>
@@ -1371,7 +1558,7 @@ function SubsidiaryTab({ api }) {
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'flex-end' }}>
             <div><span style={S.label}>من</span><input type="date" value={range.startDate} onChange={e => setRange(r => ({...r, startDate: e.target.value}))} style={{ ...S.input, width: '140px' }}/></div>
             <div><span style={S.label}>إلى</span><input type="date" value={range.endDate} onChange={e => setRange(r => ({...r, endDate: e.target.value}))} style={{ ...S.input, width: '140px' }}/></div>
-            <select value={selectedId||''} onChange={e => loadCust(parseInt(e.target.value))} style={{ ...S.select, width: '220px', alignSelf: 'flex-end' }}>
+            <select value={selectedId||''} onChange={e => e.target.value ? loadCust(parseInt(e.target.value)) : setSelectedId(null)} style={{ ...S.select, width: '220px', alignSelf: 'flex-end' }}>
               <option value="">اختر عميل...</option>
               {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -1385,7 +1572,7 @@ function SubsidiaryTab({ api }) {
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'flex-end' }}>
             <div><span style={S.label}>من</span><input type="date" value={range.startDate} onChange={e => setRange(r => ({...r, startDate: e.target.value}))} style={{ ...S.input, width: '140px' }}/></div>
             <div><span style={S.label}>إلى</span><input type="date" value={range.endDate} onChange={e => setRange(r => ({...r, endDate: e.target.value}))} style={{ ...S.input, width: '140px' }}/></div>
-            <select value={selectedId||''} onChange={e => loadSupp(parseInt(e.target.value))} style={{ ...S.select, width: '220px', alignSelf: 'flex-end' }}>
+            <select value={selectedId||''} onChange={e => e.target.value ? loadSupp(parseInt(e.target.value)) : setSelectedId(null)} style={{ ...S.select, width: '220px', alignSelf: 'flex-end' }}>
               <option value="">اختر مورد...</option>
               {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>

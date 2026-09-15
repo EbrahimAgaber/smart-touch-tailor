@@ -1,0 +1,105 @@
+/* ═══════════════════════════════════════════════════════
+   البصمة الذكية — Smart Touch POS
+   Brand Design System Tokens  |  v2 2026-07-31
+   ═══════════════════════════════════════════════════════ */
+
+/* Always load brand fonts first */
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Inter:wght@300;400;600;700&display=swap');
+
+:root {
+  /* ── Backgrounds ── */
+  --bg:          #F4F6FB;   /* Main page background — soft cool-white */
+  --bg-white:    #FFFFFF;   /* Cards, nav, footer */
+  --bg-2:        #EAF0FB;   /* Slightly deeper section background */
+
+  /* Legacy aliases used by Tailwind theme tokens */
+  --bg-base:     #F4F6FB;
+  --bg-surface:  #FFFFFF;
+  --bg-raised:   #EAF0FB;
+
+  /* ── Brand Blues (PRIMARY) ── */
+  --brand:       #3D52D5;   /* ★ THE brand color — royal blue */
+  --brand-dark:  #2D3FAA;   /* Hover/pressed variant */
+  --brand-light: #6478E8;   /* Lighter tint — highlights, gradients */
+  --brand-bg:    rgba(61, 82, 213, 0.06);   /* Tinted surface */
+  --brand-glow:  rgba(61, 82, 213, 0.22);   /* Shadow/glow on brand buttons */
+
+  /* Legacy aliases used across scenes */
+  --accent:       #3D52D5;
+  --accent-hover: #2D3FAA;
+
+  /* ── Semantic Colors ── */
+  --green:       #0DAF7A;   /* Success, ZATCA approved */
+  --green-bg:    rgba(13, 175, 122, 0.08);
+  --amber:       #F59E0B;   /* Warning, pending */
+  --amber-bg:    rgba(245, 158, 11, 0.08);
+  --red:         #EF4444;   /* Error, destructive */
+  --red-bg:      rgba(239, 68, 68, 0.08);
+  --cyan:        #0891B2;   /* Secondary accent — gradients, charts */
+
+  /* Legacy aliases */
+  --success:  #0DAF7A;
+  --warning:  #F59E0B;
+  --danger:   #EF4444;
+  --purple:   #0891B2;   /* Remapped from old purple → brand cyan */
+
+  /* ── Surfaces & Borders ── */
+  --surface:       #FFFFFF;
+  --border:        #DDE3EF;
+  --border-strong: #B8C4DE;
+
+  /* ── Typography ── */
+  --text-1:  #0F172A;   /* Primary text — near-black */
+  --text-2:  #475569;   /* Body / secondary text */
+  --text-3:  #94A3B8;   /* Muted / labels / placeholders */
+
+  /* Legacy aliases */
+  --text-primary: #0F172A;
+  --text-muted:   #475569;
+
+  /* ── Shadows ── */
+  --sh-xs:    0 1px 3px rgba(15, 23, 42, 0.07);
+  --sh-sm:    0 4px 14px rgba(15, 23, 42, 0.09);
+  --sh-md:    0 10px 32px rgba(15, 23, 42, 0.11);
+  --sh-lg:    0 20px 64px rgba(15, 23, 42, 0.13);
+  --sh-brand: 0 8px 28px rgba(61, 82, 213, 0.30);
+
+  /* Legacy glow alias — pointing at brand glow now */
+  --glow-accent: 0 8px 28px rgba(61, 82, 213, 0.30);
+
+  /* ── Typography fonts ── */
+  --font-ui:   'Cairo', sans-serif;
+  --font-en:   'Inter', sans-serif;
+  --font-mono: 'Inter', 'Courier New', monospace;
+
+  /* ── Spacing & Radius ── */
+  --r-sm: 6px;
+  --r:    12px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+
+  /* ── Sidebar (app UI / dark navy accent) ── */
+  --sidebar-bg: #1C2340;
+}
+
+/* ── Base body ── */
+body {
+  background-color: var(--bg);
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* English numbers, codes, prices */
+.price,
+.number,
+.code,
+.en {
+  font-family: var(--font-en);
+}
+
+/* RTL support */
+[dir='rtl'] {
+  font-family: var(--font-ui);
+}

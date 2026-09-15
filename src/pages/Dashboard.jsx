@@ -253,18 +253,21 @@ function ZatcaDashboardCard({ navigate }) {
   const [queue,    setQueue]    = useState(null);
   const [device,   setDevice]   = useState(undefined); // undefined = still loading
   const [retrying, setRetrying] = useState(false);
+  const [phase,    setPhase]    = useState('phase_2');
 
   const refresh = useCallback(async () => {
     try {
-      const [q, d] = await Promise.all([
+      const [q, d, s] = await Promise.all([
         // Support both invoke-style and direct method
         (window.api.getZatcaQueueStatus?.() ??
          window.api.invoke?.('zatca:getQueueStatus')),
         window.api.getZatcaDevice?.(),
+        window.api.getSettings?.()
       ]);
       if (q !== undefined) setQueue(q || null);
       // d can be null (not onboarded) or an object — both are valid
       setDevice(d ?? null);
+      if (s) setPhase(s.zatca_phase || 'phase_2');
     } catch {
       setDevice(null); // treat fetch error as not-onboarded
     }
@@ -285,6 +288,10 @@ function ZatcaDashboardCard({ navigate }) {
     } catch {}
     setRetrying(false);
   };
+
+  if (phase !== 'phase_2') {
+    return null;
+  }
 
   if (!hasZatcaP2) {
     return (

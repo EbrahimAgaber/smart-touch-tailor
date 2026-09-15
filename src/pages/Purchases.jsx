@@ -23,7 +23,7 @@ export default function Purchases() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [cart, setCart] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState('');
-  const [vatIncluded, setVatIncluded] = useState(true);
+  const [addVat, setAddVat] = useState(true);
   const [paidAmount, setPaidAmount] = useState('');
   const [detailOrder, setDetailOrder] = useState(null);
   const [detailItems, setDetailItems] = useState([]);
@@ -76,7 +76,7 @@ export default function Purchases() {
       setEditingOrderId(order.id);
       setSelectedSupplier(order.supplier_id || '');
       setNote(order.note || '');
-      setVatIncluded(order.vat_included !== 0);
+      setAddVat(order.vat_included !== 0);
       setPaidAmount(order.paid_amount || '');
       setCart(items.map(it => ({
         product_id: it.product_id,
@@ -116,11 +116,11 @@ export default function Purchases() {
         return {
           product_id: it.product_id,
           product_name: it.product_name,
-          orderedQty: it.quantity / ppu,   // user-facing qty (e.g. 12 not 144)
+          orderedQty: it.quantity,
           unit_name: it.unit_name || 'وحدة',
           pieces_per_unit: ppu,
-          unit_cost: it.unit_cost * ppu,   // cost per user-facing unit
-          returnQty: it.quantity / ppu,    // default = full return
+          unit_cost: it.unit_cost,
+          returnQty: it.quantity,
         };
       }));
       setShowReturnModal(true);
@@ -230,7 +230,7 @@ export default function Purchases() {
   }, 0);
 
   const netTotal = calculateTotal();
-  const vatAmount = vatIncluded ? parseFloat((netTotal * 0.15).toFixed(2)) : 0;
+  const vatAmount = addVat ? parseFloat((netTotal * 0.15).toFixed(2)) : 0;
   const grossTotal = parseFloat((netTotal + vatAmount).toFixed(2));
   const paid = parseFloat(paidAmount) || 0;
   const remaining = Math.max(0, grossTotal - paid);
@@ -248,7 +248,7 @@ export default function Purchases() {
     const data = {
       supplier_id: parseInt(selectedSupplier),
       total_amount: grossTotal,
-      vat_included: vatIncluded ? 1 : 0,
+      vat_included: addVat ? 1 : 0,
       paid_amount: paid,
       payment_status: paid >= grossTotal ? 'paid' : paid > 0 ? 'partial' : 'unpaid',
       note,
@@ -517,9 +517,10 @@ export default function Purchases() {
                         <th style={{ ...s.invoiceTh, textAlign: 'right', minWidth: '160px' }}>البيان</th>
                         <th style={s.invoiceTh}>الكمية</th>
                         <th style={{ ...s.invoiceTh, minWidth: '90px' }}>الوحدة</th>
-                        <th style={s.invoiceTh}>قطع/وحدة</th>
-                        <th style={s.invoiceTh}>السعر</th>
-                        <th style={s.invoiceTh}>الصافي</th>
+                        <th style={s.invoiceTh}>محتوى الوحدة (قطع)</th>
+                        <th style={s.invoiceTh}>السعر (للوحدة)</th>
+                        {addVat && <th style={s.invoiceTh}>الضريبة (15%)</th>}
+                        <th style={s.invoiceTh}>{addVat ? 'الإجمالي' : 'الصافي'}</th>
                         <th style={{ ...s.invoiceTh, width: '36px' }}></th>
                       </tr>
                     </thead>
@@ -534,7 +535,9 @@ export default function Purchases() {
                         </tr>
                       )}
                       {cart.map((item, idx) => {
-                        const lineTotal = (parseFloat(item.quantity) || 0) * (parseFloat(item.unit_cost) || 0);
+                        const lineSubtotal = (parseFloat(item.quantity) || 0) * (parseFloat(item.unit_cost) || 0);
+                        const lineVat = addVat ? lineSubtotal * 0.15 : 0;
+                        const lineTotal = lineSubtotal + lineVat;
                         const piecesCount = (parseFloat(item.quantity) || 0) * (parseFloat(item.pieces_per_unit) || 1);
                         const costPerPiece = (parseFloat(item.unit_cost) || 0) / (parseFloat(item.pieces_per_unit) || 1);
                         const isDefaultCost = !item.costManuallySet && item.originalCost > 0;
@@ -601,8 +604,14 @@ export default function Purchases() {
                                 )}
                               </div>
                             </td>
+                            {/* VAT Column */}
+                            {addVat && (
+                              <td style={{ ...s.invoiceTd, fontWeight: '700', color: '#d97706', fontSize: '12px', background: '#fffbeb' }}>
+                                {lineVat.toFixed(2)}
+                              </td>
+                            )}
                             {/* Amount */}
-                            <td style={{ ...s.invoiceTd, fontWeight: '800', fontFamily: 'monospace', fontSize: '13px', color: '#0f172a' }}>
+                            <td style={{ ...s.invoiceTd, fontWeight: '800', fontFamily: 'monospace', fontSize: '14px', color: '#0f172a', background: addVat ? '#f8fafc' : 'transparent' }}>
                               {lineTotal.toFixed(2)}
                             </td>
                             {/* Delete */}
@@ -630,7 +639,7 @@ export default function Purchases() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, maxWidth: '340px' }}>
                       {/* VAT Toggle */}
                       <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px 12px' }}>
-                        <input type="checkbox" checked={vatIncluded} onChange={e => setVatIncluded(e.target.checked)}
+                        <input type="checkbox" checked={addVat} onChange={e => setAddVat(e.target.checked)}
                           style={{ width: '16px', height: '16px', accentColor: '#3b82f6' }} />
                         <span style={{ fontSize: '13px', fontWeight: '700', color: '#334155' }}>إضافة ضريبة القيمة المضافة (15%)</span>
                       </label>
@@ -661,11 +670,11 @@ export default function Purchases() {
                             </td>
                           </tr>
                           <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                            <td style={{ padding: '8px 12px', fontWeight: '700', color: vatIncluded ? '#d97706' : '#94a3b8' }}>
+                            <td style={{ padding: '8px 12px', fontWeight: '700', color: addVat ? '#d97706' : '#94a3b8' }}>
                               ضريبة القيمة المضافة (15%)
                             </td>
-                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '800', fontFamily: 'monospace', color: vatIncluded ? '#d97706' : '#94a3b8' }}>
-                              {vatIncluded ? vatAmount.toFixed(2) : '—'}
+                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '800', fontFamily: 'monospace', color: addVat ? '#d97706' : '#94a3b8' }}>
+                              {addVat ? vatAmount.toFixed(2) : '—'}
                             </td>
                           </tr>
                           <tr style={{ background: '#1e293b' }}>
@@ -730,13 +739,13 @@ export default function Purchases() {
                 <tbody>
                   {detailItems.map((it, i) => {
                     const pieces = it.pieces_per_unit || 1;
-                    const displayQty = it.quantity / pieces;
-                    const displayUnitCost = it.unit_cost * pieces;
+                    const displayQty = it.quantity;
+                    const displayUnitCost = it.unit_cost;
                     return (
                       <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '14px', fontWeight: '700' }}>
                           {it.product_name}
-                          {pieces > 1 && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>إجمالي: {it.quantity} قطعة (بمعدل {pieces} قطع/{it.unit_name})</div>}
+                          {pieces > 1 && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>إجمالي القطع: {it.quantity * pieces} قطعة ({pieces} قطع/{it.unit_name})</div>}
                         </td>
                         <td style={{ padding: '14px' }}>
                           {displayQty} {it.unit_name || (it.is_bulk ? (it.bulk_unit_name || 'كرتون') : (it.unit || 'وحدة'))}

@@ -1,19 +1,24 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import AppLayout from '../components/AppLayout';
 import LabelPrintModal from '../components/LabelPrintModal';
+import CategoryCombobox from '../components/CategoryCombobox';
+import { suggestCategory } from '../utils/categoryDictionary';
 import { 
   Package, Search, X, Edit3, Trash2, Barcode, 
   History, Info, Upload, Tag, ArrowUpRight, ArrowDownRight, Save,
-  Download, Zap, Sparkles, Image as ImageIcon, Box
+  Download, Zap, Sparkles, Image as ImageIcon, Box,
+  Copy, ToggleLeft, ToggleRight, Split
 } from 'lucide-react';
 
 const BLANKS = { 
   Name:'', Price:'', Category:'عام', Cost:0, Stock:0, Barcode:'', 
   IsService: false, Unit: 'وحدة / قطعة (PCE)', MinStockLevel: 5,
   BulkUnitName: '', BulkUnitSize: 1, Image: '',
-  Metadata: { requires_serial: false, warranty_days: 0 }
+  IsDivisible: false, SubUnitName: '', PiecesPerUnit: 1,
+  IsFabric: false, LengthAvailable: 0,
+  Metadata: { requires_serial: false, warranty_days: 0, is_weight_based: false }
 };
 
 export default function MenuAdmin() {
@@ -138,6 +143,9 @@ export default function MenuAdmin() {
       IsService: !!item.IsService, Unit: item.Unit || 'وحدة',
       MinStockLevel: item.MinStockLevel || 0, BulkUnitName: item.BulkUnitName || '',
       BulkUnitSize: item.BulkUnitSize || 1, Image: item.Image || '',
+      IsDivisible: !!item.IsDivisible, SubUnitName: item.SubUnitName || '',
+      PiecesPerUnit: item.PiecesPerUnit || 1,
+      IsFabric: !!item.is_fabric, LengthAvailable: item.length_available || 0,
       Metadata: item.Metadata || { requires_serial: false, warranty_days: 0 }
     }); 
     setEditId(item.ID); 
@@ -147,6 +155,20 @@ export default function MenuAdmin() {
     if (!window.confirm(t('menu.form.delete_confirm'))) return; 
     await window.api.deleteMenuItem(id); 
     load(); 
+  };
+
+  const dup = async (id) => {
+    try {
+      await window.api.duplicateProduct(id);
+      load();
+    } catch (e) { console.error('Duplicate failed:', e); }
+  };
+
+  const toggle = async (id) => {
+    try {
+      await window.api.toggleProductActive(id);
+      load();
+    } catch (e) { console.error('Toggle failed:', e); }
   };
 
   const openHistory = async (product) => {
@@ -165,11 +187,28 @@ export default function MenuAdmin() {
     setTimeout(() => { if (sellingPriceRef.current) sellingPriceRef.current.focus(); }, 150);
   };
 
+  // Smart auto-categorization: suggest category based on product name
+  const [suggestedCat, setSuggestedCat] = useState(null);
+  useEffect(() => {
+    if (form.Name && form.Name.length >= 2) {
+      const suggestion = suggestCategory(form.Name);
+      setSuggestedCat(suggestion);
+      // Auto-apply only if category is still the default
+      if (suggestion && form.Category === 'عام') {
+        updateField('Category', suggestion.category);
+      }
+    } else {
+      setSuggestedCat(null);
+    }
+  }, [form.Name]);
+
+  const existingCategories = Array.from(new Set(items.map(i => i.Category || i.category).filter(Boolean)));
+
   const filtered = items.filter(i => !search || i.Name.toLowerCase().includes(search.toLowerCase()) || (i.Barcode && i.Barcode.includes(search)));
 
   return (
     <AppLayout title="نقطة البيع">
-      <div className="flex flex-col lg:flex-row gap-6 items-start flex-1 min-h-0" style={{ direction: 'rtl' }}>
+      <div className="flex flex-row gap-6 items-start flex-1 min-h-0" style={{ direction: 'rtl' }}>
         
         {/* ── RIGHT: FORM ────────────────────────────────────────── */}
         <div style={{ width: '400px', flexShrink: 0, background:'white', borderRadius:'24px', display:'flex', flexDirection:'column', height:'90vh', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.05)', border:'1px solid #f1f5f9' }}>
@@ -209,7 +248,15 @@ export default function MenuAdmin() {
               <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
                 <F label="اسم المنتج *" value={form.Name} onChange={v => updateField('Name', v)} placeholder="مثال: آيفون 15 برو" />
                 <div className="grid grid-cols-2 gap-3">
-                  <F label="القسم" value={form.Category} onChange={v => updateField('Category', v)} />
+                  <div>
+                    <label style={{ display:'block', marginBottom:'8px', fontWeight:'800', fontSize:'13px', color:'#475569' }}>القسم</label>
+                    <CategoryCombobox
+                      value={form.Category}
+                      onChange={v => updateField('Category', v)}
+                      existingCategories={existingCategories}
+                      suggestedCategory={suggestedCat}
+                    />
+                  </div>
                   <F label="سعر البيع *" type="number" value={form.Price} onChange={v => updateField('Price', v)} placeholder="0.00" />
                 </div>
                 <F label="الباركود" value={form.Barcode} onChange={v => updateField('Barcode', v)} placeholder="امسح أو أدخل الباركود" />
@@ -244,12 +291,55 @@ export default function MenuAdmin() {
                  
                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px', background:'#f8fafc', borderRadius:'14px', border:'1px solid #e2e8f0' }}>
                    <span style={{ fontSize:'14px', fontWeight:'700', color:'#475569' }}>منتج خدمي (لا يتطلب مخزون)</span>
-                   <input type="checkbox" checked={form.IsService} onChange={e => updateField('IsService', e.target.checked)} style={{ width:'20px', height:'20px', accentColor:'#3b82f6' }} />
+                   <input type="checkbox" checked={form.IsService} onChange={e => { updateField('IsService', e.target.checked); if (e.target.checked) updateField('IsFabric', false); }} style={{ width:'20px', height:'20px', accentColor:'#3b82f6' }} />
                  </div>
 
                  {!form.IsService && (
+                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px', background:'#f8fafc', borderRadius:'14px', border:'1px solid #e2e8f0', marginTop:'12px' }}>
+                     <span style={{ fontSize:'14px', fontWeight:'700', color:'#475569' }}>نوع المنتج: قماش (تفصيل)</span>
+                     <input type="checkbox" checked={form.IsFabric} onChange={e => updateField('IsFabric', e.target.checked)} style={{ width:'20px', height:'20px', accentColor:'#3b82f6' }} />
+                   </div>
+                 )}
+
+                 {form.IsFabric && (
+                   <div className="grid grid-cols-2 gap-3 mt-3 p-3" style={{ background: '#eef2ff', borderRadius: '12px', border: '1px solid #c7d2fe' }}>
+                     <F label="الكمية المتوفرة (بالأمتار)" type="number" value={form.LengthAvailable} onChange={v => updateField('LengthAvailable', v)} placeholder="0.0" />
+                     <F label="وحدة القياس" value={form.Unit} onChange={v => updateField('Unit', v)} placeholder="متر، ياردة..." />
+                   </div>
+                 )}
+
+                 {!form.IsService && (
+                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px', background:'#f8fafc', borderRadius:'14px', border:'1px solid #e2e8f0', marginTop:'12px' }}>
+                     <span style={{ fontSize:'14px', fontWeight:'700', color:'#475569' }}>يباع بالوزن (ميزان)</span>
+                     <input type="checkbox" checked={form.Metadata?.is_weight_based || false} onChange={e => { updateMeta('is_weight_based', e.target.checked); if(e.target.checked) updateField('Unit', 'كجم (KGM)'); }} style={{ width:'20px', height:'20px', accentColor:'#3b82f6' }} />
+                   </div>
+                 )}
+
+                 {!form.IsService && (
+                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px', background:'#f0fdf4', borderRadius:'14px', border:'1px solid #bbf7d0', marginTop:'12px' }}>
+                     <span style={{ fontSize:'14px', fontWeight:'700', color:'#166534' }}>تصنيف: قماش / طاقة تفصيل</span>
+                     <input type="checkbox" checked={form.IsFabric || false} onChange={e => { updateField('IsFabric', e.target.checked); if(e.target.checked) updateField('Unit', 'متر (MTR)'); }} style={{ width:'20px', height:'20px', accentColor:'#16a34a' }} />
+                   </div>
+                 )}
+
+                 {!form.IsService && form.IsFabric && (
+                    <div style={{ background:'#eef2ff', padding:'16px', borderRadius:'14px', border:'1px solid #c7d2fe', marginTop:'12px' }}>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label style={{ display:'block', marginBottom:'6px', fontWeight:'800', fontSize:'13px', color:'#3730a3' }}>عدد الطاقات (الرولات)</label>
+                          <input type="number" value={form.Stock||0} onChange={e => updateField('Stock', e.target.value)} style={{...inputStyle, borderColor:'#c7d2fe', background:'#fff'}} />
+                        </div>
+                        <div>
+                          <label style={{ display:'block', marginBottom:'6px', fontWeight:'800', fontSize:'13px', color:'#3730a3' }}>الأمتار المتاحة الكلية</label>
+                          <input type="number" value={form.LengthAvailable||0} onChange={e => updateField('LengthAvailable', e.target.value)} style={{...inputStyle, borderColor:'#c7d2fe', background:'#fff'}} />
+                        </div>
+                      </div>
+                    </div>
+                 )}
+
+                 {!form.IsService && !form.IsFabric && (
                    <>
-                     <div className="grid grid-cols-2 gap-3">
+                     <div className="grid grid-cols-2 gap-3 mt-3">
                        <div>
                          <label style={{ display:'block', marginBottom:'6px', fontWeight:'800', fontSize:'13px', color:'#475569' }}>المخزون الحالي</label>
                          <input ref={currentStockRef} type="number" value={form.Stock||''} onChange={e => updateField('Stock', e.target.value)} style={inputStyle} />
@@ -277,6 +367,34 @@ export default function MenuAdmin() {
                <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
                  <F label="اسم وحدة الجملة" value={form.BulkUnitName} onChange={v => updateField('BulkUnitName', v)} />
                  <F label="حجم الجملة (العدد)" type="number" value={form.BulkUnitSize} onChange={v => updateField('BulkUnitSize', v)} />
+
+                 {/* ── Divisibility Section ────────────────── */}
+                 {!form.IsService && (
+                   <div style={{ background:'#fefce8', padding:'16px', borderRadius:'14px', border:'1px solid #fde68a' }}>
+                     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: form.IsDivisible ? '16px' : '0' }}>
+                       <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
+                         <Split size={18} color="#d97706" />
+                         <span style={{ fontSize:'14px', fontWeight:'700', color:'#92400e' }}>يباع مجزأ (كسور)</span>
+                       </div>
+                       <input type="checkbox" checked={form.IsDivisible} onChange={e => updateField('IsDivisible', e.target.checked)} style={{ width:'20px', height:'20px', accentColor:'#d97706' }} />
+                     </div>
+                     {form.IsDivisible && (
+                       <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
+                         <div className="grid grid-cols-2 gap-3">
+                           <F label="الوحدة الفرعية" value={form.SubUnitName} onChange={v => updateField('SubUnitName', v)} placeholder="مثال: حبة" />
+                           <F label="عدد القطع في الوحدة" type="number" value={form.PiecesPerUnit} onChange={v => updateField('PiecesPerUnit', v)} placeholder="24" />
+                         </div>
+                         {form.SubUnitName && parseFloat(form.PiecesPerUnit) > 1 && (
+                           <div style={{ background:'#fffbeb', padding:'12px', borderRadius:'10px', fontSize:'13px', fontWeight:'700', color:'#92400e', textAlign:'center' }}>
+                             1 {form.Unit.split(' ')[0]} = {parseFloat(form.PiecesPerUnit)} {form.SubUnitName}
+                             <span style={{ display:'block', fontSize:'11px', fontWeight:'600', color:'#b45309', marginTop:'4px' }}>سيتمكن الكاشير من بيع كسور مثل 0.5 أو 1 {form.SubUnitName}</span>
+                           </div>
+                         )}
+                       </div>
+                     )}
+                   </div>
+                 )}
+
                  <div style={{ background:'#f8fafc', padding:'16px', borderRadius:'14px', border:'1px solid #e2e8f0' }}>
                    <label style={{ display:'flex', alignItems:'center', gap:'10px', fontSize:'14px', fontWeight:'700', color:'#475569' }}>
                      <input type="checkbox" checked={form.Metadata.requires_serial} onChange={e => updateMeta('requires_serial', e.target.checked)} style={{ width:'18px', height:'18px', accentColor:'#3b82f6' }} />
@@ -330,10 +448,15 @@ export default function MenuAdmin() {
                 {filtered.map(p => {
                   const isLow = !p.IsService && p.Stock <= (p.MinStockLevel || 0);
                   const margin = p.Price > 0 && p.Cost > 0 ? (((p.Price - p.Cost) / p.Price) * 100).toFixed(0) : null;
+                  const isInactive = p.IsActive === false;
                   return (
-                    <tr key={p.ID} style={{ borderBottom:'1px solid #f1f5f9' }}>
+                    <tr key={p.ID} style={{ borderBottom:'1px solid #f1f5f9', opacity: isInactive ? 0.45 : 1, transition:'opacity 0.2s' }}>
                       <td style={TD}>
-                        <div style={{ fontWeight:'900', color:'#0f172a', fontSize:'15px' }}>{p.Name}</div>
+                        <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                          <div style={{ fontWeight:'900', color:'#0f172a', fontSize:'15px' }}>{p.Name}</div>
+                          {isInactive && <span style={{ background:'#fef2f2', color:'#ef4444', padding:'2px 8px', borderRadius:'6px', fontSize:'10px', fontWeight:'900' }}>معطّل</span>}
+                          {p.IsDivisible && <span style={{ background:'#fefce8', color:'#d97706', padding:'2px 8px', borderRadius:'6px', fontSize:'10px', fontWeight:'900' }}>مجزأ</span>}
+                        </div>
                         <div style={{ fontSize:'12px', color:'#94a3b8', display:'flex', alignItems:'center', gap:'6px', marginTop:'4px' }}>
                           <Barcode size={12} /> {p.Barcode || 'بدون باركود'}
                         </div>
@@ -347,18 +470,37 @@ export default function MenuAdmin() {
                         {margin && <div style={{ fontSize:'11px', color: margin > 20 ? '#10b981' : '#f59e0b', fontWeight:'800' }}>الهامش: %{margin}</div>}
                       </td>
                       <td style={TD}>
-                        {p.IsService ? <Pill color="gray">خدمة</Pill> : (
+                        {p.IsService ? <Pill color="gray">خدمة</Pill> : p.IsFabric ? (
+                          <div style={{ display:'flex', flexDirection:'column', gap:'4px', width:'120px' }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', fontSize:'11px', fontWeight:'800', color: p.LengthAvailable < 15 ? '#ef4444' : '#16a34a' }}>
+                              <span>{p.LengthAvailable} متر متاح</span>
+                              <span style={{ color:'#94a3b8' }}>{p.Stock} طاقة</span>
+                            </div>
+                            <div style={{ height:'8px', width:'100%', background:'#e2e8f0', borderRadius:'4px', overflow:'hidden' }}>
+                              <div style={{ height:'100%', width: `${Math.min((p.LengthAvailable / 50) * 100, 100)}%`, background: p.LengthAvailable < 15 ? '#ef4444' : p.LengthAvailable < 25 ? '#f59e0b' : '#10b981', transition:'width 0.3s' }}></div>
+                            </div>
+                          </div>
+                        ) : (
                           <div style={{ display:'inline-block', padding:'6px 14px', borderRadius:'12px', fontSize:'13px', fontWeight:'900', background: isLow ? '#fef2f2' : '#f0fdf4', color: isLow ? '#ef4444' : '#16a34a' }}>
-                            {p.Stock} {p.Unit.includes('PCE') ? 'وحدة / قطعة (PCE)' : p.Unit.includes('KGM') ? 'كجم (KGM)' : p.Unit}
+                            {parseFloat(p.Stock).toFixed(p.IsDivisible ? 2 : 0)} {p.Unit.includes('PCE') ? 'وحدة' : p.Unit.includes('KGM') ? 'كجم' : p.Unit.split(' ')[0]}
+                            {p.IsDivisible && p.SubUnitName && p.PiecesPerUnit > 1 && (
+                              <span style={{ fontSize:'11px', color:'#94a3b8', marginRight:'4px' }}>
+                                ({Math.round(parseFloat(p.Stock) * p.PiecesPerUnit)} {p.SubUnitName})
+                              </span>
+                            )}
                           </div>
                         )}
                       </td>
                       <td style={TD}>
-                        <div style={{ display:'flex', gap:'8px' }}>
-                          <button onClick={() => del(p.ID)} style={{ ...iconBtn, color:'#ef4444', borderColor:'#fee2e2' }}><Trash2 size={16} /></button>
-                          <button onClick={() => startEdit(p)} style={iconBtn}><Edit3 size={16} /></button>
-                          <button onClick={() => openHistory(p)} style={iconBtn}><History size={16} /></button>
-                          <button onClick={() => setLabelProduct(p)} style={{ ...iconBtn, color:'#3b82f6', borderColor:'#dbeafe' }}><Tag size={16} /></button>
+                        <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>
+                          <button onClick={() => del(p.ID)} title="حذف" style={{ ...iconBtn, color:'#ef4444', borderColor:'#fee2e2' }}><Trash2 size={16} /></button>
+                          <button onClick={() => startEdit(p)} title="تعديل" style={iconBtn}><Edit3 size={16} /></button>
+                          <button onClick={() => dup(p.ID)} title="نسخ" style={{ ...iconBtn, color:'#8b5cf6', borderColor:'#ede9fe' }}><Copy size={16} /></button>
+                          <button onClick={() => openHistory(p)} title="السجل" style={iconBtn}><History size={16} /></button>
+                          <button onClick={() => setLabelProduct(p)} title="طباعة" style={{ ...iconBtn, color:'#3b82f6', borderColor:'#dbeafe' }}><Tag size={16} /></button>
+                          <button onClick={() => toggle(p.ID)} title={isInactive ? 'تفعيل' : 'تعطيل'} style={{ ...iconBtn, color: isInactive ? '#16a34a' : '#f59e0b', borderColor: isInactive ? '#dcfce7' : '#fef3c7' }}>
+                            {isInactive ? <ToggleLeft size={16} /> : <ToggleRight size={16} />}
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -478,11 +620,11 @@ function SegmentBtn({ active, children, onClick }) {
   );
 }
 
-function F({ label, value, onChange, placeholder, type='text' }) {
+function F({ label, value, onChange, placeholder, type='text', list }) {
   return (
     <div>
       <label style={{ display:'block', marginBottom:'8px', fontWeight:'800', fontSize:'13px', color:'#475569' }}>{label}</label>
-      <input type={type} value={value||''} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={inputStyle} />
+      <input type={type} list={list} value={value||''} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={inputStyle} />
     </div>
   );
 }

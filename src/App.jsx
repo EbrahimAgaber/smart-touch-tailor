@@ -8,6 +8,8 @@ import Shift from './pages/Shift';
 import Pos from './pages/Pos';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
+import TailorPos from './pages/TailorPos';
+import Alterations from './pages/Alterations';
 import Expenditures from './pages/Expenditures';
 import Stock from './pages/Stock';
 import MenuAdmin from './pages/MenuAdmin';
@@ -23,6 +25,10 @@ import Staff from './pages/Staff';
 import AuditLogs from './pages/AuditLogs';
 import Promotions from './pages/Promotions';
 import Services from './pages/Services';
+import OrdersBoard from './pages/OrdersBoard';
+import MeasurementCapture from './pages/MeasurementCapture';
+import CustomerMenu from './pages/CustomerMenu';
+import Sponsors from './pages/Sponsors';
 import CustomerDisplay from './pages/CustomerDisplay';
 import Onboarding from './pages/Onboarding';
 import SubscriptionHub from './pages/SubscriptionHub';
@@ -69,9 +75,10 @@ const PrivateRoute = ({ children }) => {
 };
 
 const AdminRoute = ({ children }) => {
+  const { businessType } = useAppSettings();
   const role = String(useAuthStore(s => s.role) || '').toLowerCase();
   if (!role) return <Navigate to="/login" replace />;
-  if (role !== 'admin') return <Navigate to="/pos" replace />;
+  if (role !== 'admin') return <Navigate to={businessType === 'tailor' ? '/tailor-pos' : '/pos'} replace />;
   return children;
 };
 
@@ -79,7 +86,7 @@ const RestaurantRoute = ({ children }) => {
   const { businessType } = useAppSettings();
   const role = useAuthStore(s => s.role);
   if (!role) return <Navigate to="/login" replace />;
-  if (businessType !== 'restaurant') return <Navigate to="/pos" replace />;
+  if (businessType !== 'restaurant') return <Navigate to={businessType === 'tailor' ? '/tailor-pos' : '/pos'} replace />;
   return children;
 };
 
@@ -323,7 +330,15 @@ export default function App() {
 
                 {/* ── Customer-facing ── */}
                 <Route path="/customers"        element={<P><FeatureGate feature="customers"><Customers /></FeatureGate></P>} />
+                <Route path="/sponsors"         element={<P><Sponsors /></P>} />
                 <Route path="/services"         element={<P><Services /></P>} />
+                
+                {/* ── Tailor-specific ── */}
+                <Route path="/tailor-pos"       element={<P><TailorPos /></P>} />
+                <Route path="/alterations"       element={<P><Alterations /></P>} />
+                <Route path="/orders-board"     element={<P><OrdersBoard /></P>} />
+                <Route path="/measurements"     element={<P><MeasurementCapture /></P>} />
+                <Route path="/customer-menu"    element={<CustomerMenu />} />
 
                 {/* ── Admin-only ── */}
                 <Route path="/dashboard"        element={<A><FeatureGate feature="dashboard"><Dashboard /></FeatureGate></A>} />

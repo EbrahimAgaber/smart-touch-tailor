@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Touch POS - Promo UI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+        body { font-family: 'Cairo', sans-serif; }
+        
+        /* Glassmorphism Classes */
+        .glass-plate {
+            background: rgba(17, 24, 39, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+            transition: all 0.7s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+        
+        .glass-plate:hover {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.8), 0 0 15px rgba(14, 165, 233, 0.3);
+            transform: translateY(-5px);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-8 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#0A0F1A] to-[#050811] overflow-hidden" style="perspective: 2000px;">
+
+    <!-- 3D Scene Wrapper -->
+    <div style="transform: rotateX(15deg) rotateY(-25deg) translateZ(0); transform-style: preserve-3d; transition: transform 1s ease;" class="hover:!transform-none w-full max-w-6xl">
+        
+        <!-- Command Center Mockup -->
+        <div class="glass-plate w-full h-[800px] relative overflow-hidden flex shadow-2xl">
+            
+            <!-- Sidebar Navigation -->
+            <aside class="w-72 border-l border-white/10 p-6 flex flex-col gap-6 relative z-20">
+                <div class="text-2xl font-bold text-cyan-400">البصمة الذكية</div>
+                <nav class="flex flex-col gap-4 mt-8">
+                    <a href="#" class="text-cyan-400 font-semibold bg-cyan-400/10 p-3 rounded-lg">لوحة القيادة</a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors p-3">نقاط البيع</a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors p-3">المخزون</a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors p-3">المالية</a>
+                </nav>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="flex-1 p-10 relative z-20">
+                <!-- Header -->
+                <header class="flex justify-between items-center mb-12">
+                    <h1 class="text-3xl font-semibold">نظرة عامة</h1>
+                    <div class="flex items-center gap-4">
+                        <span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-4 py-2 rounded-full text-sm font-bold tracking-wide shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                            معتمد رسمياً - المرحلة الثانية
+                        </span>
+                    </div>
+                </header>
+
+                <!-- Grid -->
+                <div class="grid grid-cols-2 gap-8">
+                    <!-- Hero Metric Card -->
+                    <div class="glass-plate p-8 relative group overflow-hidden" style="transform: translateZ(50px);">
+                        <div class="absolute -inset-4 bg-purple-500/20 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-1000"></div>
+                        <div class="relative z-10 flex flex-col items-center justify-center h-full">
+                            <span class="text-gray-400 font-semibold tracking-wide mb-4">إجمالي الإيرادات اليومية</span>
+                            <div class="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400 tracking-tight flex items-baseline gap-2 drop-shadow-2xl">
+                                <span class="text-3xl text-cyan-400">ر.س</span>
+                                14,250.00
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Insights Card -->
+                    <div class="glass-plate p-8 flex flex-col justify-between" style="transform: translateZ(30px);">
+                        <div class="flex justify-between items-start">
+                            <h3 class="text-lg font-semibold">حالة المخزون</h3>
+                            <span class="text-violet-400 bg-violet-400/10 px-3 py-1 rounded text-xs font-bold border border-violet-400/20 shadow-[0_0_10px_rgba(139,92,246,0.3)]">
+                                مساعد ذكاء اصطناعي
+                            </span>
+                        </div>
+                        <div class="mt-4">
+                            <div class="flex justify-between items-center py-3 border-b border-white/5">
+                                <span class="text-gray-300">منتج A</span>
+                                <span class="text-emerald-400">متوفر</span>
+                            </div>
+                            <div class="flex justify-between items-center py-3 border-b border-white/5">
+                                <span class="text-gray-300">منتج B</span>
+                                <span class="text-red-400 bg-red-400/10 px-2 py-0.5 rounded text-xs animate-pulse">مخزون حرج</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+            
+            <!-- Ambient Edge Glow Reflection -->
+            <div class="absolute inset-0 bg-gradient-to-br from-white/[0.05] to-transparent pointer-events-none z-10"></div>
+        </div>
+    </div>
+
+</body>
+</html>

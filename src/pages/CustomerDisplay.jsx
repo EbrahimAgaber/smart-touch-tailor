@@ -8,11 +8,12 @@ export default function CustomerDisplay() {
 
   useEffect(() => {
     if (!window.api) return;
-    window.api.onCartUpdate((data) => {
+    const unsubscribe = window.api.onCartUpdate((data) => {
       setCart(data.items || []);
       setTotal(data.total || 0);
     });
     window.api.getSettings().then(s => setBizName(s.business_name_ar));
+    return () => unsubscribe?.();
   }, []);
 
   const handleKeypad = (val) => {

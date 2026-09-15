@@ -69,24 +69,31 @@ const S = {
   },
 };
 
+const formatDateLocal = (d = new Date()) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 // ─── Period selector used across multiple tabs ────────────────────────────────
 function PeriodBar({ range, setRange, onPrint, extra }) {
   const thisMonth = () => {
     const d = new Date();
     setRange({
-      startDate: new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0],
-      endDate: d.toISOString().split('T')[0]
+      startDate: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`,
+      endDate: formatDateLocal(d)
     });
   };
   const thisYear = () => {
     const d = new Date();
     setRange({
       startDate: `${d.getFullYear()}-01-01`,
-      endDate: d.toISOString().split('T')[0]
+      endDate: formatDateLocal(d)
     });
   };
   const today = () => {
-    const d = new Date().toISOString().split('T')[0];
+    const d = formatDateLocal(new Date());
     setRange({ startDate: d, endDate: d });
   };
   return (
@@ -1031,9 +1038,10 @@ function PeriodsTab() {
 // TAB: VAT REPORT (existing, enhanced)
 // ═══════════════════════════════════════════════════════════════════════════════
 function VATTab() {
+  const now = new Date();
   const [range, setRange] = useState({
-    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0]
+    startDate: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`,
+    endDate: formatDateLocal(now)
   });
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1043,34 +1051,164 @@ function VATTab() {
     window.api.getVATReport(range).then(r => { setData(r); setLoading(false); }).catch(() => setLoading(false));
   }, [range]);
 
+  // Quick period presets
+  const setPreset = (key) => {
+    const d = new Date();
+    let s, e;
+    if (key === 'thisMonth') {
+      s = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+      e = formatDateLocal(d);
+    } else if (key === 'lastMonth') {
+      const pm = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+      s = `${pm.getFullYear()}-${String(pm.getMonth()+1).padStart(2,'0')}-01`;
+      e = `${pm.getFullYear()}-${String(pm.getMonth()+1).padStart(2,'0')}-${new Date(pm.getFullYear(), pm.getMonth()+1, 0).getDate()}`;
+    } else if (key === 'thisQuarter') {
+      const qm = Math.floor(d.getMonth() / 3) * 3;
+      s = `${d.getFullYear()}-${String(qm+1).padStart(2,'0')}-01`;
+      e = formatDateLocal(d);
+    } else if (key === 'lastQuarter') {
+      const qm = Math.floor(d.getMonth() / 3) * 3 - 3;
+      const qd = new Date(d.getFullYear(), qm, 1);
+      s = `${qd.getFullYear()}-${String(qd.getMonth()+1).padStart(2,'0')}-01`;
+      const qe = new Date(qd.getFullYear(), qd.getMonth() + 3, 0);
+      e = `${qe.getFullYear()}-${String(qe.getMonth()+1).padStart(2,'0')}-${qe.getDate()}`;
+    }
+    setRange({ startDate: s, endDate: e });
+  };
+
+  const outputVAT = parseFloat(data?.vatOutput ?? 0);
+  const inputVAT  = parseFloat(data?.vatInput ?? 0);
+  const netVAT    = parseFloat(data?.netVAT ?? 0);
+  const maxBar    = Math.max(outputVAT, inputVAT, 1);
+
+  const VATCard = ({ title, value, subtitle, accent, icon }) => (
+    <div style={{
+      background: 'white', padding: '20px 24px', borderRadius: '18px',
+      border: `1.5px solid ${accent}20`, boxShadow: `0 2px 12px ${accent}08`,
+      display: 'flex', alignItems: 'center', gap: '16px', flex: 1
+    }}>
+      <div style={{
+        width: '48px', height: '48px', borderRadius: '14px',
+        background: `linear-gradient(135deg, ${accent}15, ${accent}08)`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '20px'
+      }}>{icon}</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{title}</div>
+        <div style={{ fontSize: '22px', fontWeight: '900', color: accent, fontFamily: "'Inter', sans-serif", direction: 'ltr', textAlign: 'right' }}>{sar(value)} <span style={{ fontSize: '12px', fontWeight: '600', color: '#94a3b8' }}>ر.س</span></div>
+        {subtitle && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{subtitle}</div>}
+      </div>
+    </div>
+  );
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', opacity: loading ? 0.6 : 1 }}>
-      <PeriodBar range={range} setRange={setRange} onPrint />
-      {data && (
-        <div style={S.card}>
-          <h3 style={S.title}>إقرار ضريبة القيمة المضافة</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px' }}>
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: '800', color: '#64748b', marginBottom: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>المبيعات (مخرجات)</div>
-              <PLRow label="المبيعات الخاضعة للضريبة" val={data.taxableAmount} />
-              <PLRow label="ضريبة المخرجات" val={data.vatOutput} bold color="#3b82f6" />
-            </div>
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: '800', color: '#64748b', marginBottom: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>المشتريات (مدخلات)</div>
-              <PLRow label="ضريبة المدخلات المستردة" val={data.vatInput} bold color="#10b981" />
-            </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', opacity: loading ? 0.6 : 1, transition: 'opacity 0.3s' }}>
+      {/* Period Controls */}
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <PeriodBar range={range} setRange={setRange} onPrint />
+        <div style={{ display: 'flex', gap: '6px', marginRight: '8px' }}>
+          {[['thisMonth','هذا الشهر'],['lastMonth','الشهر الماضي'],['thisQuarter','هذا الربع'],['lastQuarter','الربع الماضي']].map(([k,l]) => (
+            <button key={k} onClick={() => setPreset(k)} style={{
+              padding: '6px 14px', borderRadius: '8px', border: '1px solid #e2e8f0',
+              background: 'white', color: '#64748b', fontSize: '11px', fontWeight: '700',
+              cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+            }}>{l}</button>
+          ))}
+        </div>
+      </div>
+
+      {data?.isUnregistered && (
+        <div style={{ padding: '16px 20px', borderRadius: '16px', background: '#eef2ff', border: '1.5px solid #6366f1', color: '#3730a3', fontSize: '13px', fontWeight: '700' }}>
+          ℹ️ المنشأة غير مسجلة بضريبة القيمة المضافة (Not Registered). جميع المبيعات تعامل بدون ضريبة 0.00 ر.س ولا يلزم تقديم إقرار ضريبي لهيئة الزكاة.
+        </div>
+      )}
+
+      {data && !data.isUnregistered && (
+        <>
+          {/* KPI Cards Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+            <VATCard title="المبيعات الخاضعة" value={data.taxableAmount} subtitle={`${data.invoiceCount || 0} فاتورة`} accent="#3b82f6" icon="📊" />
+            <VATCard title="ضريبة المخرجات" value={outputVAT} subtitle="المحصّلة من العملاء" accent="#ef4444" icon="📤" />
+            <VATCard title="ضريبة المدخلات" value={inputVAT} subtitle="المدفوعة للموردين" accent="#10b981" icon="📥" />
+            <VATCard title="صافي الضريبة" value={Math.abs(netVAT)} subtitle={netVAT > 0 ? 'مستحقة الدفع' : netVAT < 0 ? 'مستردة لصالحك' : 'متوازن'} accent={netVAT > 0 ? '#ef4444' : '#10b981'} icon={netVAT > 0 ? '💳' : '💰'} />
           </div>
-          <div style={{ marginTop: '28px', padding: '20px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontSize: '13px', color: '#64748b', fontWeight: '700' }}>الضريبة المستحقة / (المستردة)</div>
-              <div style={{ fontSize: '22px', fontWeight: '900', color: (data.netVAT ?? 0) >= 0 ? '#0f172a' : '#10b981', direction: 'ltr' }}>
-                {sar(data.netVAT)} ر.س
+
+          {/* Visual Breakdown */}
+          <div style={S.card}>
+            <h3 style={{ ...S.title, display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span>تحليل ضريبة القيمة المضافة</span>
+              <span style={{ fontSize: '11px', fontWeight: '600', color: '#94a3b8' }}>( {range.startDate} — {range.endDate} )</span>
+            </h3>
+
+            {/* Output vs Input Bars */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+              {/* Output VAT Bar */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#374151' }}>ضريبة المخرجات (Output VAT)</span>
+                  <span style={{ fontSize: '14px', fontWeight: '800', color: '#ef4444', fontFamily: "'Inter', sans-serif" }}>{sar(outputVAT)} ر.س</span>
+                </div>
+                <div style={{ height: '12px', background: '#fee2e2', borderRadius: '6px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', background: 'linear-gradient(90deg, #ef4444, #f87171)', borderRadius: '6px', width: `${(outputVAT / maxBar) * 100}%`, transition: 'width 0.6s ease' }} />
+                </div>
+              </div>
+
+              {/* Input VAT Bar */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#374151' }}>ضريبة المدخلات (Input VAT)</span>
+                  <span style={{ fontSize: '14px', fontWeight: '800', color: '#10b981', fontFamily: "'Inter', sans-serif" }}>{sar(inputVAT)} ر.س</span>
+                </div>
+                <div style={{ height: '12px', background: '#d1fae5', borderRadius: '6px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', background: 'linear-gradient(90deg, #10b981, #34d399)', borderRadius: '6px', width: `${(inputVAT / maxBar) * 100}%`, transition: 'width 0.6s ease' }} />
+                </div>
               </div>
             </div>
-            <span style={S.badge(data.netVAT >= 0 ? '#ef4444' : '#10b981', data.netVAT >= 0 ? '#fef2f2' : '#ecfdf5')}>
-              {(data.netVAT ?? 0) >= 0 ? 'واجبة السداد' : 'رصيد دائن'}
-            </span>
+
+            {/* Net Result Banner */}
+            <div style={{
+              padding: '24px', borderRadius: '18px',
+              background: netVAT > 0
+                ? 'linear-gradient(135deg, #fef2f2, #fff1f2)'
+                : netVAT < 0
+                  ? 'linear-gradient(135deg, #ecfdf5, #f0fdf4)'
+                  : 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
+              border: `1.5px solid ${netVAT > 0 ? '#fecaca' : netVAT < 0 ? '#bbf7d0' : '#e2e8f0'}`,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <div>
+                <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '700', marginBottom: '4px' }}>
+                  {netVAT > 0 ? '⚠️ ضريبة مستحقة الدفع لهيئة الزكاة' : netVAT < 0 ? '✅ رصيد مسترد لصالح المنشأة' : '⚖️ لا ضريبة مستحقة — متوازن'}
+                </div>
+                <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>
+                  الفرق بين ضريبة المخرجات والمدخلات
+                </div>
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{
+                  fontSize: '32px', fontWeight: '900',
+                  fontFamily: "'Inter', sans-serif",
+                  color: netVAT > 0 ? '#dc2626' : netVAT < 0 ? '#059669' : '#374151',
+                  direction: 'ltr'
+                }}>
+                  {netVAT < 0 && '−'}{sar(Math.abs(netVAT))}
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#94a3b8', marginLeft: '4px' }}>ر.س</span>
+                </div>
+                <span style={S.badge(netVAT > 0 ? '#dc2626' : '#059669', netVAT > 0 ? '#fef2f2' : '#ecfdf5')}>
+                  {netVAT > 0 ? 'واجبة السداد' : netVAT < 0 ? 'رصيد دائن (Credit)' : 'صفر'}
+                </span>
+              </div>
+            </div>
           </div>
+        </>
+      )}
+
+      {/* Zero state */}
+      {!loading && !data && (
+        <div style={{ ...S.card, textAlign: 'center', padding: '60px 20px' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+          <div style={{ fontSize: '16px', fontWeight: '800', color: '#374151', marginBottom: '8px' }}>لا توجد بيانات ضريبية</div>
+          <div style={{ fontSize: '13px', color: '#94a3b8' }}>تأكد من وجود مبيعات أو مصروفات مسجلة في الفترة المحددة</div>
         </div>
       )}
     </div>

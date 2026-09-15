@@ -42,14 +42,8 @@ export function buildLetterheadHTML({ title, subtitle, headers = [], rows = [], 
   // [GAP-4] Canonical key is vat_number (matches Settings.jsx). tax_number is a
   // legacy alias kept for compatibility with any direct DB reads that haven't migrated.
   const vatNo     = settings.vat_number || settings.tax_number || '';
-  // [GAP-4] Runtime assertion — block PDF export if VAT number is missing or malformed.
-  if (!vatNo || !/^3\d{14}$/.test(vatNo)) {
-    throw new Error(
-      'VAT number is missing or invalid — PDF export blocked. ' +
-      'Expected a 15-digit string starting with 3 (got: ' + (vatNo || 'empty') + '). ' +
-      'Please set your VAT number in Settings → هوية المنشأة.'
-    );
-  }
+  // [GAP-4] Runtime check — warn but don't block internal reports.
+  const vatValid = vatNo && /^3\d{14}$/.test(vatNo);
   const crn       = settings.crn || '';
   const address   = [settings.address_city, settings.address_district].filter(Boolean).join('، ');
   const phone     = settings.phone || '';
@@ -182,7 +176,7 @@ export function buildLetterheadHTML({ title, subtitle, headers = [], rows = [], 
       ${logoHtml}
       <div class="biz-details">
         <div class="biz-name">${bizName}</div>
-        ${vatNo ? `<div class="biz-meta">الرقم الضريبي: ${vatNo}</div>` : ''}
+        ${(vatValid ? vatNo : '') ? `<div class="biz-meta">الرقم الضريبي: ${(vatValid ? vatNo : '')}</div>` : ''}
         ${crn    ? `<div class="biz-meta">السجل التجاري: ${crn}</div>` : ''}
         ${address ? `<div class="biz-meta">${address}</div>` : ''}
         ${phone   ? `<div class="biz-meta">📞 ${phone}</div>` : ''}

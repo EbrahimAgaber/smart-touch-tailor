@@ -15,6 +15,7 @@ import {
 
 const BUSINESS_TYPES = [
   { value:'retail',    label:'🛍️ تجزئة عامة' },
+  { value:'fruit_and_vegetables', label:'🍅 خضار وفواكه' },
   { value:'grocery',   label:'🛒 بقالة / سوبرماركت' },
   { value:'restaurant',label:'🍽️ مطعم / كافيه' },
   { value:'pharmacy',  label:'💊 صيدلية' },
@@ -22,6 +23,7 @@ const BUSINESS_TYPES = [
   { value:'electronics',label:'📱 إلكترونيات' },
   { value:'salon',     label:'✂️ صالون / سبا' },
   { value:'services',  label:'🛎️ خدمات عامة' },
+  { value:'tailor',    label:'🧵 خياطة / تفصيل' },
 ];
 
 const COUNTRIES = [
@@ -46,6 +48,7 @@ const TABS = [
   { id: 'zatca',     label: 'هيئة الزكاة',      icon: Shield },
   { id: 'invoice',   label: 'الفواتير والطباعة', icon: Receipt },
   { id: 'tax',       label: 'الضريبة والعملات', icon: Globe },
+  { id: 'tailor',    label: 'إعدادات الخياطة',   icon: Package },
   { id: 'system',    label: 'النظام',           icon: Server },
   { id: 'ui',        label: 'واجهة المستخدم',   icon: Palette },
 ];
@@ -84,10 +87,21 @@ export default function Settings() {
     secondary_currency:'', exchange_rate:'1',
     expense_lock_days:'30',
     receipt_printer:'',
+    kitchen_printer:'',
     dark_mode:'false',
     date_format:'hijri',
     zatca_env:'core',
+    zatca_phase: 'phase_2',
+    predefined_notes: '',
     simulationTestsPassed: false,
+    tailor_fabric_unit: 'meter', // meter, yard
+    tailor_thobe_calc_method: 'fixed', // fixed, formula
+    tailor_thobe_fixed_amount: '3.5',
+    tailor_thobe_formula_add_inches: '10',
+    tailor_suit_fixed_amount: '3.0',
+    tailor_bisht_fixed_amount: '2.0',
+    tailor_shirt_fixed_amount: '1.5',
+    tailor_default_delivery_days: '7',
   });
 
   const [saved, setSaved] = useState(false);
@@ -127,6 +141,14 @@ export default function Settings() {
   const [simTestResults, setSimTestResults] = useState(null);
   const [certExpiresAt, setCertExpiresAt] = useState(null); // FIX 5: cert expiry ISO string
   const [envSwitchError, setEnvSwitchError] = useState('');
+
+  // ── [DEV-ONLY] Safe Re-onboard reset ────────────────────────────────────
+  // Only reachable via the same 5-click developer gate as showDevEnvironments.
+  // Two-step confirm: click opens a warning modal, confirming inside the modal
+  // actually calls the IPC handler.
+  const [devResetModalOpen, setDevResetModalOpen] = useState(false);
+  const [devResetStatus, setDevResetStatus] = useState('idle'); // idle|loading|success|error
+  const [devResetError, setDevResetError] = useState('');
 
   // ── Add-on key activation (inline, no SecurityGuard redirect) ──────────────
   const [addonKey, setAddonKey]           = useState('');
@@ -269,6 +291,34 @@ export default function Settings() {
     }
   };
 
+  // ── [DEV-ONLY] Safe re-onboard reset handler ─────────────────────────────
+  // Calls the main-process IPC that archives current CSID/cert into backup
+  // columns and clears onboarding_complete, then refreshes local device state
+  // so the UI falls back to the onboarding card automatically.
+  const handleDevResetForReonboard = async () => {
+    setDevResetStatus('loading');
+    setDevResetError('');
+    try {
+      const res = await window.api.zatcaDevResetForReonboard?.();
+      if (res?.success) {
+        setDevResetStatus('success');
+        toast('✅ ' + (res.message || 'تم إعادة تعيين حالة التهيئة بأمان.'), 'success');
+        const d = await window.api.getZatcaDevice();
+        setZatcaDevice(d);
+        setDevResetModalOpen(false);
+        setDevResetStatus('idle');
+      } else {
+        setDevResetStatus('error');
+        setDevResetError(res?.error || 'Unknown error');
+        toast('خطأ في إعادة التعيين: ' + (res?.error || ''), 'error');
+      }
+    } catch (e) {
+      setDevResetStatus('error');
+      setDevResetError(e.message);
+      toast('خطأ: ' + e.message, 'error');
+    }
+  };
+
   const save = async () => {
     const errs = {};
     if (form.vat_number && !isValidTIN(form.vat_number))
@@ -287,7 +337,9 @@ export default function Settings() {
     setVatErrors({});
     try {
       await window.api.saveSettings(form);
-      window.__vatRate__ = parseFloat(form.vat_rate) || 0.15;
+      const isUnregistered = form.zatca_phase === 'not_registered';
+      window.__vatRate__ = isUnregistered ? 0 : (parseFloat(form.vat_rate) || 0.15);
+      window.__zatcaPhase__ = form.zatca_phase;
       window.__dateFormat__ = form.date_format || 'hijri';
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -367,6 +419,63 @@ export default function Settings() {
           </div>
         )}
 
+        {/* ── [DEV-ONLY] Safe Re-onboard confirmation modal ── */}
+        {devResetModalOpen && (
+          <div style={{
+            position:'fixed', inset:0, zIndex:9999,
+            background:'rgba(0,0,0,0.7)', display:'flex',
+            alignItems:'center', justifyContent:'center'
+          }}>
+            <div style={{
+              background:'#fff', borderRadius:'16px', padding:'32px 36px',
+              maxWidth:'480px', width:'90%', textAlign:'center',
+              boxShadow:'0 20px 60px rgba(0,0,0,0.3)'
+            }}>
+              <div style={{ fontSize:'40px', marginBottom:'12px' }}>⚠️</div>
+              <h2 style={{ color:'#b91c1c', fontWeight:'900', marginBottom:'12px', fontSize:'17px' }}>
+                تأكيد إعادة التأهيل الآمنة
+              </h2>
+              <p style={{ color:'#374151', lineHeight:'1.7', marginBottom:'10px', fontSize:'13px', textAlign:'right' }}>
+                سيتم أرشفة الشهادة والمفاتيح الحالية ثم مسحها للسماح بإعادة تأهيل جديدة برمز OTP من منصة فاتورة. لن يتم حذف سجل الفواتير السابق أو عداد ICV الحالي.
+              </p>
+              <p style={{ color:'#92400e', lineHeight:'1.7', marginBottom:'20px', fontSize:'12px', textAlign:'right', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'10px', padding:'10px 12px' }}>
+                ⚠️ الفواتير المعلقة في قائمة الانتظار ستفشل بالشهادة القديمة حتى يكتمل التأهيل الجديد وتعاد محاولتها تلقائياً بعد ذلك.
+              </p>
+              {devResetStatus === 'error' && (
+                <div style={{ padding:'10px 12px', background:'#fef2f2', borderRadius:'10px', border:'1px solid #fecaca', fontSize:'12px', color:'#b91c1c', fontWeight:'700', marginBottom:'16px', textAlign:'right' }}>
+                  ⛔ {devResetError}
+                </div>
+              )}
+              <div style={{ display:'flex', gap:'10px', justifyContent:'center' }}>
+                <button
+                  onClick={() => setDevResetModalOpen(false)}
+                  disabled={devResetStatus === 'loading'}
+                  style={{
+                    background:'transparent', border:'1px solid #e5e7eb',
+                    borderRadius:'10px', padding:'10px 22px', cursor:'pointer',
+                    color:'#6b7280', fontSize:'13px', fontFamily:'inherit', fontWeight:'700'
+                  }}
+                >
+                  إلغاء
+                </button>
+                <button
+                  onClick={handleDevResetForReonboard}
+                  disabled={devResetStatus === 'loading'}
+                  style={{
+                    background:'#b91c1c', color:'#fff', border:'none',
+                    borderRadius:'10px', padding:'10px 22px', cursor: devResetStatus==='loading' ? 'not-allowed' : 'pointer',
+                    fontSize:'13px', fontFamily:'inherit', fontWeight:'800',
+                    opacity: devResetStatus === 'loading' ? 0.6 : 1,
+                    display:'flex', alignItems:'center', gap:'6px'
+                  }}
+                >
+                  {devResetStatus === 'loading' ? <><RefreshCw size={14} className="spin"/> جارٍ التنفيذ...</> : 'نعم، أعد التعيين'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── ZATCA cert warning banner ── */}
         {certWarning && (
           <div style={{
@@ -423,6 +532,7 @@ export default function Settings() {
           }}>
             {TABS.filter(tab => {
               if (tab.id === 'zatca' && !canAccess('settings.zatca')) return false;
+              if (tab.id === 'tailor' && form.business_type !== 'tailor') return false;
               return true;
             }).map(tab => {
               const Icon = tab.icon;
@@ -572,10 +682,42 @@ export default function Settings() {
                     </div>
                   )}
 
-                  {/* Queue status card — always shown */}
-                  <ZatcaQueueCard />
+                  {/* ── ZATCA Phase Selector ── */}
+                  <Card title="مرحلة الالتزام (ZATCA Phase)" icon={<Shield size={15}/>}>
+                    <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
+                      {[
+                        { value: 'not_registered', label: 'غير مسجل بضريبة القيمة المضافة', sub: 'Not Registered' },
+                        { value: 'phase_1', label: 'المرحلة الأولى (الإصدار والحفظ)', sub: 'Phase 1' },
+                        { value: 'phase_2', label: 'المرحلة الثانية (الربط والتكامل)', sub: 'Phase 2' }
+                      ].map(ph => {
+                        const active = form.zatca_phase === ph.value;
+                        return (
+                          <button key={ph.value} onClick={() => u('zatca_phase', ph.value)}
+                            style={{
+                              flex:1, minWidth:'140px', padding:'12px 10px', borderRadius:'12px',
+                              border: active ? `2px solid #2563eb` : '1.5px solid var(--border-subtle)',
+                              background: active ? `#eff6ff` : 'var(--bg-app)',
+                              color: active ? '#1d4ed8' : 'var(--text-muted)',
+                              cursor:'pointer', fontFamily:'inherit',
+                              fontWeight: active ? '800' : '600', fontSize:'13px',
+                              display:'flex', flexDirection:'column', alignItems:'center', gap:'4px',
+                              transition:'all 0.15s',
+                              boxShadow: active ? `0 0 0 3px rgba(37,99,235,0.1)` : 'none',
+                            }}>
+                            <span>{ph.label}</span>
+                            <span style={{ fontSize:'10px', opacity:0.7, fontWeight:'500' }}>{ph.sub}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </Card>
 
-                  {/* ── Environment — pill buttons per design proposal ── */}
+                  {form.zatca_phase === 'phase_2' && (
+                    <>
+                      {/* Queue status card — always shown */}
+                      <ZatcaQueueCard />
+
+                      {/* ── Environment — pill buttons per design proposal ── */}
                   <Card title={t('settings.zatca.env_title')} icon={<Server size={15}/>}>
                     <Field label={t('settings.zatca.choose_env')}>
                       <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
@@ -584,10 +726,7 @@ export default function Settings() {
                           return (
                             <button key={env.value}
                               onClick={() => {
-                                if (env.value === 'core' && form.zatca_env !== 'core' && !form.simulationTestsPassed) {
-                                  setEnvSwitchError(t('settings.zatca.core_error'));
-                                  return;
-                                }
+                                // The simulation compliance tests are now automated during onboarding, so no block is needed.
                                 setEnvSwitchError('');
                                 if (env.value !== 'core') {
                                   // Reset sim gate when leaving production
@@ -642,66 +781,6 @@ export default function Settings() {
                     </div>
                   </Card>
 
-                  {/* W-4: Simulation tests — only visible in simulation env */}
-                  {form.zatca_env === 'simulation' && (
-                    <Card title={t('settings.zatca.simulation.title')} icon={<Shield size={15} color="#f59e0b"/>}>
-                      <div style={{ fontSize:'13px', color:'#64748b', lineHeight:'1.7' }}>
-                        {t('settings.zatca.simulation.desc')}
-                      </div>
-                      <button
-                        onClick={async () => {
-                          setSimTestStatus('running');
-                          setSimTestResults(null);
-                          try {
-                            const res = await window.api.runSimulationTests();
-                            setSimTestResults(res);
-                            if (res?.allPassed) {
-                              const updated = { ...form, simulationTestsPassed: true };
-                              setForm(updated);
-                              await window.api.saveSettings(updated);
-                              toast(t('settings.zatca.simulation.success_toast'), 'success');
-                            } else {
-                              toast(t('settings.zatca.simulation.error_toast'), 'error');
-                            }
-                          } catch (e) {
-                            setSimTestResults({ success: false, error: e.message });
-                            toast('خطأ: ' + e.message, 'error');
-                          }
-                          setSimTestStatus('done');
-                        }}
-                        disabled={simTestStatus === 'running'}
-                        style={{ padding:'10px 20px', background:'#f59e0b', color:'#fff', border:'none', borderRadius:'10px', fontWeight:'800', fontSize:'13px', cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:'8px', opacity: simTestStatus==='running' ? 0.6 : 1 }}
-                      >
-                        {simTestStatus === 'running' ? t('settings.zatca.simulation.running_btn') : t('settings.zatca.simulation.run_btn')}
-                      </button>
-
-                      {/* Results */}
-                      {simTestResults && (
-                        <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-                          {simTestResults.error && !simTestResults.results?.length && (
-                            <div style={{ padding:'10px', background:'#fef2f2', borderRadius:'10px', fontSize:'12px', color:'#b91c1c' }}>
-                              خطأ: {simTestResults.error}
-                            </div>
-                          )}
-                          {(simTestResults.results || []).map((r, i) => (
-                            <div key={i} style={{ padding:'10px 14px', background: r.passed ? '#ecfdf5' : '#fef2f2', borderRadius:'10px', border:`1px solid ${r.passed ? '#bbf7d0' : '#fecaca'}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                              <span style={{ fontSize:'13px', fontWeight:'700', color: r.passed ? '#15803d' : '#b91c1c' }}>
-                                {r.passed ? '✅' : '❌'} {r.label}
-                              </span>
-                              {!r.passed && r.details?.error && (
-                                <span style={{ fontSize:'11px', color:'#b91c1c' }}>{r.details.error}</span>
-                              )}
-                            </div>
-                          ))}
-                          {simTestResults.allPassed && (
-                            <div style={{ padding:'10px', background:'#f0fdf4', borderRadius:'10px', fontSize:'12px', color:'#15803d', fontWeight:'700' }}>
-                              {t('settings.zatca.simulation.all_passed')}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </Card>
-                  )}
 
                   {/* Device status / onboarding */}
                   {zatcaDevice?.production_csid ? (
@@ -749,6 +828,25 @@ export default function Settings() {
                           {t('settings.zatca.device_status.auto_sync_desc')}
                         </p>
                       </div>
+
+                      {/* ── [DEV-ONLY] Safe Re-onboard ── only visible behind the 5-click gate ── */}
+                      {showDevEnvironments && (
+                        <div style={{ marginTop:'16px', padding:'14px 16px', background:'#fef2f2', border:'1px dashed #ef4444', borderRadius:'12px' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px' }}>
+                            <AlertTriangle size={15} color="#b91c1c"/>
+                            <span style={{ fontSize:'12px', fontWeight:'800', color:'#b91c1c' }}>منطقة المطورين (Dev Only)</span>
+                          </div>
+                          <p style={{ fontSize:'11px', color:'#7f1d1d', lineHeight:'1.6', marginBottom:'10px' }}>
+                            إعادة التأهيل الآمنة تقوم بأرشفة الشهادة/CSID الحالية ثم مسحها لبدء تأهيل جديد. لا تؤثر على سجل الفواتير السابق أو عداد ICV الحالي.
+                          </p>
+                          <button
+                            onClick={() => { setDevResetModalOpen(true); setDevResetStatus('idle'); setDevResetError(''); }}
+                            style={{ ...btnOutlineDanger, fontSize:'12px', padding:'8px 16px' }}
+                          >
+                            <RefreshCw size={13}/> إعادة التأهيل الآمنة (Safe Re-onboard)
+                          </button>
+                        </div>
+                      )}
                     </Card>
                   ) : (
                     <Card title={t('settings.zatca.onboarding.title')} icon={<Key size={15}/>}>
@@ -816,6 +914,8 @@ export default function Settings() {
                       </div>
                     </Card>
                   )}
+                    </>
+                  )}
                 </div>
               )}
 
@@ -834,6 +934,12 @@ export default function Settings() {
                           <select value={form.receipt_printer} onChange={e => u('receipt_printer',e.target.value)} style={sel}>
                             <option value="">{t('settings.invoice.system_default')}</option>
                             {printers.map(p => <option key={p.name} value={p.name}>{p.name} {p.isDefault ? t('settings.invoice.default_suffix') : ''}</option>)}
+                          </select>
+                        </Field>
+                        <Field label="طابعة المطبخ (Kitchen Printer)">
+                          <select value={form.kitchen_printer} onChange={e => u('kitchen_printer',e.target.value)} style={sel}>
+                            <option value="">لا يوجد (إيقاف الطباعة)</option>
+                            {printers.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
                           </select>
                         </Field>
                         <Field label={t('settings.invoice.paper_width')}>
@@ -979,6 +1085,60 @@ export default function Settings() {
                     </div>
                     <div style={{ padding:'10px 12px', background:'#ecfdf5', borderRadius:'10px', fontSize:'12px', color:'#065f46' }}>
                       {t('settings.tax.loyalty_hint').replace('{{rate}}', form.loyalty_rate).replace('{{redeem_rate}}', form.loyalty_redeem_rate)}
+                    </div>
+                  </Card>
+                </div>
+              )}
+
+              {/* ══════════════════════════════════════════
+                  TAB 4.5 — إعدادات الخياطة
+              ══════════════════════════════════════════ */}
+              {activeTab === 'tailor' && form.business_type === 'tailor' && (
+                <div style={colGap}>
+                  <TabHeader icon={<Package size={18}/>} title="إعدادات نظام الخياطة"
+                    desc="تخصيص طرق حساب استهلاك القماش ووحدات القياس" />
+
+                  <Card title="الإعدادات العامة" icon={<Globe size={15}/>}>
+                    <div style={grid2}>
+                      <Field label="وحدة القياس الافتراضية للقماش">
+                        <select value={form.tailor_fabric_unit} onChange={e => u('tailor_fabric_unit', e.target.value)} style={sel}>
+                          <option value="meter">متر (Meters)</option>
+                          <option value="yard">ياردة (Yards)</option>
+                          <option value="inch">إنش (Inches)</option>
+                          <option value="cm">سنتيمتر (CM)</option>
+                        </select>
+                      </Field>
+                      <IF label="أيام التسليم الافتراضية" value={form.tailor_default_delivery_days} onChange={v => u('tailor_default_delivery_days', v)} placeholder="7" />
+                    </div>
+                  </Card>
+
+                  <Card title="حاسبة قص القماش (الثوب)" icon={<Package size={15}/>}>
+                    <div style={grid2}>
+                      <Field label="طريقة الحساب الافتراضية">
+                        <select value={form.tailor_thobe_calc_method} onChange={e => u('tailor_thobe_calc_method', e.target.value)} style={sel}>
+                          <option value="fixed">قيمة ثابتة (الكل نفس الاستهلاك)</option>
+                          <option value="formula">معادلة (الطول + إضافة)</option>
+                        </select>
+                      </Field>
+                      {form.tailor_thobe_calc_method === 'fixed' && (
+                        <IF label={`الاستهلاك الثابت للثوب (${form.tailor_fabric_unit})`} value={form.tailor_thobe_fixed_amount} onChange={v => u('tailor_thobe_fixed_amount', v)} placeholder="3.5" />
+                      )}
+                      {form.tailor_thobe_calc_method === 'formula' && (
+                        <IF label="مقدار الإضافة على الطول (بالإنش)" value={form.tailor_thobe_formula_add_inches} onChange={v => u('tailor_thobe_formula_add_inches', v)} placeholder="10" />
+                      )}
+                    </div>
+                    {form.tailor_thobe_calc_method === 'formula' && (
+                      <div style={{ padding:'10px 12px', background:'#eff6ff', borderRadius:'10px', fontSize:'12px', color:'#1e40af', marginTop:'10px' }}>
+                        💡 <strong>مثال:</strong> إذا كان طول العميل 55 إنش، سيتم إضافة {form.tailor_thobe_formula_add_inches} إنش. المجموع = {55 + parseFloat(form.tailor_thobe_formula_add_inches || 0)} إنش (سيتم تحويلها لوحدة القماش عند البيع).
+                      </div>
+                    )}
+                  </Card>
+
+                  <Card title="استهلاك القطع الأخرى (ثابت)" icon={<Package size={15}/>}>
+                    <div style={grid2}>
+                      <IF label={`البدلة (${form.tailor_fabric_unit})`} value={form.tailor_suit_fixed_amount} onChange={v => u('tailor_suit_fixed_amount', v)} placeholder="3.0" />
+                      <IF label={`البشت (${form.tailor_fabric_unit})`} value={form.tailor_bisht_fixed_amount} onChange={v => u('tailor_bisht_fixed_amount', v)} placeholder="2.0" />
+                      <IF label={`القميص (${form.tailor_fabric_unit})`} value={form.tailor_shirt_fixed_amount} onChange={v => u('tailor_shirt_fixed_amount', v)} placeholder="1.5" />
                     </div>
                   </Card>
                 </div>
@@ -1206,6 +1366,20 @@ export default function Settings() {
                         </select>
                       </Field>
                     </div>
+                  </Card>
+
+                  <Card title="خيارات نقاط البيع (POS Options)" icon={<Palette size={15}/>}>
+                    <Field label="الملاحظات الجاهزة (مفصولة بفاصلة)">
+                      <textarea 
+                        value={form.predefined_notes} 
+                        onChange={e => u('predefined_notes', e.target.value)} 
+                        placeholder="مثال: بدون شطة, سفري سريع, زيادة ثلج"
+                        style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid var(--border-subtle)', background: 'var(--bg-app)', outline: 'none', color: 'var(--text-main)', fontSize: '14px', fontFamily: 'inherit', minHeight: '80px', resize: 'vertical' }}
+                      />
+                      <p style={{ fontSize:'11px', color:'#64748b', marginTop:'4px' }}>
+                        أدخل الملاحظات الجاهزة التي ستظهر للكاشير لاختيارها السريع (افصل بينها بفاصلة ,)
+                      </p>
+                    </Field>
                   </Card>
                 </div>
               )}

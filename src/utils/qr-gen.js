@@ -13,6 +13,8 @@
  *   5. generateSVG: cell size raised from 2 → 4, quiet zone kept at 4.
  */
 
+import QRCodeLib from 'qrcode';
+
 /* eslint-disable no-unused-vars */
 const QRCode = (function() {
   function qrcode(typeNumber, errorCorrectionLevel) {
@@ -183,10 +185,30 @@ const QRCode = (function() {
      * or printed via Electron printToPDF.
      */
     generateSVG: (text, cellSize = 4) => {
-      const qr = qrcode(0, 'M');
-      qr.addData(text);
-      qr.make();
-      return qr.createSvgTag(cellSize, 4); // quiet zone fixed at ISO minimum of 4
+      if (!text) return '';
+      try {
+        const qr = QRCodeLib.create(text, { errorCorrectionLevel: 'M' });
+        const margin = 4;
+        const _moduleCount = qr.modules.size;
+        const size = _moduleCount + margin * 2;
+        const width = size * cellSize;
+        const height = width;
+        let svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + width + ' ' + height + '" width="' + width + 'px" height="' + height + 'px" shape-rendering="crispEdges">';
+        svg += '<rect width="100%" height="100%" fill="#ffffff" />';
+        for (let r = 0; r < _moduleCount; r++) {
+          for (let c = 0; c < _moduleCount; c++) {
+            if (qr.modules.data[r * _moduleCount + c]) {
+              let x = (c + margin) * cellSize; let y = (r + margin) * cellSize;
+              svg += '<rect x="' + x + '" y="' + y + '" width="' + cellSize + '" height="' + cellSize + '" fill="#000000" />';
+            }
+          }
+        }
+        svg += '</svg>';
+        return svg;
+      } catch (err) {
+        console.error("QR Code Generation failed:", err);
+        return '';
+      }
     },
 
     /**

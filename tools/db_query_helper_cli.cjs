@@ -138,6 +138,24 @@ app.whenReady().then(() => {
 
         else if (cmd === 'set-business-settings') {
             out('\n=== Setting Business Settings ===');
+            // ⚠️ DANGER — DEV/SANDBOX ONLY
+            // This command stamps vat_number = '399999999900003' (a ZATCA sandbox test VAT)
+            // into the database. If onboarding is run AFTER this command, the resulting
+            // CSID certificate will be permanently bound to 399999999900003. Any invoices
+            // submitted with the real client VAT will then be rejected with:
+            //   [vatRegistrationNumber_QRCODE_INVALID] and [certificate-permissions]
+            // DO NOT run this on a client machine that has already onboarded, or is
+            // intended to onboard with a real VAT number.
+            const existingEnv = db.prepare("SELECT value FROM business_settings WHERE key='zatca_env'").get();
+            const existingVat = db.prepare("SELECT value FROM business_settings WHERE key='vat_number'").get();
+            if (existingVat && existingVat.value && existingVat.value !== '399999999900003') {
+                out('[BLOCKED] This database already has a real VAT number: ' + existingVat.value);
+                out('[BLOCKED] Refusing to overwrite with sandbox test VAT 399999999900003.');
+                out('[BLOCKED] If you are absolutely sure, manually run the SQL directly.');
+                db.close();
+                app.quit();
+                return;
+            }
             db.prepare("INSERT OR REPLACE INTO business_settings (key, value) VALUES ('vat_number', '399999999900003')").run();
             db.prepare("INSERT OR REPLACE INTO business_settings (key, value) VALUES ('business_name_ar', 'شركة الاختبار للتجارة')").run();
             db.prepare("INSERT OR REPLACE INTO business_settings (key, value) VALUES ('zatca_env', 'sandbox')").run();

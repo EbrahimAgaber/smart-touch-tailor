@@ -1,0 +1,2642 @@
+{
+  "settings": {
+    "languages": [
+      "ar"
+    ],
+    "forceNER": true,
+    "tag": "nlp",
+    "threshold": 0.5,
+    "autoLoad": true,
+    "autoSave": true,
+    "modelFileName": "model.nlp",
+    "executeActionsBeforeAnswers": false,
+    "calculateSentiment": true
+  },
+  "nluManager": {
+    "settings": {
+      "tag": "nlu-manager"
+    },
+    "locales": [
+      "ar"
+    ],
+    "languageNames": {},
+    "domainManagers": {
+      "ar": {
+        "settings": {
+          "locale": "ar",
+          "trainByDomain": false,
+          "tag": "domain-manager-ar",
+          "nluByDomain": {
+            "default": {
+              "className": "NeuralNlu",
+              "settings": {}
+            }
+          },
+          "useStemDict": true
+        },
+        "stemDict": {
+          "كم,مبيع,يوم": {
+            "intent": "db:getFinancialReport",
+            "domain": "default"
+          },
+          "كم,مبيعا,يوم": {
+            "intent": "db:getFinancialReport",
+            "domain": "default"
+          },
+          "ارباح,كم,يوم": {
+            "intent": "db:getFinancialReport",
+            "domain": "default"
+          },
+          "ارباح": {
+            "intent": "db:getFinancialReport",
+            "domain": "default"
+          },
+          "مبيع": {
+            "intent": "db:getFinancialReport",
+            "domain": "default"
+          },
+          "تقرير,مبيع": {
+            "intent": "db:getFinancialReport",
+            "domain": "default"
+          },
+          "اعط,مبيع": {
+            "intent": "db:getFinancialReport",
+            "domain": "default"
+          },
+          "عنا,كم,يوم": {
+            "intent": "db:getFinancialReport",
+            "domain": "default"
+          },
+          "ماه,مصروف": {
+            "intent": "db:getExpenditures",
+            "domain": "default"
+          },
+          "اعرض,مصروف": {
+            "intent": "db:getExpenditures",
+            "domain": "default"
+          },
+          "قائم,مصروف": {
+            "intent": "db:getExpenditures",
+            "domain": "default"
+          },
+          "مصاريف,وش": {
+            "intent": "db:getExpenditures",
+            "domain": "default"
+          },
+          "عرض,عملاء": {
+            "intent": "db:getCustomers",
+            "domain": "default"
+          },
+          "عملاء,قائم": {
+            "intent": "db:getCustomers",
+            "domain": "default"
+          },
+          "عملاء,من,هم": {
+            "intent": "db:getCustomers",
+            "domain": "default"
+          },
+          "قائم,منتج": {
+            "intent": "db:getMenu",
+            "domain": "default"
+          },
+          "اصناف": {
+            "intent": "db:getMenu",
+            "domain": "default"
+          },
+          "اصناف,ماه": {
+            "intent": "db:getMenu",
+            "domain": "default"
+          },
+          "دخل,سنو,قائم": {
+            "intent": "acct:financialStatement",
+            "domain": "default"
+          },
+          "قوائم,مال": {
+            "intent": "acct:financialStatement",
+            "domain": "default"
+          },
+          "تقرير,سنو,مال": {
+            "intent": "acct:financialStatement",
+            "domain": "default"
+          },
+          "استاذ,دفتر,عام": {
+            "intent": "acct:generalLedger",
+            "domain": "default"
+          },
+          "قيود,يوم": {
+            "intent": "acct:generalLedger",
+            "domain": "default"
+          },
+          "مال,مركز": {
+            "intent": "acct:generalLedger",
+            "domain": "default"
+          },
+          "اقرار,ضريب": {
+            "intent": "acct:vatReport",
+            "domain": "default"
+          },
+          "تقرير,ضريب": {
+            "intent": "acct:vatReport",
+            "domain": "default"
+          },
+          "بزنس,تحليل": {
+            "intent": "acct:businessInsight",
+            "domain": "default"
+          },
+          "اعمال,رؤ": {
+            "intent": "acct:businessInsight",
+            "domain": "default"
+          },
+          "اعط,تقييم,مبيع": {
+            "intent": "acct:businessInsight",
+            "domain": "default"
+          },
+          "اداء,تحليل": {
+            "intent": "acct:businessInsight",
+            "domain": "default"
+          },
+          "amount,description,ريال,صرف,علي": {
+            "intent": "db:addExpenditure",
+            "domain": "default"
+          },
+          "amount,description,صرف,علي": {
+            "intent": "db:addExpenditure",
+            "domain": "default"
+          },
+          "amount,description,اضف,ريال,مصروف": {
+            "intent": "db:addExpenditure",
+            "domain": "default"
+          },
+          "amount,ريال,سجل,مصروف": {
+            "intent": "db:addExpenditure",
+            "domain": "default"
+          },
+          "amount,ريال,مصروف": {
+            "intent": "db:addExpenditure",
+            "domain": "default"
+          },
+          "صرف": {
+            "intent": "db:addExpenditure",
+            "domain": "default"
+          },
+          "مصروف": {
+            "intent": "db:addExpenditure",
+            "domain": "default"
+          },
+          "name,اسم,اضاف,جديد,عميل": {
+            "intent": "db:addCustomer",
+            "domain": "default"
+          },
+          "جديد,سجل,عميل": {
+            "intent": "db:addCustomer",
+            "domain": "default"
+          },
+          "اضف,عميل": {
+            "intent": "db:addCustomer",
+            "domain": "default"
+          },
+          "عند,فاتور,مشتريا": {
+            "intent": "processInvoiceAndPO",
+            "domain": "default"
+          },
+          "سجل,فاتور,مشتر,من": {
+            "intent": "processInvoiceAndPO",
+            "domain": "default"
+          },
+          "عند,فاتور": {
+            "intent": "processInvoiceAndPO",
+            "domain": "default"
+          },
+          "جديد,فاتور": {
+            "intent": "processInvoiceAndPO",
+            "domain": "default"
+          },
+          "سجل,فاتور": {
+            "intent": "processInvoiceAndPO",
+            "domain": "default"
+          },
+          "invoiceid,بيع,رقم,غاء": {
+            "intent": "db:voidSale",
+            "domain": "default"
+          },
+          "فاتور,مرتجع": {
+            "intent": "db:voidSale",
+            "domain": "default"
+          },
+          "غاء,فاتور": {
+            "intent": "db:voidSale",
+            "domain": "default"
+          },
+          "بيع,غاء": {
+            "intent": "db:voidSale",
+            "domain": "default"
+          },
+          "فتح,ورد": {
+            "intent": "shift:open",
+            "domain": "default"
+          },
+          "افتح,ورد": {
+            "intent": "shift:open",
+            "domain": "default"
+          },
+          "صندوق,فتح": {
+            "intent": "shift:open",
+            "domain": "default"
+          },
+          "بدء,دوام": {
+            "intent": "shift:open",
+            "domain": "default"
+          },
+          "اغلاق,ورد": {
+            "intent": "shift:close",
+            "domain": "default"
+          },
+          "قفل,ورد": {
+            "intent": "shift:close",
+            "domain": "default"
+          },
+          "تقفيل,صندوق": {
+            "intent": "shift:close",
+            "domain": "default"
+          },
+          "انهاء,دوام": {
+            "intent": "shift:close",
+            "domain": "default"
+          },
+          "مرحب": {
+            "intent": "greetings.hello",
+            "domain": "default"
+          },
+          "سلام,علي": {
+            "intent": "greetings.hello",
+            "domain": "default"
+          },
+          "هلا": {
+            "intent": "greetings.hello",
+            "domain": "default"
+          },
+          "حال,كيف": {
+            "intent": "greetings.hello",
+            "domain": "default"
+          }
+        },
+        "intentDict": {
+          "db:getFinancialReport": "default",
+          "db:getExpenditures": "default",
+          "db:getCustomers": "default",
+          "db:getMenu": "default",
+          "acct:financialStatement": "default",
+          "acct:generalLedger": "default",
+          "acct:vatReport": "default",
+          "acct:businessInsight": "default",
+          "db:addExpenditure": "default",
+          "db:addCustomer": "default",
+          "processInvoiceAndPO": "default",
+          "db:voidSale": "default",
+          "shift:open": "default",
+          "shift:close": "default",
+          "greetings.hello": "default"
+        },
+        "sentences": [
+          {
+            "domain": "default",
+            "utterance": "كم المبيعات اليوم",
+            "intent": "db:getFinancialReport"
+          },
+          {
+            "domain": "default",
+            "utterance": "كم مبيعات اليوم",
+            "intent": "db:getFinancialReport"
+          },
+          {
+            "domain": "default",
+            "utterance": "ارباح اليوم كم",
+            "intent": "db:getFinancialReport"
+          },
+          {
+            "domain": "default",
+            "utterance": "الارباح",
+            "intent": "db:getFinancialReport"
+          },
+          {
+            "domain": "default",
+            "utterance": "المبيعات",
+            "intent": "db:getFinancialReport"
+          },
+          {
+            "domain": "default",
+            "utterance": "تقرير المبيعات",
+            "intent": "db:getFinancialReport"
+          },
+          {
+            "domain": "default",
+            "utterance": "اعطني المبيعات",
+            "intent": "db:getFinancialReport"
+          },
+          {
+            "domain": "default",
+            "utterance": "كم بعنا اليوم",
+            "intent": "db:getFinancialReport"
+          },
+          {
+            "domain": "default",
+            "utterance": "ماهي المصروفات",
+            "intent": "db:getExpenditures"
+          },
+          {
+            "domain": "default",
+            "utterance": "اعرض المصروفات",
+            "intent": "db:getExpenditures"
+          },
+          {
+            "domain": "default",
+            "utterance": "قائمة المصروفات",
+            "intent": "db:getExpenditures"
+          },
+          {
+            "domain": "default",
+            "utterance": "وش المصاريف",
+            "intent": "db:getExpenditures"
+          },
+          {
+            "domain": "default",
+            "utterance": "عرض العملاء",
+            "intent": "db:getCustomers"
+          },
+          {
+            "domain": "default",
+            "utterance": "قائمة العملاء",
+            "intent": "db:getCustomers"
+          },
+          {
+            "domain": "default",
+            "utterance": "من هم العملاء",
+            "intent": "db:getCustomers"
+          },
+          {
+            "domain": "default",
+            "utterance": "قائمة المنتجات",
+            "intent": "db:getMenu"
+          },
+          {
+            "domain": "default",
+            "utterance": "الاصناف",
+            "intent": "db:getMenu"
+          },
+          {
+            "domain": "default",
+            "utterance": "ماهي الاصناف",
+            "intent": "db:getMenu"
+          },
+          {
+            "domain": "default",
+            "utterance": "قائمة الدخل السنوية",
+            "intent": "acct:financialStatement"
+          },
+          {
+            "domain": "default",
+            "utterance": "القوائم المالية",
+            "intent": "acct:financialStatement"
+          },
+          {
+            "domain": "default",
+            "utterance": "التقرير المالي السنوي",
+            "intent": "acct:financialStatement"
+          },
+          {
+            "domain": "default",
+            "utterance": "دفتر الاستاذ العام",
+            "intent": "acct:generalLedger"
+          },
+          {
+            "domain": "default",
+            "utterance": "القيود اليومية",
+            "intent": "acct:generalLedger"
+          },
+          {
+            "domain": "default",
+            "utterance": "المركز المالي",
+            "intent": "acct:generalLedger"
+          },
+          {
+            "domain": "default",
+            "utterance": "الاقرار الضريبي",
+            "intent": "acct:vatReport"
+          },
+          {
+            "domain": "default",
+            "utterance": "تقرير الضريبة",
+            "intent": "acct:vatReport"
+          },
+          {
+            "domain": "default",
+            "utterance": "تحليل البزنس",
+            "intent": "acct:businessInsight"
+          },
+          {
+            "domain": "default",
+            "utterance": "رؤية الاعمال",
+            "intent": "acct:businessInsight"
+          },
+          {
+            "domain": "default",
+            "utterance": "اعطني تقييم للمبيعات",
+            "intent": "acct:businessInsight"
+          },
+          {
+            "domain": "default",
+            "utterance": "تحليل الاداء",
+            "intent": "acct:businessInsight"
+          },
+          {
+            "domain": "default",
+            "utterance": "صرفت %amount% ريال على %description%",
+            "intent": "db:addExpenditure"
+          },
+          {
+            "domain": "default",
+            "utterance": "صرفت %amount% على %description%",
+            "intent": "db:addExpenditure"
+          },
+          {
+            "domain": "default",
+            "utterance": "اضف مصروف %amount% ريال %description%",
+            "intent": "db:addExpenditure"
+          },
+          {
+            "domain": "default",
+            "utterance": "سجل مصروف %amount% ريال",
+            "intent": "db:addExpenditure"
+          },
+          {
+            "domain": "default",
+            "utterance": "مصروف %amount% ريال",
+            "intent": "db:addExpenditure"
+          },
+          {
+            "domain": "default",
+            "utterance": "صرفت",
+            "intent": "db:addExpenditure"
+          },
+          {
+            "domain": "default",
+            "utterance": "مصروف",
+            "intent": "db:addExpenditure"
+          },
+          {
+            "domain": "default",
+            "utterance": "اضافة عميل جديد اسمه %name%",
+            "intent": "db:addCustomer"
+          },
+          {
+            "domain": "default",
+            "utterance": "سجل عميل جديد",
+            "intent": "db:addCustomer"
+          },
+          {
+            "domain": "default",
+            "utterance": "اضف عميل",
+            "intent": "db:addCustomer"
+          },
+          {
+            "domain": "default",
+            "utterance": "عندي فاتورة مشتريات",
+            "intent": "processInvoiceAndPO"
+          },
+          {
+            "domain": "default",
+            "utterance": "سجل المشتريات من الفاتورة",
+            "intent": "processInvoiceAndPO"
+          },
+          {
+            "domain": "default",
+            "utterance": "عندي فاتورة",
+            "intent": "processInvoiceAndPO"
+          },
+          {
+            "domain": "default",
+            "utterance": "فاتورة جديدة",
+            "intent": "processInvoiceAndPO"
+          },
+          {
+            "domain": "default",
+            "utterance": "سجل فاتورة",
+            "intent": "processInvoiceAndPO"
+          },
+          {
+            "domain": "default",
+            "utterance": "الغاء البيعة رقم %invoiceId%",
+            "intent": "db:voidSale"
+          },
+          {
+            "domain": "default",
+            "utterance": "مرتجع الفاتورة",
+            "intent": "db:voidSale"
+          },
+          {
+            "domain": "default",
+            "utterance": "الغاء الفاتورة",
+            "intent": "db:voidSale"
+          },
+          {
+            "domain": "default",
+            "utterance": "الغاء بيع",
+            "intent": "db:voidSale"
+          },
+          {
+            "domain": "default",
+            "utterance": "فتح الوردية",
+            "intent": "shift:open"
+          },
+          {
+            "domain": "default",
+            "utterance": "افتح الوردية",
+            "intent": "shift:open"
+          },
+          {
+            "domain": "default",
+            "utterance": "فتح الصندوق",
+            "intent": "shift:open"
+          },
+          {
+            "domain": "default",
+            "utterance": "بدء الدوام",
+            "intent": "shift:open"
+          },
+          {
+            "domain": "default",
+            "utterance": "اغلاق الوردية",
+            "intent": "shift:close"
+          },
+          {
+            "domain": "default",
+            "utterance": "قفل الوردية",
+            "intent": "shift:close"
+          },
+          {
+            "domain": "default",
+            "utterance": "تقفيل الصندوق",
+            "intent": "shift:close"
+          },
+          {
+            "domain": "default",
+            "utterance": "انهاء الدوام",
+            "intent": "shift:close"
+          },
+          {
+            "domain": "default",
+            "utterance": "مرحبا",
+            "intent": "greetings.hello"
+          },
+          {
+            "domain": "default",
+            "utterance": "السلام عليكم",
+            "intent": "greetings.hello"
+          },
+          {
+            "domain": "default",
+            "utterance": "هلا",
+            "intent": "greetings.hello"
+          },
+          {
+            "domain": "default",
+            "utterance": "كيف حالك",
+            "intent": "greetings.hello"
+          }
+        ],
+        "domains": {
+          "master_domain": {
+            "settings": {
+              "locale": "ar",
+              "tag": "nlu-ar",
+              "keepStopwords": true,
+              "nonefeatureValue": 1,
+              "nonedeltaMultiplier": 1.2,
+              "spellCheck": false,
+              "spellCheckDistance": 1,
+              "filterZeros": true,
+              "log": true
+            },
+            "features": {
+              "كم": 1,
+              "مبيع": 1,
+              "يوم": 1,
+              "مبيعا": 1,
+              "ارباح": 1,
+              "تقرير": 1,
+              "اعط": 1,
+              "عنا": 1,
+              "ماه": 1,
+              "مصروف": 1,
+              "اعرض": 1,
+              "قائم": 1,
+              "وش": 1,
+              "مصاريف": 1,
+              "عرض": 1,
+              "عملاء": 1,
+              "من": 1,
+              "هم": 1,
+              "منتج": 1,
+              "اصناف": 1,
+              "دخل": 1,
+              "سنو": 1,
+              "قوائم": 1,
+              "مال": 1,
+              "دفتر": 1,
+              "استاذ": 1,
+              "عام": 1,
+              "قيود": 1,
+              "مركز": 1,
+              "اقرار": 1,
+              "ضريب": 1,
+              "تحليل": 1,
+              "بزنس": 1,
+              "رؤ": 1,
+              "اعمال": 1,
+              "تقييم": 1,
+              "اداء": 1,
+              "صرف": 1,
+              "amount": 1,
+              "ريال": 1,
+              "علي": 1,
+              "description": 1,
+              "اضف": 1,
+              "سجل": 1,
+              "اضاف": 1,
+              "عميل": 1,
+              "جديد": 1,
+              "اسم": 1,
+              "name": 1,
+              "عند": 1,
+              "فاتور": 1,
+              "مشتريا": 1,
+              "مشتر": 1,
+              "غاء": 1,
+              "بيع": 1,
+              "رقم": 1,
+              "invoiceid": 1,
+              "مرتجع": 1,
+              "فتح": 1,
+              "ورد": 1,
+              "افتح": 1,
+              "صندوق": 1,
+              "بدء": 1,
+              "دوام": 1,
+              "اغلاق": 1,
+              "قفل": 1,
+              "تقفيل": 1,
+              "انهاء": 1,
+              "مرحب": 1,
+              "سلام": 1,
+              "هلا": 1,
+              "كيف": 1,
+              "حال": 1
+            },
+            "intents": {
+              "db:getFinancialReport": 1,
+              "db:getExpenditures": 1,
+              "db:getCustomers": 1,
+              "db:getMenu": 1,
+              "acct:financialStatement": 1,
+              "acct:generalLedger": 1,
+              "acct:vatReport": 1,
+              "acct:businessInsight": 1,
+              "db:addExpenditure": 1,
+              "db:addCustomer": 1,
+              "processInvoiceAndPO": 1,
+              "db:voidSale": 1,
+              "shift:open": 1,
+              "shift:close": 1,
+              "greetings.hello": 1
+            },
+            "intentFeatures": {
+              "db:getFinancialReport": {
+                "كم": 1,
+                "مبيع": 1,
+                "يوم": 1,
+                "مبيعا": 1,
+                "ارباح": 1,
+                "تقرير": 1,
+                "اعط": 1,
+                "عنا": 1
+              },
+              "db:getExpenditures": {
+                "ماه": 1,
+                "مصروف": 1,
+                "اعرض": 1,
+                "قائم": 1,
+                "وش": 1,
+                "مصاريف": 1
+              },
+              "db:getCustomers": {
+                "عرض": 1,
+                "عملاء": 1,
+                "قائم": 1,
+                "من": 1,
+                "هم": 1
+              },
+              "db:getMenu": {
+                "قائم": 1,
+                "منتج": 1,
+                "اصناف": 1,
+                "ماه": 1
+              },
+              "acct:financialStatement": {
+                "قائم": 1,
+                "دخل": 1,
+                "سنو": 1,
+                "قوائم": 1,
+                "مال": 1,
+                "تقرير": 1
+              },
+              "acct:generalLedger": {
+                "دفتر": 1,
+                "استاذ": 1,
+                "عام": 1,
+                "قيود": 1,
+                "يوم": 1,
+                "مركز": 1,
+                "مال": 1
+              },
+              "acct:vatReport": {
+                "اقرار": 1,
+                "ضريب": 1,
+                "تقرير": 1
+              },
+              "acct:businessInsight": {
+                "تحليل": 1,
+                "بزنس": 1,
+                "رؤ": 1,
+                "اعمال": 1,
+                "اعط": 1,
+                "تقييم": 1,
+                "مبيع": 1,
+                "اداء": 1
+              },
+              "db:addExpenditure": {
+                "صرف": 1,
+                "amount": 1,
+                "ريال": 1,
+                "علي": 1,
+                "description": 1,
+                "اضف": 1,
+                "مصروف": 1,
+                "سجل": 1
+              },
+              "db:addCustomer": {
+                "اضاف": 1,
+                "عميل": 1,
+                "جديد": 1,
+                "اسم": 1,
+                "name": 1,
+                "سجل": 1,
+                "اضف": 1
+              },
+              "processInvoiceAndPO": {
+                "عند": 1,
+                "فاتور": 1,
+                "مشتريا": 1,
+                "سجل": 1,
+                "مشتر": 1,
+                "من": 1,
+                "جديد": 1
+              },
+              "db:voidSale": {
+                "غاء": 1,
+                "بيع": 1,
+                "رقم": 1,
+                "invoiceid": 1,
+                "مرتجع": 1,
+                "فاتور": 1
+              },
+              "shift:open": {
+                "فتح": 1,
+                "ورد": 1,
+                "افتح": 1,
+                "صندوق": 1,
+                "بدء": 1,
+                "دوام": 1
+              },
+              "shift:close": {
+                "اغلاق": 1,
+                "ورد": 1,
+                "قفل": 1,
+                "تقفيل": 1,
+                "صندوق": 1,
+                "انهاء": 1,
+                "دوام": 1
+              },
+              "greetings.hello": {
+                "مرحب": 1,
+                "سلام": 1,
+                "علي": 1,
+                "هلا": 1,
+                "كيف": 1,
+                "حال": 1
+              }
+            },
+            "featuresToIntent": {
+              "كم": [
+                "db:getFinancialReport"
+              ],
+              "مبيع": [
+                "db:getFinancialReport",
+                "acct:businessInsight"
+              ],
+              "يوم": [
+                "db:getFinancialReport",
+                "acct:generalLedger"
+              ],
+              "مبيعا": [
+                "db:getFinancialReport"
+              ],
+              "ارباح": [
+                "db:getFinancialReport"
+              ],
+              "تقرير": [
+                "db:getFinancialReport",
+                "acct:financialStatement",
+                "acct:vatReport"
+              ],
+              "اعط": [
+                "db:getFinancialReport",
+                "acct:businessInsight"
+              ],
+              "عنا": [
+                "db:getFinancialReport"
+              ],
+              "ماه": [
+                "db:getExpenditures",
+                "db:getMenu"
+              ],
+              "مصروف": [
+                "db:getExpenditures",
+                "db:addExpenditure"
+              ],
+              "اعرض": [
+                "db:getExpenditures"
+              ],
+              "قائم": [
+                "db:getExpenditures",
+                "db:getCustomers",
+                "db:getMenu",
+                "acct:financialStatement"
+              ],
+              "وش": [
+                "db:getExpenditures"
+              ],
+              "مصاريف": [
+                "db:getExpenditures"
+              ],
+              "عرض": [
+                "db:getCustomers"
+              ],
+              "عملاء": [
+                "db:getCustomers"
+              ],
+              "من": [
+                "db:getCustomers",
+                "processInvoiceAndPO"
+              ],
+              "هم": [
+                "db:getCustomers"
+              ],
+              "منتج": [
+                "db:getMenu"
+              ],
+              "اصناف": [
+                "db:getMenu"
+              ],
+              "دخل": [
+                "acct:financialStatement"
+              ],
+              "سنو": [
+                "acct:financialStatement"
+              ],
+              "قوائم": [
+                "acct:financialStatement"
+              ],
+              "مال": [
+                "acct:financialStatement",
+                "acct:generalLedger"
+              ],
+              "دفتر": [
+                "acct:generalLedger"
+              ],
+              "استاذ": [
+                "acct:generalLedger"
+              ],
+              "عام": [
+                "acct:generalLedger"
+              ],
+              "قيود": [
+                "acct:generalLedger"
+              ],
+              "مركز": [
+                "acct:generalLedger"
+              ],
+              "اقرار": [
+                "acct:vatReport"
+              ],
+              "ضريب": [
+                "acct:vatReport"
+              ],
+              "تحليل": [
+                "acct:businessInsight"
+              ],
+              "بزنس": [
+                "acct:businessInsight"
+              ],
+              "رؤ": [
+                "acct:businessInsight"
+              ],
+              "اعمال": [
+                "acct:businessInsight"
+              ],
+              "تقييم": [
+                "acct:businessInsight"
+              ],
+              "اداء": [
+                "acct:businessInsight"
+              ],
+              "صرف": [
+                "db:addExpenditure"
+              ],
+              "amount": [
+                "db:addExpenditure"
+              ],
+              "ريال": [
+                "db:addExpenditure"
+              ],
+              "علي": [
+                "db:addExpenditure",
+                "greetings.hello"
+              ],
+              "description": [
+                "db:addExpenditure"
+              ],
+              "اضف": [
+                "db:addExpenditure",
+                "db:addCustomer"
+              ],
+              "سجل": [
+                "db:addExpenditure",
+                "db:addCustomer",
+                "processInvoiceAndPO"
+              ],
+              "اضاف": [
+                "db:addCustomer"
+              ],
+              "عميل": [
+                "db:addCustomer"
+              ],
+              "جديد": [
+                "db:addCustomer",
+                "processInvoiceAndPO"
+              ],
+              "اسم": [
+                "db:addCustomer"
+              ],
+              "name": [
+                "db:addCustomer"
+              ],
+              "عند": [
+                "processInvoiceAndPO"
+              ],
+              "فاتور": [
+                "processInvoiceAndPO",
+                "db:voidSale"
+              ],
+              "مشتريا": [
+                "processInvoiceAndPO"
+              ],
+              "مشتر": [
+                "processInvoiceAndPO"
+              ],
+              "غاء": [
+                "db:voidSale"
+              ],
+              "بيع": [
+                "db:voidSale"
+              ],
+              "رقم": [
+                "db:voidSale"
+              ],
+              "invoiceid": [
+                "db:voidSale"
+              ],
+              "مرتجع": [
+                "db:voidSale"
+              ],
+              "فتح": [
+                "shift:open"
+              ],
+              "ورد": [
+                "shift:open",
+                "shift:close"
+              ],
+              "افتح": [
+                "shift:open"
+              ],
+              "صندوق": [
+                "shift:open",
+                "shift:close"
+              ],
+              "بدء": [
+                "shift:open"
+              ],
+              "دوام": [
+                "shift:open",
+                "shift:close"
+              ],
+              "اغلاق": [
+                "shift:close"
+              ],
+              "قفل": [
+                "shift:close"
+              ],
+              "تقفيل": [
+                "shift:close"
+              ],
+              "انهاء": [
+                "shift:close"
+              ],
+              "مرحب": [
+                "greetings.hello"
+              ],
+              "سلام": [
+                "greetings.hello"
+              ],
+              "هلا": [
+                "greetings.hello"
+              ],
+              "كيف": [
+                "greetings.hello"
+              ],
+              "حال": [
+                "greetings.hello"
+              ]
+            },
+            "neuralNetwork": {
+              "settings": {
+                "locale": "ar",
+                "tag": "nlu-ar",
+                "keepStopwords": true,
+                "nonefeatureValue": 1,
+                "nonedeltaMultiplier": 1.2,
+                "spellCheck": false,
+                "spellCheckDistance": 1,
+                "filterZeros": true,
+                "log": true
+              },
+              "features": [
+                "كم",
+                "مبيع",
+                "يوم",
+                "مبيعا",
+                "ارباح",
+                "تقرير",
+                "اعط",
+                "عنا",
+                "ماه",
+                "مصروف",
+                "اعرض",
+                "قائم",
+                "وش",
+                "مصاريف",
+                "عرض",
+                "عملاء",
+                "من",
+                "هم",
+                "منتج",
+                "اصناف",
+                "دخل",
+                "سنو",
+                "قوائم",
+                "مال",
+                "دفتر",
+                "استاذ",
+                "عام",
+                "قيود",
+                "مركز",
+                "اقرار",
+                "ضريب",
+                "تحليل",
+                "بزنس",
+                "رؤ",
+                "اعمال",
+                "تقييم",
+                "اداء",
+                "صرف",
+                "amount",
+                "ريال",
+                "علي",
+                "description",
+                "اضف",
+                "سجل",
+                "اضاف",
+                "عميل",
+                "جديد",
+                "اسم",
+                "name",
+                "عند",
+                "فاتور",
+                "مشتريا",
+                "مشتر",
+                "غاء",
+                "بيع",
+                "رقم",
+                "invoiceid",
+                "مرتجع",
+                "فتح",
+                "ورد",
+                "افتح",
+                "صندوق",
+                "بدء",
+                "دوام",
+                "اغلاق",
+                "قفل",
+                "تقفيل",
+                "انهاء",
+                "مرحب",
+                "سلام",
+                "هلا",
+                "كيف",
+                "حال"
+              ],
+              "intents": [
+                "db:getFinancialReport",
+                "db:getExpenditures",
+                "db:getCustomers",
+                "db:getMenu",
+                "acct:financialStatement",
+                "acct:generalLedger",
+                "acct:vatReport",
+                "acct:businessInsight",
+                "db:addExpenditure",
+                "db:addCustomer",
+                "processInvoiceAndPO",
+                "db:voidSale",
+                "shift:open",
+                "shift:close",
+                "greetings.hello"
+              ],
+              "perceptrons": [
+                [
+                  1.9140625,
+                  11.49417781829834,
+                  -1.4390109777450562,
+                  11.236577987670898,
+                  11.586891174316406,
+                  0.42865827679634094,
+                  0.3362828493118286,
+                  11.221443176269531,
+                  -0.7939520478248596,
+                  -2.4271297454833984,
+                  -0.4633973240852356,
+                  -1.664070725440979,
+                  -1.2260814905166626,
+                  -1.2260814905166626,
+                  -0.8702781200408936,
+                  -1.583485722541809,
+                  -0.4691810607910156,
+                  -0.405038982629776,
+                  -0.7871031165122986,
+                  -2.435884714126587,
+                  -0.1978488266468048,
+                  -1.6500215530395508,
+                  -0.40392783284187317,
+                  -2.1480987071990967,
+                  -0.8178583979606628,
+                  -0.8178583979606628,
+                  -0.8178583979606628,
+                  -3.332935333251953,
+                  -0.3011966049671173,
+                  -0.3450236916542053,
+                  -3.6602306365966797,
+                  -1.6342253684997559,
+                  -0.8194544315338135,
+                  -1.2242788076400757,
+                  -1.2242788076400757,
+                  -14.247020721435547,
+                  -0.8142238259315491,
+                  -2.42864990234375,
+                  -0.23838292062282562,
+                  -0.14181438088417053,
+                  -1.3275433778762817,
+                  -0.21495233476161957,
+                  -1.0798557996749878,
+                  -0.5684348940849304,
+                  -0.17326995730400085,
+                  -1.363141417503357,
+                  -0.5706214308738708,
+                  -0.17326995730400085,
+                  -0.17326995730400085,
+                  -0.5697869062423706,
+                  -1.8800448179244995,
+                  -0.13117554783821106,
+                  -0.04672890529036522,
+                  -1.2468127012252808,
+                  -1.1945945024490356,
+                  -0.15939627587795258,
+                  -0.15939627587795258,
+                  -0.5676805973052979,
+                  -0.8696843981742859,
+                  -1.8754901885986328,
+                  -0.5723687410354614,
+                  -1.5757397413253784,
+                  -0.8156251311302185,
+                  -1.6294859647750854,
+                  -0.5706256628036499,
+                  -0.5696681141853333,
+                  -0.8673306107521057,
+                  -0.8132267594337463,
+                  -2.420525312423706,
+                  -1.1097602844238281,
+                  -2.4181299209594727,
+                  -1.2176660299301147,
+                  -1.2176660299301147,
+                  2.4463270722793706
+                ],
+                [
+                  -0.019777707755565643,
+                  -0.31354188919067383,
+                  -0.3952814042568207,
+                  -0.0062763080932199955,
+                  -0.1579723358154297,
+                  -0.36612963676452637,
+                  -0.2714022994041443,
+                  -0.0009513541008345783,
+                  11.898850440979004,
+                  7.130125999450684,
+                  12.060541152954102,
+                  11.392288208007812,
+                  9.673426628112793,
+                  9.673426628112793,
+                  -0.3144819438457489,
+                  -6.002598285675049,
+                  -0.1963128000497818,
+                  -0.18294160068035126,
+                  -6.004307270050049,
+                  -6.5572190284729,
+                  -2.9788293838500977,
+                  -3.1241276264190674,
+                  -0.27872174978256226,
+                  -0.6879472732543945,
+                  -0.32099485397338867,
+                  -0.32099485397338867,
+                  -0.32099485397338867,
+                  -0.37197744846343994,
+                  -0.2271694839000702,
+                  -0.2966589033603668,
+                  -0.5467942953109741,
+                  -0.5646299123764038,
+                  -0.2965340316295624,
+                  -0.36711257696151733,
+                  -0.36711257696151733,
+                  -0.268855482339859,
+                  -0.24747727811336517,
+                  -0.4448440372943878,
+                  -3.929840326309204,
+                  -3.8693864345550537,
+                  -0.20393843948841095,
+                  -0.9834088683128357,
+                  -0.8814330101013184,
+                  -1.17066490650177,
+                  -0.06624754518270493,
+                  -0.1024455651640892,
+                  -0.1331060230731964,
+                  -0.06624754518270493,
+                  -0.06624754518270493,
+                  -0.11974593251943588,
+                  -0.28069889545440674,
+                  -0.055855344980955124,
+                  -0.0035289807710796595,
+                  -0.1817939579486847,
+                  -0.1541297435760498,
+                  -0.06573735177516937,
+                  -0.06573735177516937,
+                  -0.06916435062885284,
+                  -0.1590949296951294,
+                  -0.2875308394432068,
+                  -0.07951024919748306,
+                  -0.1981601119041443,
+                  -0.11276036500930786,
+                  -0.21703208982944489,
+                  -0.0652611255645752,
+                  -0.05836852267384529,
+                  -0.1017807200551033,
+                  -0.09468808770179749,
+                  -0.17356450855731964,
+                  -0.0787150114774704,
+                  -0.1657371073961258,
+                  -0.12235601991415024,
+                  -0.12235601991415024,
+                  -5.286163831738048
+                ],
+                [
+                  -0.07518929988145828,
+                  -0.2931625545024872,
+                  -0.302811861038208,
+                  -0.02823917753994465,
+                  -0.23522324860095978,
+                  -0.2388409972190857,
+                  -0.16897861659526825,
+                  -0.010090294294059277,
+                  -0.1981634795665741,
+                  -2.3057734966278076,
+                  -0.0046531264670193195,
+                  2.4563064575195312,
+                  -0.13130821287631989,
+                  -0.13130821287631989,
+                  2.471856117248535,
+                  11.966368675231934,
+                  0.8987061381340027,
+                  1.5690088272094727,
+                  -2.3062915802001953,
+                  -0.5220917463302612,
+                  -1.100719928741455,
+                  -1.207600712776184,
+                  -0.17960351705551147,
+                  -0.45968449115753174,
+                  -0.20777645707130432,
+                  -0.20777645707130432,
+                  -0.20777645707130432,
+                  -0.21636998653411865,
+                  -0.1361451894044876,
+                  -0.18941378593444824,
+                  -0.3511611521244049,
+                  -0.355924516916275,
+                  -0.18002495169639587,
+                  -0.22870950400829315,
+                  -0.22870950400829315,
+                  -0.14939266443252563,
+                  -0.1488381177186966,
+                  -0.34986618161201477,
+                  -0.234568789601326,
+                  -0.17393264174461365,
+                  -0.24173428118228912,
+                  -0.15722401440143585,
+                  -0.16708619892597198,
+                  -0.7474658489227295,
+                  -0.07323472201824188,
+                  -0.2878313362598419,
+                  -0.17628927528858185,
+                  -0.07323472201824188,
+                  -0.07323472201824188,
+                  -0.10550368577241898,
+                  -0.8484169840812683,
+                  -0.061633188277482986,
+                  -0.6330605745315552,
+                  -0.2208995372056961,
+                  -0.20211699604988098,
+                  -0.08067163079977036,
+                  -0.08067163079977036,
+                  -0.02708781510591507,
+                  -0.19850343465805054,
+                  -0.3547542095184326,
+                  -0.09672678261995316,
+                  -0.2445317804813385,
+                  -0.13563279807567596,
+                  -0.26521530747413635,
+                  -0.07849285006523132,
+                  -0.06968854367733002,
+                  -0.12754787504673004,
+                  -0.11827737092971802,
+                  -0.24583174288272858,
+                  -0.11036276817321777,
+                  -0.2399904429912567,
+                  -0.15915130078792572,
+                  -0.15915130078792572,
+                  -0.1471576321913953
+                ],
+                [
+                  -0.20974065363407135,
+                  -0.8848863840103149,
+                  -0.599393904209137,
+                  -0.07844030112028122,
+                  -0.8850104212760925,
+                  -0.4025733172893524,
+                  -0.28404632210731506,
+                  -0.07721850275993347,
+                  0.07841319590806961,
+                  -3.8258609771728516,
+                  -0.00030387871083803475,
+                  2.9393796920776367,
+                  -0.44301000237464905,
+                  -0.44301000237464905,
+                  -0.06237496808171272,
+                  -3.825680732727051,
+                  -0.08318649977445602,
+                  -0.010438299737870693,
+                  10.45994758605957,
+                  13.348053932189941,
+                  -1.8363358974456787,
+                  -2.003986120223999,
+                  -0.31293442845344543,
+                  -0.7492647767066956,
+                  -0.3423381447792053,
+                  -0.3423381447792053,
+                  -0.3423381447792053,
+                  -0.37676382064819336,
+                  -0.24086898565292358,
+                  -0.3454555571079254,
+                  -0.5980825424194336,
+                  -0.6275467872619629,
+                  -0.33020782470703125,
+                  -0.4434496760368347,
+                  -0.4434496760368347,
+                  -0.24439729750156403,
+                  -0.2848687171936035,
+                  -0.8858432173728943,
+                  -0.3460555672645569,
+                  -0.2529553174972534,
+                  -0.5360927581787109,
+                  -0.2267054319381714,
+                  -0.3487415909767151,
+                  -0.30335861444473267,
+                  -0.12039289623498917,
+                  -0.5380378365516663,
+                  -0.3188968300819397,
+                  -0.12039289623498917,
+                  -0.12039289623498917,
+                  -0.25866779685020447,
+                  -0.710757315158844,
+                  -0.11252442747354507,
+                  -0.061758123338222504,
+                  -0.4696812629699707,
+                  -0.4170398414134979,
+                  -0.14483308792114258,
+                  -0.14483308792114258,
+                  -0.17599307000637054,
+                  -0.38537493348121643,
+                  -0.7135512232780457,
+                  -0.19801776111125946,
+                  -0.5579569339752197,
+                  -0.29856565594673157,
+                  -0.5942984819412231,
+                  -0.1734522134065628,
+                  -0.17326153814792633,
+                  -0.32869768142700195,
+                  -0.2923259437084198,
+                  -0.8854883909225464,
+                  -0.3504178524017334,
+                  -0.8853301405906677,
+                  -0.44319620728492737,
+                  -0.44319620728492737,
+                  0.8869720346151002
+                ],
+                [
+                  -0.06697619706392288,
+                  -1.0697475671768188,
+                  -0.363132506608963,
+                  -0.024372590705752373,
+                  -0.16183796525001526,
+                  0.8436208367347717,
+                  -0.12494011968374252,
+                  -0.002378106815740466,
+                  -0.03515375778079033,
+                  -1.3773058652877808,
+                  -0.005883621983230114,
+                  1.3702068328857422,
+                  -0.08006601780653,
+                  -0.08006601780653,
+                  -0.03916839137673378,
+                  -1.3766428232192993,
+                  -0.06400240957736969,
+                  -0.009164765477180481,
+                  -1.3766357898712158,
+                  -0.06521038711071014,
+                  5.120424747467041,
+                  7.7886433601379395,
+                  8.632196426391602,
+                  5.647013187408447,
+                  -0.2549176514148712,
+                  -0.2549176514148712,
+                  -0.2549176514148712,
+                  -0.27740299701690674,
+                  -5.6533918380737305,
+                  -0.15791194140911102,
+                  -1.1575446128845215,
+                  -0.3605419099330902,
+                  -0.17678846418857574,
+                  -0.21037361025810242,
+                  -0.21037361025810242,
+                  -0.11978622525930405,
+                  -0.14603568613529205,
+                  -0.32316142320632935,
+                  -0.29559510946273804,
+                  -0.2221381813287735,
+                  -0.23811031877994537,
+                  -0.19279274344444275,
+                  -0.15607956051826477,
+                  -0.22955648601055145,
+                  -0.08369956910610199,
+                  -0.29286110401153564,
+                  -0.23128710687160492,
+                  -0.08369956910610199,
+                  -0.08369956910610199,
+                  -0.16000531613826752,
+                  -0.44276565313339233,
+                  -0.07590541988611221,
+                  -0.040327295660972595,
+                  -0.23972655832767487,
+                  -0.1984577625989914,
+                  -0.09385797381401062,
+                  -0.09385797381401062,
+                  -0.06215093284845352,
+                  -0.21268035471439362,
+                  -0.36757105588912964,
+                  -0.08908350020647049,
+                  -0.23070310056209564,
+                  -0.12371538579463959,
+                  -0.24751976132392883,
+                  -0.07161600887775421,
+                  -0.06292198598384857,
+                  -0.10718844830989838,
+                  -0.1016111895442009,
+                  -0.17101870477199554,
+                  -0.08020053058862686,
+                  -0.16205355525016785,
+                  -0.1253063827753067,
+                  -0.1253063827753067,
+                  0.006435346197731631
+                ],
+                [
+                  -4.236541271209717,
+                  -1.175872802734375,
+                  4.671772003173828,
+                  -1.154759168624878,
+                  -1.1471918821334839,
+                  -2.2902281284332275,
+                  -0.2556273341178894,
+                  -1.1414408683776855,
+                  -0.19461289048194885,
+                  -0.7583020925521851,
+                  -0.02555004693567753,
+                  -0.43120911717414856,
+                  -0.3597407639026642,
+                  -0.3597407639026642,
+                  -0.2516195476055145,
+                  -0.46795517206192017,
+                  -0.19196845591068268,
+                  -0.09701016545295715,
+                  -0.2871684432029724,
+                  -0.7060443758964539,
+                  -0.019167399033904076,
+                  -2.0369296073913574,
+                  -4.327085971832275,
+                  3.6215364933013916,
+                  4.526697635650635,
+                  4.526697635650635,
+                  4.526697635650635,
+                  8.908321380615234,
+                  9.958479881286621,
+                  -0.38716211915016174,
+                  -0.6707717180252075,
+                  -0.7028306722640991,
+                  -0.3559872806072235,
+                  -0.47029900550842285,
+                  -0.47029900550842285,
+                  -0.2556273341178894,
+                  -0.3118845522403717,
+                  -0.7590489387512207,
+                  -0.4436362683773041,
+                  -0.3327881395816803,
+                  -0.5088138580322266,
+                  -0.2822522819042206,
+                  -0.34519076347351074,
+                  -0.35835203528404236,
+                  -0.14322127401828766,
+                  -0.5564544796943665,
+                  -0.3698951005935669,
+                  -0.14322127401828766,
+                  -0.14322127401828766,
+                  -0.28804856538772583,
+                  -0.7782427668571472,
+                  -0.13432380557060242,
+                  -0.07439044862985611,
+                  -0.481742799282074,
+                  -0.4199158549308777,
+                  -0.17054423689842224,
+                  -0.17054423689842224,
+                  -0.1618061661720276,
+                  -0.42676272988319397,
+                  -0.755186140537262,
+                  -0.20768961310386658,
+                  -0.5455052852630615,
+                  -0.30718761682510376,
+                  -0.5884425640106201,
+                  -0.17647062242031097,
+                  -0.15867489576339722,
+                  -0.2967927157878876,
+                  -0.2676085829734802,
+                  -0.7121901512145996,
+                  -0.2862028479576111,
+                  -0.7096492052078247,
+                  -0.3823285698890686,
+                  -0.3823285698890686,
+                  0.7056268426541488
+                ],
+                [
+                  -0.18645335733890533,
+                  -3.241665840148926,
+                  -0.23466989398002625,
+                  -0.0812860056757927,
+                  -0.3111318349838257,
+                  3.2033963203430176,
+                  -0.13927283883094788,
+                  -0.020960472524166107,
+                  -0.09843562543392181,
+                  -0.41724783182144165,
+                  -0.009381217882037163,
+                  -0.19842597842216492,
+                  -0.15858198702335358,
+                  -0.15858198702335358,
+                  -0.1090044155716896,
+                  -0.22056038677692413,
+                  -0.10871366411447525,
+                  -0.044971659779548645,
+                  -0.11755885928869247,
+                  -0.26935556530952454,
+                  -0.013234653510153294,
+                  -1.6167068481445312,
+                  -0.01915719173848629,
+                  -1.6265977621078491,
+                  -0.09763101488351822,
+                  -0.09763101488351822,
+                  -0.09763101488351822,
+                  -0.045988839119672775,
+                  0,
+                  3.211113929748535,
+                  11.037031173706055,
+                  -0.4231990873813629,
+                  -0.2075907289981842,
+                  -0.26727962493896484,
+                  -0.26727962493896484,
+                  -0.13927283883094788,
+                  -0.1847974956035614,
+                  -0.41658154129981995,
+                  -0.3005082607269287,
+                  -0.2236340492963791,
+                  -0.2939158082008362,
+                  -0.19183146953582764,
+                  -0.1960267871618271,
+                  -0.23722675442695618,
+                  -0.08078356087207794,
+                  -0.335856169462204,
+                  -0.24005013704299927,
+                  -0.08078356087207794,
+                  -0.08078356087207794,
+                  -0.17896221578121185,
+                  -0.4820583164691925,
+                  -0.08753897994756699,
+                  -0.04949299991130829,
+                  -0.2874303460121155,
+                  -0.24631911516189575,
+                  -0.09747364372015,
+                  -0.09747364372015,
+                  -0.08535322546958923,
+                  -0.24985471367835999,
+                  -0.44415879249572754,
+                  -0.11951853334903717,
+                  -0.303521990776062,
+                  -0.167931467294693,
+                  -0.3303860127925873,
+                  -0.0970296561717987,
+                  -0.08612838387489319,
+                  -0.15850555896759033,
+                  -0.14697302877902985,
+                  -0.31721776723861694,
+                  -0.13997606933116913,
+                  -0.3097536563873291,
+                  -0.19762589037418365,
+                  -0.19762589037418365,
+                  0.04074569952238922
+                ],
+                [
+                  -0.7990449070930481,
+                  -1.9737379550933838,
+                  -0.8053162693977356,
+                  -0.062284380197525024,
+                  -0.7821833491325378,
+                  -1.0083645582199097,
+                  1.6974684000015259,
+                  -0.0015470687067136168,
+                  -0.20383648574352264,
+                  -1.012270450592041,
+                  -0.0005480801337398589,
+                  -0.4879823625087738,
+                  -0.3541436493396759,
+                  -0.3541436493396759,
+                  -0.25307977199554443,
+                  -0.47146373987197876,
+                  -0.24469484388828278,
+                  -0.09375327080488205,
+                  -0.23316414654254913,
+                  -0.626246452331543,
+                  -0.131802037358284,
+                  -0.15040352940559387,
+                  -0.24017496407032013,
+                  -0.48320668935775757,
+                  -0.24274012446403503,
+                  -0.24274012446403503,
+                  -0.24274012446403503,
+                  -0.004436017945408821,
+                  -0.21765974164009094,
+                  -0.3307015299797058,
+                  -0.3437565267086029,
+                  9.299949645996094,
+                  4.651756286621094,
+                  6.975133895874023,
+                  6.975133895874023,
+                  14.185208320617676,
+                  4.648100852966309,
+                  -1.030500054359436,
+                  -0.7214215397834778,
+                  -0.551867663860321,
+                  -0.7158190608024597,
+                  -0.4490850567817688,
+                  -0.48979970812797546,
+                  -0.5631248950958252,
+                  -0.2033698558807373,
+                  -0.8270492553710938,
+                  -0.5685106515884399,
+                  -0.2033698558807373,
+                  -0.2033698558807373,
+                  -0.4332067668437958,
+                  -1.1558414697647095,
+                  -0.21354930102825165,
+                  -0.12244526296854019,
+                  -0.6956736445426941,
+                  -0.5959935188293457,
+                  -0.24149684607982635,
+                  -0.24149684607982635,
+                  -0.2096177190542221,
+                  -0.6048498153686523,
+                  -1.0725467205047607,
+                  -0.29121503233909607,
+                  -0.749027669429779,
+                  -0.4260762929916382,
+                  -0.8103095293045044,
+                  -0.23684190213680267,
+                  -0.21054470539093018,
+                  -0.3996254503726959,
+                  -0.35931360721588135,
+                  -0.818120002746582,
+                  -0.3490021526813507,
+                  -0.8009216785430908,
+                  -0.4985443353652954,
+                  -0.4985443353652954,
+                  0.3357652328650786
+                ],
+                [
+                  -0.4458337128162384,
+                  -1.3965133428573608,
+                  -0.9039484858512878,
+                  -0.14453834295272827,
+                  -1.397108793258667,
+                  -0.514728307723999,
+                  -0.18566395342350006,
+                  -0.10539504140615463,
+                  -12.46923828125,
+                  11.366105079650879,
+                  -12.472738265991211,
+                  -12.452489852905273,
+                  -0.682096540927887,
+                  -0.682096540927887,
+                  -0.5999684929847717,
+                  -0.7656483054161072,
+                  -0.4529131054878235,
+                  -0.15048444271087646,
+                  -0.004083496052771807,
+                  -1.3506429195404053,
+                  -0.0013139903312548995,
+                  -0.03241367265582085,
+                  -0.445698082447052,
+                  -0.9202630519866943,
+                  -0.4551956057548523,
+                  -0.4551956057548523,
+                  -0.4551956057548523,
+                  -0.45791199803352356,
+                  -0.44395801424980164,
+                  -0.5156841278076172,
+                  -0.8490514159202576,
+                  -0.9091944694519043,
+                  -0.45508480072021484,
+                  -0.6801881790161133,
+                  -0.6801881790161133,
+                  0,
+                  -0.45361822843551636,
+                  13.140942573547363,
+                  2.552689552307129,
+                  -0.6349734663963318,
+                  -2.3120710849761963,
+                  -0.27770140767097473,
+                  -0.02743561565876007,
+                  -0.36851802468299866,
+                  -0.19785261154174805,
+                  -1.7713372707366943,
+                  -0.7566524147987366,
+                  -0.19785261154174805,
+                  -0.19785261154174805,
+                  -0.3620365858078003,
+                  -1.8105487823486328,
+                  -0.1701255589723587,
+                  -0.25489339232444763,
+                  -0.7429648637771606,
+                  -0.6636877655982971,
+                  -0.16621918976306915,
+                  -0.16621918976306915,
+                  -0.08778318017721176,
+                  -0.5461204648017883,
+                  -1.1138672828674316,
+                  -0.2951388359069824,
+                  -0.8619857430458069,
+                  -0.4695292115211487,
+                  -0.9384588599205017,
+                  -0.2945254445075989,
+                  -0.2941904664039612,
+                  -0.5452957153320312,
+                  -0.46869346499443054,
+                  -1.3993970155715942,
+                  -0.8944055438041687,
+                  -1.3988299369812012,
+                  -0.7023535370826721,
+                  -0.7023535370826721,
+                  1.408730643778232
+                ],
+                [
+                  -0.21905235946178436,
+                  -0.3219849467277527,
+                  -0.2635922133922577,
+                  -0.05725880339741707,
+                  -0.26927584409713745,
+                  -0.15928544104099274,
+                  -0.07127578556537628,
+                  -0.027848802506923676,
+                  -0.13219140470027924,
+                  -1.3695443868637085,
+                  -0.04637289047241211,
+                  -0.23865416646003723,
+                  -0.1409274935722351,
+                  -0.1409274935722351,
+                  -0.10368019342422485,
+                  -0.1971685290336609,
+                  -0.3662164807319641,
+                  -0.017236266285181046,
+                  -0.07458674162626266,
+                  -0.26872971653938293,
+                  -0.04420455917716026,
+                  -0.08713755756616592,
+                  -0.08786699920892715,
+                  -0.2091962993144989,
+                  -0.09490122646093369,
+                  -0.09490122646093369,
+                  -0.09490122646093369,
+                  -0.036476410925388336,
+                  -0.07001851499080658,
+                  -0.11095808446407318,
+                  -0.16255490481853485,
+                  -0.18432247638702393,
+                  -0.09427706897258759,
+                  -0.1364876627922058,
+                  -0.1364876627922058,
+                  -0.004135947208851576,
+                  -0.0886337161064148,
+                  -0.2683671712875366,
+                  -1.227517008781433,
+                  -1.216076135635376,
+                  -0.17366988956928253,
+                  -0.9930315017700195,
+                  4.537801265716553,
+                  2.225421905517578,
+                  0.7418062686920166,
+                  9.479535102844238,
+                  2.312389850616455,
+                  0.7418062686920166,
+                  0.7418062686920166,
+                  -0.21001939475536346,
+                  -2.7376856803894043,
+                  -0.09997039288282394,
+                  -0.3256467878818512,
+                  -0.28815513849258423,
+                  -0.26347216963768005,
+                  -0.12005934864282608,
+                  -0.12005934864282608,
+                  -0.017668122425675392,
+                  -0.2715892791748047,
+                  -0.47222334146499634,
+                  -0.10725370049476624,
+                  -0.2819734513759613,
+                  -0.14760172367095947,
+                  -0.30012521147727966,
+                  -0.0860220342874527,
+                  -0.07530560344457626,
+                  -0.12667396664619446,
+                  -0.12052836269140244,
+                  -0.2699620723724365,
+                  -0.1481587290763855,
+                  -0.2690875232219696,
+                  -0.1558416187763214,
+                  -0.1558416187763214,
+                  0.2683699230315024
+                ],
+                [
+                  -0.269665002822876,
+                  -0.35001203417778015,
+                  -0.29604053497314453,
+                  -0.06041845306754112,
+                  -0.1945534348487854,
+                  -0.15569861233234406,
+                  -0.0724620446562767,
+                  -0.029634390026330948,
+                  -0.13520295917987823,
+                  -1.1908109188079834,
+                  -0.053394488990306854,
+                  -0.22546227276325226,
+                  -0.1076720654964447,
+                  -0.1076720654964447,
+                  -0.07244864851236343,
+                  -0.7915540337562561,
+                  -0.2905844748020172,
+                  -0.6379051804542542,
+                  -0.05395462363958359,
+                  -0.15138554573059082,
+                  -0.02988932840526104,
+                  -0.07136008888483047,
+                  -0.058807503432035446,
+                  -0.16500957310199738,
+                  -0.05942903086543083,
+                  -0.05942903086543083,
+                  -0.05942903086543083,
+                  -0.015728048980236053,
+                  -0.04552542418241501,
+                  -0.05456239730119705,
+                  -0.1042833924293518,
+                  -0.11134054511785507,
+                  -0.051053546369075775,
+                  -0.0637768879532814,
+                  -0.0637768879532814,
+                  -0.0033814525231719017,
+                  -0.0436110645532608,
+                  -0.07275189459323883,
+                  -0.9954975843429565,
+                  -0.9797863960266113,
+                  -0.17879614233970642,
+                  -0.03810277208685875,
+                  -0.004140538163483143,
+                  4.555887222290039,
+                  -0.18862880766391754,
+                  -7.75070333480835,
+                  4.6006903648376465,
+                  -0.18862880766391754,
+                  -0.18862880766391754,
+                  4.649276256561279,
+                  11.05399227142334,
+                  -0.043930232524871826,
+                  0.36910727620124817,
+                  -9.655065536499023,
+                  -0.2553483545780182,
+                  -0.16365422308444977,
+                  -0.16365422308444977,
+                  -9.655160903930664,
+                  -0.27814826369285583,
+                  -0.5422171950340271,
+                  -0.11047790944576263,
+                  -0.2916583716869354,
+                  -0.1523459106683731,
+                  -0.31823065876960754,
+                  -0.08875235170125961,
+                  -0.07753625512123108,
+                  -0.1305549144744873,
+                  -0.12345698475837708,
+                  -0.1722448468208313,
+                  -0.1283031553030014,
+                  -0.1601644903421402,
+                  -0.12429795414209366,
+                  -0.12429795414209366,
+                  -1.3845797979440793
+                ],
+                [
+                  -0.37451958656311035,
+                  -0.5498475432395935,
+                  -0.4470632076263428,
+                  -0.09955223649740219,
+                  -0.3748863637447357,
+                  -0.2678487300872803,
+                  -0.11827949434518814,
+                  -0.03850391507148743,
+                  -0.2506714165210724,
+                  -0.45198768377304077,
+                  -0.12984590232372284,
+                  -0.4049988090991974,
+                  -0.2166164666414261,
+                  -0.2166164666414261,
+                  -0.15598513185977936,
+                  -0.34515827894210815,
+                  -1.0530126094818115,
+                  -0.06859709322452545,
+                  -0.12001199275255203,
+                  -0.35088837146759033,
+                  -0.07134796679019928,
+                  -0.14271876215934753,
+                  -0.13633480668067932,
+                  -0.3415333032608032,
+                  -0.15737232565879822,
+                  -0.15737232565879822,
+                  -0.15737232565879822,
+                  -0.05750347301363945,
+                  -0.11597303301095963,
+                  -0.16038915514945984,
+                  -0.24706286191940308,
+                  -0.2837367355823517,
+                  -0.14091432094573975,
+                  -0.18801245093345642,
+                  -0.18801245093345642,
+                  -0.004547030199319124,
+                  -0.12725257873535156,
+                  -0.29549747705459595,
+                  -0.08310623466968536,
+                  -0.05415988713502884,
+                  -0.31794536113739014,
+                  -0.06629808247089386,
+                  -0.15331971645355225,
+                  -4.133210182189941,
+                  -0.03782644122838974,
+                  -0.21088609099388123,
+                  -4.133297920227051,
+                  -0.03782644122838974,
+                  -0.03782644122838974,
+                  -4.13331413269043,
+                  3.9960718154907227,
+                  -1.2584420442581177,
+                  -0.9671487808227539,
+                  10.148808479309082,
+                  4.001492977142334,
+                  -0.0015089060179889202,
+                  -0.0015089060179889202,
+                  10.152449607849121,
+                  -0.44655346870422363,
+                  -0.8107913136482239,
+                  -0.18914645910263062,
+                  -0.4722992777824402,
+                  -0.2546020746231079,
+                  -0.5123740434646606,
+                  -0.15161670744419098,
+                  -0.13277336955070496,
+                  -0.2196572870016098,
+                  -0.20787809789180756,
+                  -0.3758159875869751,
+                  -0.24572890996932983,
+                  -0.36147451400756836,
+                  -0.2486957311630249,
+                  -0.2486957311630249,
+                  0.1377999839255733
+                ],
+                [
+                  -0.4600629508495331,
+                  -0.7147399187088013,
+                  -0.5816366672515869,
+                  -0.12097805738449097,
+                  -0.6559244394302368,
+                  -0.349002867937088,
+                  -0.16050219535827637,
+                  -0.05852436274290085,
+                  -0.328606516122818,
+                  -0.6556674838066101,
+                  -0.19549556076526642,
+                  -0.5357253551483154,
+                  -0.34344619512557983,
+                  -0.34344619512557983,
+                  -0.2259758859872818,
+                  -0.5023912191390991,
+                  -0.18037691712379456,
+                  -0.13835880160331726,
+                  -0.18633174896240234,
+                  -0.6557028293609619,
+                  -0.09747909009456635,
+                  -0.18254873156547546,
+                  -0.21598392724990845,
+                  -0.49403074383735657,
+                  -0.2353321611881256,
+                  -0.2353321611881256,
+                  -0.2353321611881256,
+                  -0.10778454691171646,
+                  -0.185677170753479,
+                  -0.2690446078777313,
+                  -0.38896989822387695,
+                  -0.44648829102516174,
+                  -0.23062904179096222,
+                  -0.32871147990226746,
+                  -0.32871147990226746,
+                  -0.007749611046165228,
+                  -0.21112267673015594,
+                  -0.6555546522140503,
+                  -0.09781818091869354,
+                  -0.06434179842472076,
+                  -0.4330369234085083,
+                  -0.07825026661157608,
+                  -0.2515525221824646,
+                  -0.1816025674343109,
+                  -0.07327142357826233,
+                  -0.4047815501689911,
+                  -0.21365173161029816,
+                  -0.07327142357826233,
+                  -0.07327142357826233,
+                  -0.17930494248867035,
+                  -0.5105296969413757,
+                  -0.07861202210187912,
+                  -0.029405467212200165,
+                  -0.3450697362422943,
+                  -0.31116175651550293,
+                  -0.10001955926418304,
+                  -0.10001955926418304,
+                  -0.1457642912864685,
+                  10.1248140335083,
+                  3.531381845474243,
+                  10.085359573364258,
+                  3.481078624725342,
+                  9.304681777954102,
+                  4.324737548828125,
+                  -4.543919086456299,
+                  -4.529111385345459,
+                  -4.122722625732422,
+                  -4.9799580574035645,
+                  -0.6564037799835205,
+                  -0.3546920716762543,
+                  -0.6559672355651855,
+                  -0.3657945990562439,
+                  -0.3657945990562439,
+                  0.655404562425763
+                ],
+                [
+                  -0.6346216201782227,
+                  -1.0083726644515991,
+                  -0.8114987015724182,
+                  -0.16508664190769196,
+                  -0.858262836933136,
+                  -0.49075815081596375,
+                  -0.224720761179924,
+                  -0.07928057014942169,
+                  -0.47690829634666443,
+                  -0.8827952146530151,
+                  -0.2760440409183502,
+                  -0.7570599317550659,
+                  -0.48934510350227356,
+                  -0.48934510350227356,
+                  -0.32888707518577576,
+                  -0.7152575850486755,
+                  -0.2504080832004547,
+                  -0.1923963576555252,
+                  -0.266844779253006,
+                  -0.8420552015304565,
+                  -0.1369766891002655,
+                  -0.2535651922225952,
+                  -0.3080645501613617,
+                  -0.7007042765617371,
+                  -0.33432167768478394,
+                  -0.33432167768478394,
+                  -0.33432167768478394,
+                  -0.16281689703464508,
+                  -0.26194196939468384,
+                  -0.3761802315711975,
+                  -0.5483813285827637,
+                  -0.6303645372390747,
+                  -0.3281485140323639,
+                  -0.44943198561668396,
+                  -0.44943198561668396,
+                  -0.010394100099802017,
+                  -0.2929518520832062,
+                  -0.8184627890586853,
+                  -0.13204266130924225,
+                  -0.08950024098157883,
+                  -0.6066833734512329,
+                  -0.10755542665719986,
+                  -0.3298218250274658,
+                  -0.2589220702648163,
+                  -0.10096897184848785,
+                  -0.5482561588287354,
+                  -0.3037814497947693,
+                  -0.10096897184848785,
+                  -0.10096897184848785,
+                  -0.255394846200943,
+                  -0.7010514736175537,
+                  -0.11776137351989746,
+                  -0.040021538734436035,
+                  -0.461030513048172,
+                  -0.41356921195983887,
+                  -0.14059755206108093,
+                  -0.14059755206108093,
+                  -0.18212738633155823,
+                  -6.3914475440979,
+                  5.517055511474609,
+                  -6.324265480041504,
+                  5.584193706512451,
+                  -5.030886650085449,
+                  4.223727703094482,
+                  7.961376667022705,
+                  7.961356163024902,
+                  7.894238471984863,
+                  9.25461483001709,
+                  -0.8701261878013611,
+                  -0.5021631717681885,
+                  -0.8557342290878296,
+                  -0.5326479077339172,
+                  -0.5326479077339172,
+                  0.8072720759963918
+                ],
+                [
+                  -0.9241299629211426,
+                  -2.3351027965545654,
+                  -1.6326165199279785,
+                  -0.29347649216651917,
+                  -2.3351030349731445,
+                  -0.9456400871276855,
+                  -0.44649985432624817,
+                  -0.15156103670597076,
+                  -0.8476994633674622,
+                  -2.33503794670105,
+                  -0.6142950057983398,
+                  -1.5687880516052246,
+                  -1.1675753593444824,
+                  -1.1675753593444824,
+                  -0.8376988768577576,
+                  -1.497450828552246,
+                  -0.46768757700920105,
+                  -0.4033842980861664,
+                  -0.7663604021072388,
+                  -2.3350677490234375,
+                  -0.30031925439834595,
+                  -0.46883347630500793,
+                  -0.7252382636070251,
+                  -1.6144593954086304,
+                  -0.7783724069595337,
+                  -0.7783724069595337,
+                  -0.7783724069595337,
+                  -0.7025001049041748,
+                  -0.7206571698188782,
+                  -0.9456307291984558,
+                  -1.3894855976104736,
+                  -1.5576043128967285,
+                  -0.7800572514533997,
+                  -1.1675580739974976,
+                  -1.1675580739974976,
+                  -0.012946315109729767,
+                  -0.7775118350982666,
+                  -2.4716880321502686,
+                  -2.3394718170166016,
+                  -0.813962996006012,
+                  4.808860778808594,
+                  -2.3328776359558105,
+                  -0.9595139622688293,
+                  -0.5768845081329346,
+                  -0.18428777158260345,
+                  -1.3755961656570435,
+                  -0.5934656262397766,
+                  -0.18428777158260345,
+                  -0.18428777158260345,
+                  -0.5802753567695618,
+                  -1.7591652870178223,
+                  -0.221353217959404,
+                  -0.055049486458301544,
+                  -1.204951524734497,
+                  -1.1301578283309937,
+                  -0.2733430862426758,
+                  -0.2733430862426758,
+                  -0.5759445428848267,
+                  -0.877651035785675,
+                  -1.8233047723770142,
+                  -0.518265426158905,
+                  -1.4658920764923096,
+                  -0.77993243932724,
+                  -1.5575438737869263,
+                  -0.5118168592453003,
+                  -0.5118044018745422,
+                  -0.8692167401313782,
+                  -0.7775644659996033,
+                  11.950530052185059,
+                  7.141740798950195,
+                  11.95047664642334,
+                  5.975295543670654,
+                  5.975295543670654,
+                  2.3351206865848093
+                ]
+              ]
+            }
+          }
+        }
+      }
+    },
+    "intentDomains": {},
+    "extraSentences": [
+      [
+        "ar",
+        "كم المبيعات اليوم"
+      ],
+      [
+        "ar",
+        "كم مبيعات اليوم"
+      ],
+      [
+        "ar",
+        "ارباح اليوم كم"
+      ],
+      [
+        "ar",
+        "الارباح"
+      ],
+      [
+        "ar",
+        "المبيعات"
+      ],
+      [
+        "ar",
+        "تقرير المبيعات"
+      ],
+      [
+        "ar",
+        "اعطني المبيعات"
+      ],
+      [
+        "ar",
+        "كم بعنا اليوم"
+      ],
+      [
+        "ar",
+        "ماهي المصروفات"
+      ],
+      [
+        "ar",
+        "اعرض المصروفات"
+      ],
+      [
+        "ar",
+        "قائمة المصروفات"
+      ],
+      [
+        "ar",
+        "وش المصاريف"
+      ],
+      [
+        "ar",
+        "عرض العملاء"
+      ],
+      [
+        "ar",
+        "قائمة العملاء"
+      ],
+      [
+        "ar",
+        "من هم العملاء"
+      ],
+      [
+        "ar",
+        "قائمة المنتجات"
+      ],
+      [
+        "ar",
+        "الاصناف"
+      ],
+      [
+        "ar",
+        "ماهي الاصناف"
+      ],
+      [
+        "ar",
+        "قائمة الدخل السنوية"
+      ],
+      [
+        "ar",
+        "القوائم المالية"
+      ],
+      [
+        "ar",
+        "التقرير المالي السنوي"
+      ],
+      [
+        "ar",
+        "دفتر الاستاذ العام"
+      ],
+      [
+        "ar",
+        "القيود اليومية"
+      ],
+      [
+        "ar",
+        "المركز المالي"
+      ],
+      [
+        "ar",
+        "الاقرار الضريبي"
+      ],
+      [
+        "ar",
+        "تقرير الضريبة"
+      ],
+      [
+        "ar",
+        "تحليل البزنس"
+      ],
+      [
+        "ar",
+        "رؤية الاعمال"
+      ],
+      [
+        "ar",
+        "اعطني تقييم للمبيعات"
+      ],
+      [
+        "ar",
+        "تحليل الاداء"
+      ],
+      [
+        "ar",
+        "صرفت %amount% ريال على %description%"
+      ],
+      [
+        "ar",
+        "صرفت %amount% على %description%"
+      ],
+      [
+        "ar",
+        "اضف مصروف %amount% ريال %description%"
+      ],
+      [
+        "ar",
+        "سجل مصروف %amount% ريال"
+      ],
+      [
+        "ar",
+        "مصروف %amount% ريال"
+      ],
+      [
+        "ar",
+        "صرفت"
+      ],
+      [
+        "ar",
+        "مصروف"
+      ],
+      [
+        "ar",
+        "اضافة عميل جديد اسمه %name%"
+      ],
+      [
+        "ar",
+        "سجل عميل جديد"
+      ],
+      [
+        "ar",
+        "اضف عميل"
+      ],
+      [
+        "ar",
+        "عندي فاتورة مشتريات"
+      ],
+      [
+        "ar",
+        "سجل المشتريات من الفاتورة"
+      ],
+      [
+        "ar",
+        "عندي فاتورة"
+      ],
+      [
+        "ar",
+        "فاتورة جديدة"
+      ],
+      [
+        "ar",
+        "سجل فاتورة"
+      ],
+      [
+        "ar",
+        "الغاء البيعة رقم %invoiceId%"
+      ],
+      [
+        "ar",
+        "مرتجع الفاتورة"
+      ],
+      [
+        "ar",
+        "الغاء الفاتورة"
+      ],
+      [
+        "ar",
+        "الغاء بيع"
+      ],
+      [
+        "ar",
+        "فتح الوردية"
+      ],
+      [
+        "ar",
+        "افتح الوردية"
+      ],
+      [
+        "ar",
+        "فتح الصندوق"
+      ],
+      [
+        "ar",
+        "بدء الدوام"
+      ],
+      [
+        "ar",
+        "اغلاق الوردية"
+      ],
+      [
+        "ar",
+        "قفل الوردية"
+      ],
+      [
+        "ar",
+        "تقفيل الصندوق"
+      ],
+      [
+        "ar",
+        "انهاء الدوام"
+      ],
+      [
+        "ar",
+        "مرحبا"
+      ],
+      [
+        "ar",
+        "السلام عليكم"
+      ],
+      [
+        "ar",
+        "هلا"
+      ],
+      [
+        "ar",
+        "كيف حالك"
+      ]
+    ]
+  },
+  "ner": {
+    "settings": {
+      "tag": "ner",
+      "entityPreffix": "%",
+      "entitySuffix": "%"
+    },
+    "rules": {}
+  },
+  "nlgManager": {
+    "settings": {
+      "tag": "nlg-manager"
+    },
+    "responses": {
+      "ar": {
+        "greetings.hello": [
+          {
+            "answer": "وعليكم السلام! تفضل، كيف يمكنني مساعدتك؟ يمكنك الاستعلام عن المبيعات، تسجيل مصروف، أو إرفاق فاتورة مشتريات."
+          },
+          {
+            "answer": "مرحباً بك في المساعد الذكي! أنا جاهز لتلبية أوامرك."
+          }
+        ]
+      }
+    }
+  },
+  "actionManager": {
+    "settings": {
+      "tag": "action-manager"
+    },
+    "actions": {}
+  },
+  "slotManager": {
+    "db:addExpenditure": {
+      "amount": {
+        "intent": "db:addExpenditure",
+        "entity": "amount",
+        "mandatory": false,
+        "locales": {}
+      },
+      "description": {
+        "intent": "db:addExpenditure",
+        "entity": "description",
+        "mandatory": false,
+        "locales": {}
+      }
+    },
+    "db:addCustomer": {
+      "name": {
+        "intent": "db:addCustomer",
+        "entity": "name",
+        "mandatory": false,
+        "locales": {}
+      }
+    },
+    "db:voidSale": {
+      "invoiceId": {
+        "intent": "db:voidSale",
+        "entity": "invoiceId",
+        "mandatory": false,
+        "locales": {}
+      }
+    }
+  }
+}

@@ -16,6 +16,7 @@
 
 let _db;
 const { postJournalEntry, fmtDate, toHalala, fromHalala } = require('./accounting.cjs');
+const roundMoney = (n) => Math.round((parseFloat(n) || 0) * 100) / 100;
 
 function initP2(dbInstance) {
     _db = dbInstance;
@@ -964,29 +965,35 @@ function getUnmatchedBankTransactions(bankAccountId, startDate, endDate, reconci
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getVATReturnBoxes(startDate, endDate) {
+    if (startDate && typeof startDate === 'object' && !(startDate instanceof Date)) {
+        endDate = startDate.endDate;
+        startDate = startDate.startDate;
+    }
     const sDate = fmtDate(startDate);
     const eDate = fmtDate(endDate);
 
-    // Box 1 — Standard rated sales (15%)
-    const box1 = _db.prepare(`
-        SELECT
-            COALESCE(SUM(s.subtotal), 0) as amount,
-            COALESCE(SUM(s.tax_amount), 0) as vat
-        FROM sales s
-        WHERE DATE(s.timestamp) BETWEEN ? AND ?
-          AND s.status NOT IN ('void','voided','return')
-          AND (s.subtotal > 0)
-    `).get(sDate, eDate);
+    const vatRate = 0.15;
 
-    // Exempt / Zero-rated (products with tax_category != 'S')
+    // Sales calculation (matching getVATReport)
+    const salesRow = _db.prepare(`
+        SELECT
+            COUNT(*) as invoiceCount,
+            COALESCE(SUM(total_amount / (1 + ?)), 0) as taxableAmount,
+            COALESCE(SUM(total_amount - (total_amount / (1 + ?))), 0) as vatOutput
+        FROM sales
+        WHERE DATE(timestamp) BETWEEN ? AND ?
+          AND (status IS NULL OR status NOT IN ('void','voided','return'))
+    `).get(vatRate, vatRate, sDate, eDate);
+
+    // Exempt / Zero-rated items if tagged in product catalog
     const box2_3 = _db.prepare(`
         SELECT p.tax_category,
-               SUM(si.quantity * si.item_price) as total
+               COALESCE(SUM(si.quantity * si.item_price), 0) as total
         FROM sales_items si
         JOIN sales s ON si.sale_id = s.id
         JOIN products p ON si.product_id = p.id
         WHERE DATE(s.timestamp) BETWEEN ? AND ?
-          AND s.status NOT IN ('void','voided')
+          AND (s.status IS NULL OR s.status NOT IN ('void','voided','return'))
           AND p.tax_category != 'S'
         GROUP BY p.tax_category
     `).all(sDate, eDate);
@@ -994,33 +1001,52 @@ function getVATReturnBoxes(startDate, endDate) {
     const zeroRated = box2_3.find(r => r.tax_category === 'Z')?.total || 0;
     const exempt    = box2_3.find(r => r.tax_category === 'E')?.total || 0;
 
-    // Box 5 — Input VAT from expenditures
-    const inputVAT = _db.prepare(`
-        SELECT COALESCE(SUM(vat_amount), 0) as vat,
-               COALESCE(SUM(net_amount), 0) as amount
+    // Input VAT from received purchase orders
+    const poRow = _db.prepare(`
+        SELECT
+            COALESCE(SUM(CASE WHEN vat_amount > 0 THEN vat_amount WHEN vat_included = 1 THEN total_amount - (total_amount / (1 + ?)) ELSE total_amount * ? END), 0) as vatInput,
+            COALESCE(SUM(CASE WHEN vat_amount > 0 THEN total_amount - vat_amount WHEN vat_included = 1 THEN total_amount / (1 + ?) ELSE total_amount END), 0) as netInput
+        FROM purchase_orders
+        WHERE status = 'received'
+          AND DATE(COALESCE(received_at, created_at)) BETWEEN ? AND ?
+    `).get(vatRate, vatRate, vatRate, sDate, eDate);
+
+    // Input VAT from expenditures (matching getVATReport)
+    const expRow = _db.prepare(`
+        SELECT
+            COALESCE(SUM(vat_amount), 0) as vatInput,
+            COALESCE(SUM(CASE WHEN net_amount > 0 THEN net_amount WHEN vat_amount > 0 THEN vat_amount / ? ELSE amount / (1 + ?) END), 0) as netInput
         FROM expenditures
         WHERE DATE(COALESCE(expense_date, timestamp)) BETWEEN ? AND ?
-          AND vat_eligible = 1
           AND (status IS NULL OR status != 'deleted')
-    `).get(sDate, eDate);
+    `).get(vatRate, vatRate, sDate, eDate);
 
-    // Also check journal entries for VAT input (2400)
+    // Additional standalone journal entries for VAT input (Account 2400)
     const jeVATInput = _db.prepare(`
-        SELECT COALESCE(SUM(l.debit_halala - l.credit_halala) / 100.0, 0) as net
+        SELECT COALESCE(SUM(l.debit_halala - l.credit_halala) / 100.0, 0) as vat
         FROM journal_entry_lines l
         JOIN journal_entries je ON l.entry_id = je.id
         WHERE l.account_code = 2400
-          AND je.entry_date BETWEEN ? AND ?
-          AND je.status != 'reversed'
+          AND (je.reference_type IS NULL OR je.reference_type NOT IN ('expenditure', 'purchase_order'))
+          AND DATE(je.entry_date) BETWEEN ? AND ?
+          AND (je.status IS NULL OR je.status != 'reversed')
     `).get(sDate, eDate);
 
-    const stdAmount = parseFloat(box1.amount || 0);
-    const stdVAT    = parseFloat(box1.vat    || 0);
-    const totalSales = stdAmount + zeroRated + exempt;
-    const inputVATTotal = parseFloat(inputVAT.vat || 0) + parseFloat(jeVATInput.net || 0);
-    const inputAmount   = parseFloat(inputVAT.amount || 0);
+    const stdAmount  = roundMoney(salesRow?.taxableAmount || 0);
+    const stdVAT     = roundMoney(salesRow?.vatOutput || 0);
+    const totalSales = roundMoney(stdAmount + zeroRated + exempt);
 
-    const vatDue = stdVAT - inputVATTotal;
+    const poVAT  = parseFloat(poRow?.vatInput || 0);
+    const poNet  = parseFloat(poRow?.netInput || 0);
+    const expVAT = parseFloat(expRow?.vatInput || 0);
+    const expNet = parseFloat(expRow?.netInput || 0);
+    const otherVAT = Math.max(0, parseFloat(jeVATInput?.vat || 0));
+    const otherNet = otherVAT > 0 ? (otherVAT / vatRate) : 0;
+
+    const inputVATTotal = roundMoney(poVAT + expVAT + otherVAT);
+    const inputAmount   = roundMoney(poNet + expNet + otherNet);
+
+    const vatDue = roundMoney(stdVAT - inputVATTotal);
 
     return {
         period: { start: sDate, end: eDate },
@@ -1580,14 +1606,14 @@ function getBudgetVsActual(period) {
 
     const budgets = _db.prepare(`SELECT * FROM budget_entries WHERE period = ?`).all(period);
     const actuals = _db.prepare(`
-        SELECT l.account_code,
-               SUM(l.debit_halala - l.credit_halala) / 100.0 as net_actual
+        SELECT l.account_code, a.type as acc_type,
+               SUM(CASE WHEN a.type = 'Revenue' THEN (l.credit_halala - l.debit_halala) ELSE (l.debit_halala - l.credit_halala) END) / 100.0 as net_actual
         FROM journal_entry_lines l
         JOIN journal_entries je ON l.entry_id = je.id
         JOIN accounts a ON l.account_code = a.account_code
-        WHERE je.entry_date BETWEEN ? AND ? AND je.status != 'reversed'
+        WHERE DATE(je.entry_date) BETWEEN ? AND ? AND je.status != 'reversed'
           AND a.type IN ('Revenue', 'Expense')
-        GROUP BY l.account_code
+        GROUP BY l.account_code, a.type
     `).all(sDate, eDate);
 
     const accounts = _db.prepare(`SELECT * FROM accounts WHERE type IN ('Revenue','Expense') AND level=3`).all();
@@ -1598,7 +1624,7 @@ function getBudgetVsActual(period) {
         const budgetedH = budget ? budget.budgeted_halala : 0;
         const actualAmt = parseFloat(actual?.net_actual || 0);
         const budgetAmt = budgetedH / 100;
-        const variance  = actualAmt - budgetAmt;
+        const variance  = a.type === 'Revenue' ? (actualAmt - budgetAmt) : (budgetAmt - actualAmt);
         return {
             account_code: a.account_code,
             name_ar: a.name_ar,

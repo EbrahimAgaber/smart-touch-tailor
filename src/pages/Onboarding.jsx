@@ -10,6 +10,7 @@ import {
 
 const BUSINESS_TYPES = [
   { value: 'retail', label: 'تجزئة عامة', icon: <Store size={24} /> },
+  { value: 'fruit_and_vegetables', label: 'خضار وفواكه', icon: <Package size={24} /> },
   { value: 'restaurant', label: 'مطعم / كافيه', icon: <Utensils size={24} /> },
   { value: 'grocery', label: 'تموينات / سوبر ماركت', icon: <Package size={24} /> },
   { value: 'pharmacy', label: 'صيدلية', icon: <Pill size={24} /> },

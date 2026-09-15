@@ -190,6 +190,8 @@ export default function Shift() {
 
 function generateZReport(data) {
   const categories = data.summary?.categories || [];
+  const products = data.summary?.product_movements || [];
+  const invoices = data.summary?.invoices || [];
   const total = data.summary?.total || { gross: 0, vat: 0, net: 0 };
 
   return `<html dir="rtl"><head><meta charset="utf-8">
@@ -249,11 +251,27 @@ function generateZReport(data) {
       <table class="table-data">
         <tr><td>نقد (Cash):</td><td style="text-align:left;">${Number(data.cash_sales || 0).toFixed(2)} SAR</td></tr>
         <tr><td>بطاقة (Card):</td><td style="text-align:left;">${Number(data.card_sales || 0).toFixed(2)} SAR</td></tr>
+        <tr><td>آجل (Credit):</td><td style="text-align:left;">${Number(data.credit_sales || 0).toFixed(2)} SAR</td></tr>
+        <tr><td>مستردة (Refunds):</td><td style="text-align:left; color: red;">${Number(data.refunded_amount || 0).toFixed(2)} SAR</td></tr>
       </table>
       
       <div class="section-title" style="border-top: 1px dashed #000; padding-top: 10px;">حسب الأقسام:</div>
       <table class="table-data" style="font-size: 12px;">
         ${categories.map(c => `<tr><td>${c.category}:</td><td style="text-align:left;">${Number(c.total || 0).toFixed(2)} SAR (${c.qty})</td></tr>`).join('')}
+      </table>
+
+      <div class="section-title" style="border-top: 1px dashed #000; padding-top: 10px;">حركة المنتجات:</div>
+      <table class="table-data" style="font-size: 12px;">
+        ${products.map(p => `<tr><td>${p.product_name || 'غير معروف'}:</td><td style="text-align:left;">${p.qty} مرة</td></tr>`).join('')}
+      </table>
+
+      <div class="section-title" style="border-top: 1px dashed #000; padding-top: 10px;">سجل الفواتير:</div>
+      <table class="table-data" style="font-size: 11px;">
+        ${invoices.map(inv => `<tr>
+          <td>${inv.invoice}</td>
+          <td>${inv.status === 'credit' ? 'مرتجع' : (inv.payment_method || 'نقدي')}</td>
+          <td style="text-align:left;">${Number(inv.total_amount || 0).toFixed(2)} SAR</td>
+        </tr>`).join('')}
       </table>
       
       <div class="variance-section">

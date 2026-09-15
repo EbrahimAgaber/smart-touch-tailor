@@ -1,17 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
+import { renderToString } from 'react-dom/server';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import AppLayout from '../components/AppLayout';
-import { Download, RefreshCw, Search, RotateCcw, ChevronDown, ChevronUp, FileText, ShoppingBag, Printer } from 'lucide-react';
+import { Download, RefreshCw, Search, RotateCcw, ChevronDown, ChevronUp, FileText, ShoppingBag, Printer, Minus, Plus, PackageCheck } from 'lucide-react';
 import QRCode from '../utils/qr-gen';
 import ExportButton from '../components/ExportButton';
-
+import TailorWorkOrder from '../components/TailorWorkOrder';
 const today = () => new Date().toISOString().split('T')[0];
 const monthStart = () => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
 
 const statusLabel = (s, t) => {
   if (s === 'void')   return { label:t('history.status.void'),    bg:'#fee2e2', col:'#991b1b' };
   if (s === 'credit') return { label:t('history.status.credit'),     bg:'#fef3c7', col:'#92400e' };
+  if (s === 'partial') return { label:'مدفوع جزئياً',  bg:'#fef3c7', col:'#92400e' };
   return                     { label:t('history.status.paid'),  bg:'#dcfce7', col:'#15803d' };
 };
 
@@ -23,6 +25,25 @@ const zatcaClearanceBadge = (s, isB2B, t) => {
   // Pending: only show badge if B2B (B2C pending is less critical)
   if (isB2B)            return { label:t('history.status.pending'),    bg:'#fef9c3', col:'#854d0e' };
   return null;
+};
+
+// Human-readable Arabic labels for payment method codes, used when printing
+// a receipt (both the single-method line and the split-payment breakdown).
+const PAY_LABEL_AR = { Cash:'نقدي', Card:'بطاقة', Credit:'آجل', Bank:'تحويل بنكي', STC:'STC Pay' };
+const payLabel = (type) => PAY_LABEL_AR[type] || type || '—';
+
+// Builds a compact "find us on" line for the bottom of a printed receipt
+// from whichever social/contact fields the business owner actually filled
+// in Settings → هوية المنشأة → التواصل. Any field left blank is skipped
+// entirely — nothing renders unless the owner set it. Sits ABOVE the
+// "Developed by البصمة الذكية" credit line, which is always kept as-is.
+const buildSocialFooterHTML = (settings) => {
+  const parts = [];
+  if (settings?.instagram) parts.push(`📷 ${settings.instagram}`);
+  if (settings?.whatsapp)  parts.push(`💬 ${settings.whatsapp}`);
+  if (settings?.website)   parts.push(`🌐 ${settings.website}`);
+  if (!parts.length) return '';
+  return `<p style="margin:6px 0; font-size:10.5px; color:#64748b; direction:ltr; text-align:center;">${parts.join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</p>`;
 };
 
 export default function SalesHistory() {
@@ -37,14 +58,35 @@ export default function SalesHistory() {
   const [sales, setSales]     = useState([]);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(null);
+
+  const handlePayRemaining = (s) => {
+    const outstanding = parseFloat(s.total || 0) - parseFloat(s.paid || 0);
+    if (outstanding <= 0) return;
+    const handoffData = {
+        ticketId: s.id,
+        customer: { id: s.customer_id, name: s.customer_name, phone: s.customer_phone },
+        cartItems: [{
+            id: `balance_${s.invoice}_${Math.random()}`,
+            Name: `سداد متبقي فاتورة #${s.invoice}`,
+            Price: outstanding,
+            Qty: 1,
+            Category: 'أخرى'
+        }],
+        total: outstanding,
+        depositPaid: parseFloat(s.paid || 0),
+        orderNote: `فاتورة #${s.invoice}`
+    };
+    navigate('/pos', { state: { alterationHandoff: handoffData } });
+  };
+
   const [voidModal, setVoidModal] = useState(null); // {invoice}
   const [voidReason, setVoidReason] = useState('');
   const [returnModal, setReturnModal] = useState(null);
-  const [returnQtys, setReturnQtys] = useState({});
-  const [returnReason, setReturnReason] = useState(t('history.modals.return_reason_default'));
   const [debitModal, setDebitModal] = useState(null);
   const [debitAmount, setDebitAmount] = useState('');
   const [debitReason, setDebitReason] = useState('');
+  const [paymentModal, setPaymentModal] = useState(null);
+  const [newPaymentMethod, setNewPaymentMethod] = useState('');
   const [settings, setSettings] = useState({});
 
   useEffect(() => {
@@ -59,14 +101,18 @@ export default function SalesHistory() {
         startDate: range.startDate,
         endDate: range.endDate,
         search: search || undefined,
-        status: statusFilter !== 'all' ? statusFilter : undefined,
+        status: statusFilter !== 'all' && statusFilter !== 'partial' ? statusFilter : undefined,
         ...overrides
       };
       const [data, qData] = await Promise.all([
         window.api.getSalesHistory(filters),
         window.api.getHeldOrders ? window.api.getHeldOrders() : Promise.resolve([])
       ]);
-      setSales(Array.isArray(data) ? data : []);
+      let fetchedSales = Array.isArray(data) ? data : [];
+      if (statusFilter === 'partial') {
+          fetchedSales = fetchedSales.filter(s => parseFloat(s.paid) < parseFloat(s.total) && s.status !== 'void' && s.status !== 'credit');
+      }
+      setSales(fetchedSales);
       setQuotes((Array.isArray(qData) ? qData : []).filter(o => o.order_type === 'quote'));
     } catch (e) { setSales([]); setQuotes([]); }
     setLoading(false);
@@ -76,6 +122,20 @@ export default function SalesHistory() {
   const vatRate = parseFloat(settings.vat_rate || '0.15');
   const totalVAT = totalRevenue * vatRate / (1 + vatRate);
   const voidCount = sales.filter(s => s.status === 'void').length;
+
+  // [PERF-FIX] Parse each sale's items_json exactly once per fetch instead of
+  // on every single render (previously this ran for every row on every
+  // keystroke anywhere on the page, e.g. while typing a return quantity in
+  // the modal below — with a large sales history this is what made the UI
+  // feel like it had frozen).
+  const parsedItemsBySaleId = useMemo(() => {
+    const map = new Map();
+    for (const s of sales) {
+      try { map.set(s.id, JSON.parse(s.items_json || '[]')); }
+      catch { map.set(s.id, []); }
+    }
+    return map;
+  }, [sales]);
 
   const handleVoid = async () => {
     if (!voidModal) return;
@@ -87,61 +147,92 @@ export default function SalesHistory() {
     } catch (e) { alert(t('history.alerts.void_error') + e.message); }
   };
 
+  const handleCorrectPayment = async () => {
+    if (!paymentModal || !newPaymentMethod) return;
+    try {
+      const res = await window.api.correctPaymentMethod({
+        invoiceId: paymentModal.invoice,
+        newMethod: newPaymentMethod,
+        staffId: 1
+      });
+      if (res.success) {
+        setPaymentModal(null);
+        setNewPaymentMethod('');
+        fetchSales();
+      } else {
+        alert('خطأ: ' + res.error);
+      }
+    } catch (e) { alert('خطأ: ' + e.message); }
+  };
+
   const openReturn = (sale) => {
     try {
       const items = JSON.parse(sale.items_json || '[]');
+      if (!items.length) { alert(t('history.alerts.read_error')); return; }
       setReturnModal({ ...sale, items });
-      const initQtys = {};
-      items.forEach((it, i) => initQtys[i] = 0);
-      setReturnQtys(initQtys);
-      setReturnReason(t('history.modals.return_reason_default'));
     } catch { alert(t('history.alerts.read_error')); }
   };
 
-  const handleReturn = async () => {
-    if (!returnModal) return;
+  // [FIX-RETURN-1] handleReturn now receives the already-validated return
+  // lines + reason directly from the isolated <ReturnModal> component below
+  // (qty typing no longer touches SalesHistory's own state, which used to
+  // force this whole page — including every parsed items_json row — to
+  // re-render on every keystroke and made the UI feel frozen).
+  //
+  // [FIX-RETURN-2] The original invoice UUID is only populated for invoices
+  // issued while ZATCA Phase 2 was active. Any older/legacy invoice has a
+  // NULL uuid, which used to hard-block every single return with a
+  // "the original invoice does not exist" alert. The invoice NUMBER always
+  // exists and is what ZATCA's BillingReference/InvoiceDocumentReference/ID
+  // is meant to carry (the UUID field is a separate, optional element) —
+  // so we use the invoice number as billingRef instead. This does not touch
+  // the ZATCA signing/XML pipeline itself, only which value the frontend
+  // supplies as the billing reference.
+  const handleReturn = async (sale, returnItems, reason) => {
+    const billingRef = sale.invoice;
+
+    let returnTotal = 0;
+    const creditItems = returnItems.map(it => {
+      returnTotal += (it.qty * parseFloat(it.Price));
+      return { ...it, Qty: -it.qty };
+    });
+
+    const returnVat = returnItems.reduce((sum, item) => {
+      const lineTotal = (item.Price || 0) * (item.qty || item.returnQty || 0);
+      return sum + (lineTotal * vatRate / (1 + vatRate));
+    }, 0);
+    const vatAmt = Math.round(returnVat * 100) / 100;
+    const cnNumber = `CN-${sale.invoice}-${Date.now().toString().slice(-4)}`;
+    const payload = {
+      invoice: cnNumber,
+      items: creditItems,
+      subtotal: -(returnTotal - vatAmt),
+      tax: -vatAmt,
+      total: -returnTotal,
+      payment: sale.payment,
+      customer_id: sale.customer_id,
+      billingRef,
+      originalInvoice: sale.invoice,
+      note: `\u0625\u0634\u0639\u0627\u0631 \u062f\u0627\u0626\u0646 (\u0627\u0633\u062a\u0631\u062c\u0627\u0639) \u0644\u0644\u0641\u0627\u062a\u0648\u0631\u0629 \u0627\u0644\u0623\u0635\u0644\u064a\u0629 #${sale.invoice} - ${reason}`,
+      status: 'credit' // Flag as credit note
+    };
+
     try {
-      // [GAP-3] The original invoice UUID is mandatory for ZATCA credit notes (typeCode 381).
-      // ZATCA will reject any credit note that does not carry a BillingReference.
-      const billingRef = returnModal.uuid;
-      if (!billingRef) {
-        alert('\u062a\u0639\u0630\u0651\u0631 \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0625\u0634\u0639\u0627\u0631 \u0627\u0644\u062f\u0627\u0626\u0646: \u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629 \u0627\u0644\u0623\u0635\u0644\u064a\u0629 \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f. \u0644\u0627 \u064a\u0645\u0643\u0646 \u0625\u0646\u0634\u0627\u0621 \u0645\u0631\u062a\u062c\u0639.');
-        return;
+      const res = await window.api.saveSale(payload);
+      // [FIX-RETURN-3] saveSale's IPC handler never throws on failure — it
+      // resolves with { success:false, error }. The old code never checked
+      // this, so a failed return silently closed the dialog as if it worked.
+      if (res && res.success === false) {
+        alert('\u062e\u0637\u0623 \u0641\u064a \u0625\u0631\u062c\u0627\u0639 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629: ' + (res.error || res.message || ''));
+        return false;
       }
-
-      let returnTotal = 0;
-      const returnItems = [];
-      returnModal.items.forEach((it, i) => {
-        const qty = parseFloat(returnQtys[i] || 0);
-        if (qty > 0) {
-          returnTotal += (qty * parseFloat(it.Price));
-          returnItems.push({ ...it, Qty: -qty }); // negative for credit note
-        }
-      });
-      if (returnItems.length === 0) return alert('\u064a\u062c\u0628 \u062a\u062d\u062f\u064a\u062f \u0635\u0646\u0641 \u0648\u0627\u062d\u062f \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644 \u0644\u0644\u0627\u0633\u062a\u0631\u062c\u0627\u0639');
-
-      const vatAmt = returnTotal * vatRate / (1 + vatRate);
-      const cnNumber = `CN-${returnModal.invoice}-${Date.now().toString().slice(-4)}`;
-      const payload = {
-        invoice: cnNumber,
-        items: returnItems,
-        subtotal: -(returnTotal - vatAmt),
-        tax: -vatAmt,
-        total: -returnTotal,
-        payment: returnModal.payment,
-        customer_id: returnModal.customer_id,
-        // [GAP-3] Pass billingRef (original invoice UUID) so the backend can emit
-        // the BillingReference block required for ZATCA typeCode 381 credit notes.
-        billingRef,
-        originalInvoice: returnModal.invoice,
-        note: `\u0625\u0634\u0639\u0627\u0631 \u062f\u0627\u0626\u0646 (\u0627\u0633\u062a\u0631\u062c\u0627\u0639) \u0644\u0644\u0641\u0627\u062a\u0648\u0631\u0629 \u0627\u0644\u0623\u0635\u0644\u064a\u0629 #${returnModal.invoice} - ${returnReason}`,
-        status: 'credit' // Flag as credit note
-      };
-
-      await window.api.saveSale(payload);
       setReturnModal(null);
       fetchSales();
-    } catch (e) { alert('\u062e\u0637\u0623 \u0641\u064a \u0625\u0631\u062c\u0627\u0639 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629: ' + e.message); }
+      return true;
+    } catch (e) {
+      alert('\u062e\u0637\u0623 \u0641\u064a \u0625\u0631\u062c\u0627\u0639 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629: ' + e.message);
+      return false;
+    }
   };
 
   const handleDebitNote = async () => {
@@ -181,9 +272,52 @@ export default function SalesHistory() {
     } catch (e) { alert('خطأ في التصدير: ' + e.message); }
   };
 
+  const printTailorTicket = async (sale) => {
+    try {
+      const tailorOrder = await window.api?.tailor?.getOrderBySale?.(sale.invoice);
+      if (!tailorOrder) {
+        alert('لم يتم العثور على ورقة عمل الخياط لهذا الطلب.');
+        return;
+      }
+      const orderPayload = {
+        invoiceNumber: sale.invoice,
+        customer: tailorOrder.customer || { name: 'غير معروف', phone: '' },
+        date: tailorOrder.created_at || sale.timestamp,
+        deliveryDate: tailorOrder.target_delivery_date,
+        notes: tailorOrder.note,
+        subtotal: sale.subtotal,
+        paid: sale.paid,
+        balance: sale.total_amount - sale.paid,
+        items: tailorOrder.garments || []
+      };
+      
+      const htmlContent = renderToString(<TailorWorkOrder orderDetails={orderPayload} fabrics={[]} />);
+      const fullHtml = `
+        <html dir="rtl">
+        <head>
+          <style>
+            @page { size: A4 portrait; margin: 0; }
+            body { background: white; margin: 0; }
+            .no-print { display: none !important; }
+          </style>
+        </head>
+        <body>${htmlContent}</body>
+        </html>
+      `;
+      if (window.api?.printHTMLSilent) {
+        window.api.printHTMLSilent({ html: fullHtml });
+      } else if (window.api?.printHTML) {
+        window.api.printHTML(fullHtml);
+      }
+    } catch (e) {
+      alert('خطأ في طباعة ورقة الخياط: ' + e.message);
+    }
+  };
+
   const printReceipt = async (sale, forceWidth) => {
-    if (!sale) return;
-    const bizAr  = settings.business_name_ar || 'نظام البصمة الذكية';
+    try {
+      if (!sale) return;
+      const bizAr  = settings.business_name_ar || 'نظام البصمة الذكية';
     const bizEn  = settings.business_name_en || '';
     const logo   = settings.business_logo || '';
     const footer = settings.receipt_footer || 'شكراً لزيارتكم';
@@ -201,6 +335,18 @@ export default function SalesHistory() {
     const gr     = parseFloat(sale.total);
     const vatAmt = parseFloat(sale.tax || gr * vatRate / (1 + vatRate));
     const net    = gr - vatAmt;
+
+    // Split-payment breakdown — e.g. SAR 20 paid as SAR 5 cash + SAR 15 card.
+    // payment_details_json is the array of {type, amount} rows POS saved at
+    // checkout; if there's more than one non-zero row this was a split sale
+    // and the receipt should itemize each method instead of showing a single
+    // "Payment Method" line.
+    let paymentBreakdown = [];
+    try {
+      const pd = JSON.parse(sale.payment_details_json || '[]');
+      if (Array.isArray(pd)) paymentBreakdown = pd.filter(p => p && parseFloat(p.amount) > 0);
+    } catch (_) {}
+    const isSplitPayment = paymentBreakdown.length > 1;
 
     // FIX 2: Use Phase 2 9-tag TLV for printed receipts
     // Try to get crypto fields from zatca_queue for this invoice
@@ -529,6 +675,7 @@ export default function SalesHistory() {
                               رقم الفاتورة (Invoice No): <span>${sale.invoice}</span><br>
                               تاريخ الإصدار (Issue Date): <span dir="ltr">${new Date(sale.sale_date).toLocaleString('ar-SA')}</span>
                           </div>
+                          ${settings.receipt_header ? `<div style="margin-top:8px; font-size:12px; color:#475569; white-space:pre-wrap; max-width:320px;">${settings.receipt_header}</div>` : ''}
                       </td>
                       <td class="header-logo-box">
                           ${logo ? `<img src="${logo}" class="logo-img">` : ''}
@@ -667,10 +814,21 @@ export default function SalesHistory() {
                           <span>الإجمالي شامل الضريبة (Total)</span>
                           <span>SAR ${gr.toFixed(2)}</span>
                       </div>
+                      ${isSplitPayment ? `
+                      <div class="totals-row" style="flex-direction:column; align-items:stretch; gap:6px;">
+                          <span style="font-weight:700; color:#64748b;">طريقة الدفع (دفع مقسّم / Split Payment)</span>
+                          ${paymentBreakdown.map(p => `
+                          <div style="display:flex; justify-content:space-between; padding-right:10px; font-size:12.5px;">
+                              <span>• ${payLabel(p.type)}</span>
+                              <strong>SAR ${parseFloat(p.amount).toFixed(2)}</strong>
+                          </div>`).join('')}
+                      </div>
+                      ` : `
                       <div class="totals-row">
                           <span>طريقة الدفع (Payment Method)</span>
-                          <strong>${sale.payment || '—'}</strong>
+                          <strong>${payLabel(sale.payment)}</strong>
                       </div>
+                      `}
                       <div class="totals-row">
                           <span>المبلغ المدفوع (Paid)</span>
                           <strong>SAR ${parseFloat(sale.paid || sale.total).toFixed(2)}</strong>
@@ -687,6 +845,7 @@ export default function SalesHistory() {
               <!-- Footer -->
               <div class="footer">
                   <p style="margin: 0; font-weight: bold;">${footer}</p>
+                  ${buildSocialFooterHTML(settings)}
                   <p style="margin: 5px 0 0 0; font-size: 10px;">نظام البصمة الذكية الفني للفوترة الإلكترونية • Developed by البصمة الذكية</p>
               </div>
           </div>
@@ -742,6 +901,7 @@ export default function SalesHistory() {
               <h2 style="margin:0; font-size:18px; font-weight: 800;">${bizAr}</h2>
               ${addr ? `<p style="margin:4px 0; font-weight: 500;">${addr}</p>` : ''}
               <p style="margin:2px 0; font-weight: 500;">الرقم الضريبي: <strong>${vatNum}</strong></p>
+              ${settings.receipt_header ? `<p style="margin:4px 0; font-size:11px; color:#333; white-space:pre-wrap;">${settings.receipt_header}</p>` : ''}
           </div>
 
           <div style="text-align:center; font-weight:800; font-size: 14px; border-top:2px dashed #000; border-bottom:2px dashed #000; padding:6px 0; margin-bottom:10px; color: #000;">
@@ -778,6 +938,12 @@ export default function SalesHistory() {
                   <span>الإجمالي:</span>
                   <span>${gr.toFixed(2)} SAR</span>
               </div>
+              ${isSplitPayment ? `
+              <div class="info-line" style="font-weight:700; margin-top:4px;"><span>طريقة الدفع (مقسّمة):</span><span></span></div>
+              ${paymentBreakdown.map(p => `<div class="info-line" style="padding-right:8px;"><span>• ${payLabel(p.type)}</span><span>${parseFloat(p.amount).toFixed(2)} SAR</span></div>`).join('')}
+              ` : `
+              <div class="info-line"><span>طريقة الدفع:</span><span>${payLabel(sale.payment)}</span></div>
+              `}
               <div class="info-line"><span>المدفوع:</span><span>${parseFloat(sale.paid || sale.total).toFixed(2)} SAR</span></div>
               ${parseFloat(sale.change||0) > 0 ? `<div class="info-line"><span>الباقي:</span><span>${parseFloat(sale.change).toFixed(2)} SAR</span></div>` : ''}
           </div>
@@ -788,6 +954,7 @@ export default function SalesHistory() {
 
           <div class="footer">
               <p style="margin:0; font-weight: 700;">${footer}</p>
+              ${buildSocialFooterHTML(settings)}
               <div style="margin-top:15px; font-size:10px; color:#000; border-top:1px dashed #000; padding-top:8px;">
                   Developed by البصمة الذكية<br>
                   ea.gaber10@gmail.com
@@ -799,13 +966,25 @@ export default function SalesHistory() {
       </body></html>`;
     }
 
-    const win = window.open('', '_blank', `width=${width === 'A4' ? 900 : 450},height=${width === 'A4' ? 1100 : 650}`);
-    if (win) { 
-      win.document.write(html); 
-      win.document.close(); 
-      win.onload = () => { 
-        setTimeout(() => { win.print(); win.close(); }, 500); 
-      }; 
+    if (window.api) {
+      if (width !== 'A4' && settings.printer_name && window.api.printHTMLSilent) {
+        window.api.printHTMLSilent({ html, printerName: settings.printer_name });
+      } else if (window.api.printHTML) {
+        window.api.printHTML(html);
+      }
+    } else {
+      const win = window.open('', '_blank', `width=${width === 'A4' ? 900 : 450},height=${width === 'A4' ? 1100 : 650}`);
+      if (win) { 
+        win.document.write(html); 
+        win.document.close(); 
+        win.onload = () => { 
+          setTimeout(() => { win.print(); win.close(); }, 500); 
+        }; 
+      }
+    }
+    } catch (err) {
+      alert('خطأ في الطباعة: ' + err.message);
+      console.error(err);
     }
   };
 
@@ -1043,8 +1222,12 @@ export default function SalesHistory() {
       </body></html>`;
     }
 
-    const win = window.open('', '_blank', `width=${width === 'A4' ? 900 : 450},height=${width === 'A4' ? 1100 : 650}`);
-    if (win) { win.document.write(html); win.document.close(); win.onload = () => { setTimeout(() => { win.print(); win.close(); }, 500); }; }
+    if (window.api?.printHTML) {
+      window.api.printHTML(html);
+    } else {
+      const win = window.open('', '_blank', `width=${width === 'A4' ? 900 : 450},height=${width === 'A4' ? 1100 : 650}`);
+      if (win) { win.document.write(html); win.document.close(); win.onload = () => { setTimeout(() => { win.print(); win.close(); }, 500); }; }
+    }
   };
 
   const printQuote = (q) => {
@@ -1217,8 +1400,12 @@ export default function SalesHistory() {
       </div>
 
     </body></html>`;
-    const win = window.open('', '_blank', 'width=1100,height=1300');
-    if(win){ win.document.write(html); win.document.close(); setTimeout(()=>win.print(),800); }
+    if (window.api?.printHTML) {
+      window.api.printHTML(html);
+    } else {
+      const win = window.open('', '_blank', 'width=1100,height=1300');
+      if(win){ win.document.write(html); win.document.close(); setTimeout(()=>win.print(),800); }
+    }
   };
 
 
@@ -1277,6 +1464,7 @@ export default function SalesHistory() {
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={dateInp}>
             <option value="all">{t('history.status.all')}</option>
             <option value="paid">{t('history.status.paid')}</option>
+            <option value="partial">مدفوع جزئياً</option>
             <option value="credit">{t('history.status.credit')}</option>
             <option value="void">{t('history.status.void')}</option>
           </select>
@@ -1327,8 +1515,8 @@ export default function SalesHistory() {
         </div>
 
         {/* Table */}
-        <div style={{ background:'white', borderRadius:'20px', border:'1px solid #f1f5f9', overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.04)' }}>
-          <table style={{ width:'100%', borderCollapse:'collapse', textAlign:'right' }}>
+        <div style={{ background:'white', borderRadius:'20px', border:'1px solid #f1f5f9', overflowX:'auto', boxShadow:'0 1px 3px rgba(0,0,0,0.04)' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', textAlign:'right', whiteSpace: 'nowrap' }}>
             <thead style={{ background:'#f8fafc', borderBottom:'1px solid #f1f5f9' }}>
               <tr>
                 {['', t('history.table.invoice_no'), t('history.table.date'), t('history.table.customer'), t('history.table.payment'), t('history.table.total'), t('history.table.tax'), t('history.table.status'), t('history.table.actions')].map(h => (
@@ -1347,9 +1535,10 @@ export default function SalesHistory() {
                   {t('history.table.no_sales')}
                 </td></tr>
               ) : sales.map((s, i) => {
-                const st = statusLabel(s.status, t);
+                const derivedStatus = (parseFloat(s.paid) < parseFloat(s.total) && s.status !== 'void' && s.status !== 'credit') ? 'partial' : s.status;
+                const st = statusLabel(derivedStatus, t);
                 const vatAmt = parseFloat(s.tax || s.total * vatRate / (1 + vatRate));
-                const items = (() => { try { return JSON.parse(s.items_json || '[]'); } catch { return []; } })();
+                const items = parsedItemsBySaleId.get(s.id) || [];
                 return [
                   <tr key={s.invoice} style={{ borderBottom:'1px solid #f8fafc', background: s.status==='void' ? '#fefefe' : 'transparent', opacity: s.status==='void' ? .6 : 1 }}>
                     <td style={{ padding:'16px 20px' }}>
@@ -1380,7 +1569,7 @@ export default function SalesHistory() {
                       </div>
                     </td>
                     <td style={{ padding:'12px 14px' }}>
-                      <div style={{ display:'flex', gap:'6px' }}>
+                      <div style={{ display:'flex', flexWrap:'nowrap', gap:'6px' }}>
                         <button onClick={() => downloadXML(s)} title="تحميل XML للـ ZATCA"
                           style={{ padding:'6px 10px', background:'#eff6ff', border:'none', color:'#3b82f6', borderRadius:'8px', cursor:'pointer', fontWeight:'700', fontSize:'11px', fontFamily:'inherit', display:'flex', alignItems:'center', gap:'4px' }}>
                           <FileText size={13}/> XML
@@ -1397,10 +1586,17 @@ export default function SalesHistory() {
                               </span>
                             ) : (
                               <>
-                                <button onClick={() => printReceipt(s, 'A4')} title="A4"
-                                  style={{ padding:'6px 10px', background:'#0f172a', border:'none', color:'#fff', borderRadius:'8px', cursor:'pointer', fontWeight:'700', fontSize:'11px', fontFamily:'inherit', display:'flex', alignItems:'center', gap:'4px' }}>
-                                  <Printer size={13}/> {t('history.actions.print_a4')}
-                                </button>
+                                {s.order_type === 'tailor' ? (
+                                  <button onClick={() => printTailorTicket(s)} title="Tailor Ticket"
+                                    style={{ padding:'6px 10px', background:'#4338ca', border:'none', color:'#fff', borderRadius:'8px', cursor:'pointer', fontWeight:'700', fontSize:'11px', fontFamily:'inherit', display:'flex', alignItems:'center', gap:'4px' }}>
+                                    <Printer size={13}/> ورقة عمل الخياط
+                                  </button>
+                                ) : (
+                                  <button onClick={() => printReceipt(s, 'A4')} title="A4"
+                                    style={{ padding:'6px 10px', background:'#0f172a', border:'none', color:'#fff', borderRadius:'8px', cursor:'pointer', fontWeight:'700', fontSize:'11px', fontFamily:'inherit', display:'flex', alignItems:'center', gap:'4px' }}>
+                                    <Printer size={13}/> {t('history.actions.print_a4')}
+                                  </button>
+                                )}
                                 <button onClick={() => printReceipt(s, '80')} title="80mm"
                                   style={{ padding:'6px 10px', background:'#2563eb', border:'none', color:'#fff', borderRadius:'8px', cursor:'pointer', fontWeight:'700', fontSize:'11px', fontFamily:'inherit', display:'flex', alignItems:'center', gap:'4px' }}>
                                   <Printer size={13}/> {t('history.actions.print_thermal')}
@@ -1421,10 +1617,22 @@ export default function SalesHistory() {
                             </button>
                           </>
                         )}
+                        {s.status !== 'void' && s.status !== 'credit' && parseFloat(s.paid) < parseFloat(s.total) && (
+                          <button onClick={() => handlePayRemaining(s)} title="دفع المتبقي"
+                            style={{ padding:'6px 8px', background:'#ecfdf5', border:'1px solid #a7f3d0', color:'#059669', borderRadius:'8px', cursor:'pointer', fontFamily:'inherit', fontSize:'12px', fontWeight:'800' }}>
+                            دفع المتبقي
+                          </button>
+                        )}
                         {s.status !== 'void' && s.status !== 'credit' && parseFloat(s.total) > 0 && (
                           <button onClick={() => openReturn(s)} title="Return"
                             style={{ padding:'6px 8px', background:'#fef3c7', border:'none', color:'#d97706', borderRadius:'8px', cursor:'pointer', fontFamily:'inherit', fontSize:'12px', fontWeight:'700' }}>
                             {t('history.actions.return')}
+                          </button>
+                        )}
+                        {s.status !== 'void' && s.status !== 'credit' && parseFloat(s.total) > 0 && !s.payment_method_corrected && (
+                          <button onClick={() => setPaymentModal(s)} title="تصحيح الدفع"
+                            style={{ padding:'6px 8px', background:'#e0e7ff', border:'none', color:'#4338ca', borderRadius:'8px', cursor:'pointer', fontFamily:'inherit', fontSize:'12px', fontWeight:'700' }}>
+                            تصحيح طريقة الدفع
                           </button>
                         )}
                         {s.customer_tax_id && s.status !== 'void' && (
@@ -1530,6 +1738,30 @@ export default function SalesHistory() {
 
       </div>
 
+      {/* Payment Correction modal */}
+      {paymentModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.45)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }} onClick={e => e.target===e.currentTarget && setPaymentModal(null)}>
+          <div style={{ background:'white', borderRadius:'22px', padding:'32px', maxWidth:'420px', width:'95%', textAlign:'center' }} dir="rtl">
+            <h3 style={{ fontWeight:'800', marginBottom:'8px' }}>تصحيح طريقة الدفع للفاتورة #{paymentModal.invoice}</h3>
+            <p style={{ color:'#64748b', fontSize:'13px', marginBottom:'20px', fontWeight:'700' }}>
+              الرجاء تحديد الطريقة الصحيحة (مسموح بالتعديل مرة واحدة فقط).
+            </p>
+            <select value={newPaymentMethod} onChange={e => setNewPaymentMethod(e.target.value)}
+              style={{ width:'100%', padding:'12px', borderRadius:'12px', border:'1px solid #e2e8f0', fontSize:'14px', fontFamily:'inherit', outline:'none', marginBottom:'16px', textAlign:'right', boxSizing:'border-box' }}>
+              <option value="">اختر طريقة الدفع الصحيحة...</option>
+              <option value="Cash">نقدي</option>
+              <option value="Card">بطاقة (مدى/فيزا)</option>
+              <option value="STC">STC Pay</option>
+              <option value="Bank">تحويل بنكي</option>
+            </select>
+            <div style={{ display:'flex', gap:'12px', justifyContent:'center' }}>
+              <button onClick={() => setPaymentModal(null)} style={{ padding:'12px 24px', background:'#f1f5f9', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'700', fontFamily:'inherit' }}>{t('history.modals.cancel')}</button>
+              <button onClick={handleCorrectPayment} disabled={!newPaymentMethod} style={{ padding:'12px 24px', background: newPaymentMethod ? '#4338ca' : '#94a3b8', color:'white', border:'none', borderRadius:'12px', cursor: newPaymentMethod ? 'pointer' : 'not-allowed', fontWeight:'700', fontFamily:'inherit' }}>تأكيد التصحيح</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Void confirmation modal */}
       {voidModal && (
         <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.45)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }} onClick={e => e.target===e.currentTarget && setVoidModal(null)}>
@@ -1549,45 +1781,16 @@ export default function SalesHistory() {
         </div>
       )}
 
-      {/* Credit Note (Return) Modal */}
+      {/* Credit Note (Return) Modal — isolated component so typing a quantity
+          only re-renders this small modal, not the whole sales table. */}
       {returnModal && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.45)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }} onClick={e => e.target===e.currentTarget && setReturnModal(null)}>
-          <div style={{ background:'white', borderRadius:'22px', padding:'32px', maxWidth:'500px', width:'95%', maxHeight:'85vh', overflowY:'auto' }} dir="rtl">
-            <h3 style={{ fontWeight:'800', marginBottom:'6px', fontSize:'18px' }}>{t('history.modals.return_title')}</h3>
-            <p style={{ color:'#64748b', fontSize:'12px', marginBottom:'24px' }}>{t('history.modals.return_subtitle')} #{returnModal.invoice}</p>
-            
-            <div style={{ marginBottom:'20px', display:'flex', flexDirection:'column', gap:'10px' }}>
-              <div style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', paddingBottom:'4px', borderBottom:'1px solid #f1f5f9', display:'flex' }}>
-                <span style={{ flex:2 }}>{t('history.table.items')}</span>
-                <span style={{ flex:1, textAlign:'center' }}>الكمية المشتراة</span>
-                <span style={{ flex:1, textAlign:'center' }}>كمية الإرجاع</span>
-              </div>
-              {returnModal.items.map((it, i) => (
-                <div key={i} style={{ display:'flex', alignItems:'center', fontSize:'13px' }}>
-                  <span style={{ flex:2, fontWeight:'600' }}>{it.Name}</span>
-                  <span style={{ flex:1, textAlign:'center', color:'#64748b' }}>{it.Qty}</span>
-                  <div style={{ flex:1, textAlign:'center' }}>
-                    <input type="number" min="0" max={it.Qty} step="any" value={returnQtys[i]||''} 
-                      onChange={e => {
-                        const val = parseFloat(e.target.value) || 0;
-                        if(val > it.Qty) return;
-                        setReturnQtys({...returnQtys, [i]: val});
-                      }}
-                      style={{ width:'60px', padding:'6px', textAlign:'center', borderRadius:'8px', border:'1px solid #e2e8f0' }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <input value={returnReason} onChange={e => setReturnReason(e.target.value)} placeholder={t('history.modals.return_reason_ph')}
-              style={{ width:'100%', padding:'12px', borderRadius:'12px', border:'1px solid #e2e8f0', fontSize:'14px', fontFamily:'inherit', outline:'none', marginBottom:'24px', textAlign:'right', boxSizing:'border-box' }} />
-            
-            <div style={{ display:'flex', gap:'12px', justifyContent:'center' }}>
-              <button onClick={() => setReturnModal(null)} style={{ flex:1, padding:'12px', background:'#f1f5f9', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'700', fontFamily:'inherit' }}>{t('history.modals.cancel')}</button>
-              <button onClick={handleReturn} style={{ flex:2, padding:'12px', background:'#d97706', color:'white', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'700', fontFamily:'inherit' }}>{t('history.modals.return_confirm')}</button>
-            </div>
-          </div>
-        </div>
+        <ReturnModal
+          sale={returnModal}
+          vatRate={vatRate}
+          t={t}
+          onClose={() => setReturnModal(null)}
+          onConfirm={handleReturn}
+        />
       )}
 
       {/* Debit Note Modal */}
@@ -1618,3 +1821,169 @@ export default function SalesHistory() {
 
 const lbl = { display:'block', fontSize:'11px', fontWeight:'700', color:'#94a3b8', marginBottom:'5px' };
 const dateInp = { padding:'10px 12px', borderRadius:'11px', border:'1px solid #e2e8f0', fontSize:'13px', outline:'none', fontFamily:'inherit', background:'white', cursor:'pointer' };
+
+// ─────────────────────────────────────────────────────────────────────────
+// ReturnModal — isolated so typing a return quantity never re-renders the
+// (potentially huge) sales table in the parent. This is what fixes the
+// "screen freezes when I click the amount box" bug: previously every
+// keystroke updated state on SalesHistory itself, forcing React to
+// reconcile the entire table (including re-parsing every row's items_json)
+// on every character typed.
+// ─────────────────────────────────────────────────────────────────────────
+const ReturnModal = memo(function ReturnModal({ sale, vatRate, t, onClose, onConfirm }) {
+  const [qtys, setQtys] = useState(() => Object.fromEntries(sale.items.map((_, i) => [i, 0])));
+  const [reason, setReason] = useState(t('history.modals.return_reason_default'));
+  const [submitting, setSubmitting] = useState(false);
+  const [isTailorCut, setIsTailorCut] = useState(false);
+  const [penaltyAmount, setPenaltyAmount] = useState('');
+
+  const setQty = (i, rawVal, maxQty) => {
+    let v = parseFloat(rawVal);
+    if (isNaN(v) || v < 0) v = 0;
+    if (v > maxQty) v = maxQty;
+    setQtys(prev => ({ ...prev, [i]: v }));
+  };
+  const step = (i, delta, maxQty) => {
+    const current = parseFloat(qtys[i] || 0);
+    setQty(i, current + delta, maxQty);
+  };
+
+  const returnAll = () => setQtys(Object.fromEntries(sale.items.map((it, i) => [i, parseFloat(it.Qty)])));
+  const clearAll  = () => setQtys(Object.fromEntries(sale.items.map((_, i) => [i, 0])));
+
+  const selectedLines = sale.items
+    .map((it, i) => ({ ...it, qty: parseFloat(qtys[i] || 0) }))
+    .filter(l => l.qty > 0);
+
+  const rawGross = selectedLines.reduce((s, l) => s + l.qty * parseFloat(l.Price), 0);
+  const penaltyVal = parseFloat(penaltyAmount) || 0;
+  const returnGross = rawGross - penaltyVal;
+  const returnVat   = returnGross * vatRate / (1 + vatRate);
+  const returnNet   = returnGross - returnVat;
+  const hasSelection = selectedLines.length > 0;
+
+  const handleConfirm = async () => {
+    if (!hasSelection || submitting) return;
+    setSubmitting(true);
+    await onConfirm(sale, selectedLines, reason);
+    setSubmitting(false);
+  };
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.45)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}
+      onClick={e => e.target === e.currentTarget && !submitting && onClose()}>
+      <div style={{ background:'white', borderRadius:'22px', padding:'28px', maxWidth:'560px', width:'95%', maxHeight:'88vh', overflowY:'auto', display:'flex', flexDirection:'column', gap:'18px' }} dir="rtl">
+
+        <div>
+          <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'4px' }}>
+            <div style={{ width:'40px', height:'40px', borderRadius:'12px', background:'#fef3c7', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <RotateCcw size={20} color="#d97706" />
+            </div>
+            <div>
+              <h3 style={{ fontWeight:'800', fontSize:'18px', margin:0 }}>{t('history.modals.return_title')}</h3>
+              <p style={{ color:'#64748b', fontSize:'12px', margin:0 }}>{t('history.modals.return_subtitle')} #{sale.invoice}</p>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display:'flex', gap:'8px' }}>
+          <button type="button" onClick={returnAll} disabled={submitting}
+            style={{ flex:1, padding:'8px', borderRadius:'10px', border:'1px solid #fde68a', background:'#fffbeb', color:'#92400e', fontWeight:'700', fontSize:'12px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px' }}>
+            <PackageCheck size={14}/> إرجاع كل الأصناف
+          </button>
+          <button type="button" onClick={clearAll} disabled={submitting}
+            style={{ flex:1, padding:'8px', borderRadius:'10px', border:'1px solid #e2e8f0', background:'#f8fafc', color:'#64748b', fontWeight:'700', fontSize:'12px', cursor:'pointer' }}>
+            مسح الكميات
+          </button>
+        </div>
+
+        <div style={{ display:'flex', flexDirection:'column', gap:'8px', border:'1px solid #f1f5f9', borderRadius:'14px', padding:'6px' }}>
+          <div style={{ fontSize:'11px', fontWeight:'700', color:'#94a3b8', padding:'6px 8px', borderBottom:'1px solid #f1f5f9', display:'flex' }}>
+            <span style={{ flex:2 }}>{t('history.table.items')}</span>
+            <span style={{ flex:1, textAlign:'center' }}>الكمية المشتراة</span>
+            <span style={{ flex:'1.4', textAlign:'center' }}>كمية الإرجاع</span>
+            <span style={{ flex:1, textAlign:'left' }}>المبلغ</span>
+          </div>
+          {sale.items.map((it, i) => {
+            const qty = parseFloat(qtys[i] || 0);
+            const lineTotal = qty * parseFloat(it.Price || 0);
+            const maxQty = parseFloat(it.Qty || 0);
+            return (
+              <div key={i} style={{ display:'flex', alignItems:'center', fontSize:'13px', padding:'6px 8px', borderRadius:'10px', background: qty > 0 ? '#fffbeb' : 'transparent' }}>
+                <span style={{ flex:2, fontWeight:'600' }}>{it.Name}</span>
+                <span style={{ flex:1, textAlign:'center', color:'#64748b' }}>{maxQty} × {parseFloat(it.Price).toFixed(2)}</span>
+                <div style={{ flex:'1.4', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px' }}>
+                  <button type="button" onClick={() => step(i, -1, maxQty)} disabled={submitting || qty <= 0}
+                    style={{ width:'26px', height:'26px', borderRadius:'8px', border:'1px solid #e2e8f0', background:'white', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', opacity: qty <= 0 ? .4 : 1 }}>
+                    <Minus size={13}/>
+                  </button>
+                  <input type="number" min="0" max={maxQty} step="any" value={qtys[i] || ''}
+                    onChange={e => setQty(i, e.target.value, maxQty)}
+                    disabled={submitting}
+                    style={{ width:'56px', padding:'6px', textAlign:'center', borderRadius:'8px', border:'1px solid #e2e8f0' }} />
+                  <button type="button" onClick={() => step(i, 1, maxQty)} disabled={submitting || qty >= maxQty}
+                    style={{ width:'26px', height:'26px', borderRadius:'8px', border:'1px solid #e2e8f0', background:'white', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', opacity: qty >= maxQty ? .4 : 1 }}>
+                    <Plus size={13}/>
+                  </button>
+                </div>
+                <span style={{ flex:1, textAlign:'left', fontWeight:'700', color: qty > 0 ? '#d97706' : '#cbd5e1' }}>{lineTotal.toFixed(2)}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Tailor specific refund controls */}
+        {sale.items.some(it => it.Category === 'Tailoring' || it.Category === 'خياطة' || sale.order_type === 'tailor') && (
+            <div style={{ padding:'14px', background:'#f8fafc', borderRadius:'14px', border:'1px solid #e2e8f0', marginTop:'10px' }}>
+                <label style={{ display:'flex', alignItems:'center', gap:'8px', fontWeight:800, cursor:'pointer', marginBottom: isTailorCut ? '12px' : '0' }}>
+                    <input type="checkbox" checked={isTailorCut} onChange={e => setIsTailorCut(e.target.checked)} style={{ width:'16px', height:'16px' }} />
+                    تم قص القماش؟ (خصم تكلفة المواد)
+                </label>
+                {isTailorCut && (
+                    <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
+                        <span style={{ fontSize:'12px', fontWeight:700, color:'#64748b' }}>مبلغ الخصم (ر.س):</span>
+                        <input type="number" min="0" value={penaltyAmount} onChange={e => setPenaltyAmount(e.target.value)} style={{ padding:'8px', borderRadius:'8px', border:'1px solid #cbd5e1', flex:1, fontSize:'14px' }} placeholder="مثال: 150" />
+                    </div>
+                )}
+            </div>
+        )}
+
+        <div>
+          <label style={{ ...lbl, marginBottom:'6px' }}>{t('history.modals.return_reason_ph')}</label>
+          <input value={reason} onChange={e => setReason(e.target.value)} placeholder={t('history.modals.return_reason_ph')}
+            disabled={submitting}
+            style={{ width:'100%', padding:'12px', borderRadius:'12px', border:'1px solid #e2e8f0', fontSize:'14px', fontFamily:'inherit', outline:'none', textAlign:'right', boxSizing:'border-box' }} />
+        </div>
+
+        <div style={{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'14px', padding:'14px 16px', display:'flex', flexDirection:'column', gap:'4px' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#92400e' }}>
+            <span>المجموع الفرعي (غير شامل الضريبة)</span>
+            <span>SAR {returnNet.toFixed(2)}</span>
+          </div>
+          <div style={{ display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#92400e' }}>
+            <span>الضريبة ({(vatRate*100).toFixed(0)}%)</span>
+            <span>SAR {returnVat.toFixed(2)}</span>
+          </div>
+          <div style={{ display:'flex', justifyContent:'space-between', fontWeight:'900', fontSize:'16px', color:'#92400e', borderTop:'1px solid #fde68a', paddingTop:'6px', marginTop:'2px' }}>
+            <span>إجمالي المرتجع</span>
+            <span>SAR {returnGross.toFixed(2)}</span>
+          </div>
+          <p style={{ margin:'6px 0 0', fontSize:'10.5px', color:'#a16207' }}>
+            سيتم إصدار إشعار دائن وإعادة الكميات المحددة أعلاه تلقائياً إلى المخزون.
+          </p>
+        </div>
+
+        <div style={{ display:'flex', gap:'12px', justifyContent:'center' }}>
+          <button onClick={onClose} disabled={submitting}
+            style={{ flex:1, padding:'12px', background:'#f1f5f9', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:'700', fontFamily:'inherit' }}>
+            {t('history.modals.cancel')}
+          </button>
+          <button onClick={handleConfirm} disabled={!hasSelection || submitting}
+            style={{ flex:2, padding:'12px', background: (!hasSelection || submitting) ? '#fcd34d' : '#d97706', color:'white', border:'none', borderRadius:'12px', cursor: (!hasSelection || submitting) ? 'not-allowed' : 'pointer', fontWeight:'700', fontFamily:'inherit', opacity: (!hasSelection || submitting) ? .7 : 1 }}>
+            {submitting ? 'جاري التنفيذ…' : t('history.modals.return_confirm')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});

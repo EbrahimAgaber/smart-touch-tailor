@@ -36,7 +36,13 @@ const fromHalala = (h)   => ((parseInt(h) || 0) / 100);
 function fmtDate(d) {
     if (!d) return new Date().toISOString().split('T')[0];
     if (typeof d === 'string') return d.split('T')[0];
-    return d.toISOString().split('T')[0];
+    if (d instanceof Date) return d.toISOString().split('T')[0];
+    if (typeof d === 'object' && d.startDate) return d.startDate.split('T')[0];
+    try {
+        return new Date(d).toISOString().split('T')[0];
+    } catch (e) {
+        return new Date().toISOString().split('T')[0];
+    }
 }
 
 function nextJvRef() {
@@ -245,6 +251,68 @@ function _seedCoA() {
         // Mark all seeded as system
         _db.exec(`UPDATE accounts SET is_system = 1 WHERE account_code >= 1000`);
     })();
+    // ── Safe Migration of historical ledger_entries into journal_entries ──
+    _db.transaction(() => {
+        const legacyGroups = _db.prepare(`
+            SELECT 
+                COALESCE(reference, description, 'LEGACY-' || date) as group_key,
+                date,
+                description,
+                reference
+            FROM ledger_entries
+            GROUP BY COALESCE(reference, description, 'LEGACY-' || date), date, description, reference
+        `).all();
+
+        const checkRef = _db.prepare(`SELECT id FROM journal_entries WHERE reference_no IN (?, ?, ?, ?)`);
+        const checkDesc = _db.prepare(`SELECT id FROM journal_entries WHERE description = ? AND entry_date = ?`);
+        const getLines = _db.prepare(`
+            SELECT * FROM ledger_entries
+            WHERE COALESCE(reference, description, 'LEGACY-' || date) = ?
+              AND date = ?
+              AND description = ?
+              AND IFNULL(reference, '') = IFNULL(?, '')
+        `);
+        const insJE = _db.prepare(`
+            INSERT INTO journal_entries (entry_date, reference_no, description, entry_type, reference_type, reference_id, status)
+            VALUES (?, ?, ?, 'Auto', 'migration', ?, 'posted')
+        `);
+        const insLine = _db.prepare(`
+            INSERT INTO journal_entry_lines (entry_id, account_code, description, debit_halala, credit_halala)
+            VALUES (?, ?, ?, ?, ?)
+        `);
+
+        for (const grp of legacyGroups) {
+            let possibleRefs = [
+                grp.reference,
+                grp.reference ? 'SAL-' + grp.reference : null,
+                grp.reference ? 'EXP-' + grp.reference : null,
+                grp.reference ? 'MIG-' + grp.reference : null
+            ];
+            
+            let existing;
+            if (grp.reference) {
+                existing = checkRef.get(...possibleRefs);
+            } else {
+                existing = checkDesc.get(grp.description, fmtDate(grp.date));
+            }
+
+            if (existing) continue; // Skip already migrated or double-posted
+
+            const lines = getLines.all(grp.group_key, grp.date, grp.description, grp.reference);
+            if (lines.length === 0) continue;
+
+            const entryDate = fmtDate(grp.date);
+            const refNo = grp.reference ? `MIG-${grp.reference}` : nextJvRef();
+
+            const jeResult = insJE.run(entryDate, refNo, grp.description || 'ترحيل قديم', grp.reference || null);
+            const jeId = jeResult.lastInsertRowid;
+
+            for (const line of lines) {
+                const acctCode = legacyMap[line.account_code] || line.account_code;
+                insLine.run(jeId, acctCode, line.description, toHalala(line.debit), toHalala(line.credit));
+            }
+        }
+    })();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -309,6 +377,21 @@ function postJournalEntry({
         `);
 
         for (const l of linesH) {
+            // Verify account_code exists in accounts table to prevent FOREIGN KEY constraint failure
+            const accExists = _db.prepare(`SELECT 1 FROM accounts WHERE account_code = ?`).get(l.account_code);
+            if (!accExists) {
+                const codeNum = parseInt(l.account_code);
+                const isAsset     = codeNum >= 1000 && codeNum < 2000;
+                const isLiability = codeNum >= 2000 && codeNum < 3000;
+                const isEquity    = codeNum >= 3000 && codeNum < 4000;
+                const isRevenue   = codeNum >= 4000 && codeNum < 5000;
+                const type = isAsset ? 'Asset' : isLiability ? 'Liability' : isEquity ? 'Equity' : isRevenue ? 'Revenue' : 'Expense';
+                const normalBal = (isAsset || !isLiability && !isEquity && !isRevenue) ? 'debit' : 'credit';
+                _db.prepare(`
+                    INSERT OR IGNORE INTO accounts (account_code, name_ar, name_en, type, parent_id, level, normal_balance, is_system, is_active)
+                    VALUES (?, ?, ?, ?, NULL, 3, ?, 1, 1)
+                `).run(l.account_code, `حساب ${l.account_code}`, `Account ${l.account_code}`, type, normalBal);
+            }
             lineStmt.run(entryId, l.account_code, l.description, l.debit_halala, l.credit_halala);
             // Keep legacy accounts.balance in sync (in SAR, not halala, for backward compat)
             _db.prepare(`

@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=1920"/>
+<title>البصمة الذكية — Promo Screens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;background:#050810;color:#F9FAFB;}
+:root{
+  --bg-base:#0A0F1A;
+  --bg-surface:#111827;
+  --bg-raised:#1C2537;
+  --bg-hover:#2C3A52;
+  --border-dim:#374151;
+  --border-bright:#4B5563;
+  --accent:#0EA5E9;
+  --accent-dim:rgba(14,165,233,0.12);
+  --success:#10B981;
+  --warning:#F59E0B;
+  --danger:#EF4444;
+  --purple:#8B5CF6;
+  --text-1:#F9FAFB;
+  --text-2:#9CA3AF;
+  --text-3:#6B7280;
+  --mono:'IBM Plex Mono',monospace;
+  --r-sm:6px;--r-md:10px;--r-lg:14px;--r-xl:20px;
+  --glow:0 0 24px rgba(14,165,233,0.2);
+}
+
+/* ── SLIDE CONTAINER ─────────────────────────────────────────── */
+.slide{
+  width:1920px;height:1080px;
+  position:relative;overflow:hidden;
+  display:flex;flex-direction:column;
+  background:var(--bg-base);
+  page-break-after:always;
+  margin-bottom:4px;
+}
+.slide-id{
+  position:absolute;top:8px;left:8px;
+  font-size:11px;color:var(--text-3);
+  font-family:var(--mono);
+  z-index:999;
+}
+
+/* ── NAV RAIL ────────────────────────────────────────────────── */
+.nav-rail{
+  width:56px;height:100%;
+  background:var(--bg-surface);
+  border-left:1px solid var(--border-dim);
+  display:flex;flex-direction:column;
+  align-items:center;
+  padding:16px 0;
+  gap:4px;
+  flex-shrink:0;
+}
+.nav-logo{
+  width:34px;height:34px;
+  background:linear-gradient(135deg,#0EA5E9,#6366F1);
+  border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;margin-bottom:16px;
+  box-shadow:var(--glow);
+}
+.nav-item{
+  width:40px;height:40px;
+  border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;cursor:pointer;
+  transition:0.15s;
+  color:var(--text-3);
+}
+.nav-item.active{background:var(--accent-dim);color:var(--accent);}
+.nav-item:hover{background:var(--bg-raised);}
+
+/* ── STATUS BAR ──────────────────────────────────────────────── */
+.status-bar{
+  height:28px;width:100%;
+  background:var(--bg-surface);
+  border-bottom:1px solid var(--border-dim);
+  display:flex;align-items:center;
+  padding:0 16px;
+  gap:12px;
+  flex-shrink:0;
+}
+.status-dot{
+  width:7px;height:7px;
+  border-radius:50%;
+  background:var(--success);
+  animation:pulse 2s infinite;
+}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.status-text{font-size:11px;color:var(--text-3);font-family:var(--mono);}
+.status-badge{
+  padding:2px 8px;border-radius:99px;
+  font-size:10px;font-weight:700;
+  background:rgba(16,185,129,0.1);color:var(--success);
+}
+
+/* ── MAIN LAYOUT ─────────────────────────────────────────────── */
+.app-shell{display:flex;flex:1;min-height:0;flex-direction:row-reverse;}
+.main-content{flex:1;min-width:0;overflow:hidden;display:flex;flex-direction:column;}
+.page-header{
+  padding:20px 28px 0;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.page-title{font-size:22px;font-weight:800;color:var(--text-1);}
+.page-sub{font-size:13px;color:var(--text-3);margin-top:2px;}
+.content-area{flex:1;padding:20px 28px;overflow:hidden;}
+
+/* ── CARD ────────────────────────────────────────────────────── */
+.card{
+  background:var(--bg-surface);
+  border:1px solid var(--border-dim);
+  border-radius:var(--r-xl);
+  padding:20px;
+}
+.card-title{font-size:14px;font-weight:800;color:var(--text-1);margin-bottom:14px;}
+
+/* ── KPI CARDS ───────────────────────────────────────────────── */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;}
+.kpi{
+  background:var(--bg-surface);
+  border:1px solid var(--border-dim);
+  border-radius:var(--r-xl);
+  padding:22px 20px;
+  display:flex;flex-direction:column;align-items:center;
+  text-align:center;
+  position:relative;overflow:hidden;
+}
+.kpi::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  border-radius:var(--r-xl) var(--r-xl) 0 0;
+}
+.kpi.blue::before{background:var(--accent);}
+.kpi.green::before{background:var(--success);}
+.kpi.amber::before{background:var(--warning);}
+.kpi.purple::before{background:var(--purple);}
+.kpi-icon{
+  width:44px;height:44px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;margin-bottom:10px;
+}
+.kpi-label{font-size:11px;color:var(--text-2);font-weight:700;text-transform:uppercase;margin-bottom:6px;}
+.kpi-value{font-size:28px;font-weight:900;color:var(--text-1);font-family:var(--mono);line-height:1;}
+.kpi-trend{
+  margin-top:8px;padding:3px 10px;border-radius:99px;
+  font-size:11px;font-weight:800;
+}
+.kpi-trend.up{background:rgba(16,185,129,0.12);color:var(--success);}
+.kpi-trend.dn{background:rgba(239,68,68,0.12);color:var(--danger);}
+
+/* ── CHART (SVG) ─────────────────────────────────────────────── */
+.chart-area{height:180px;position:relative;}
+.chart-area svg{width:100%;height:100%;}
+
+/* ── TABLE ───────────────────────────────────────────────────── */
+.data-table{width:100%;border-collapse:collapse;}
+.data-table th{
+  font-size:11px;color:var(--text-2);
+  text-transform:uppercase;font-weight:700;
+  padding:8px 0;
+  border-bottom:1px solid var(--border-dim);
+  text-align:right;
+}
+.data-table td{
+  padding:11px 0;font-size:13px;
+  border-bottom:1px solid rgba(55,65,81,0.4);
+  color:var(--text-1);text-align:right;
+}
+.badge{
+  padding:3px 10px;border-radius:99px;
+  font-size:10px;font-weight:800;display:inline-block;
+}
+.badge.green{background:rgba(16,185,129,0.12);color:var(--success);}
+.badge.red{background:rgba(239,68,68,0.12);color:var(--danger);}
+.badge.amber{background:rgba(245,158,11,0.12);color:var(--warning);}
+
+/* ── POS SCREEN ──────────────────────────────────────────────── */
+.pos-grid{display:grid;grid-template-columns:1fr 380px;gap:0;height:100%;}
+.pos-left{padding:20px;overflow:hidden;display:flex;flex-direction:column;gap:16px;}
+.pos-right{
+  background:var(--bg-surface);
+  border-right:1px solid var(--border-dim);
+  display:flex;flex-direction:column;
+  height:100%;
+}
+.search-bar{
+  background:var(--bg-raised);
+  border:1px solid var(--border-dim);
+  border-radius:var(--r-lg);
+  padding:12px 16px;
+  display:flex;gap:10px;align-items:center;
+  color:var(--text-3);font-size:14px;
+}
+.search-icon{font-size:16px;}
+.cat-strip{display:flex;gap:8px;flex-wrap:nowrap;overflow:hidden;}
+.cat-btn{
+  padding:7px 14px;border-radius:var(--r-md);
+  font-size:13px;font-weight:600;
+  background:var(--bg-raised);color:var(--text-2);
+  border:1px solid var(--border-dim);
+  white-space:nowrap;cursor:pointer;
+}
+.cat-btn.active{background:var(--accent-dim);color:var(--accent);border-color:rgba(14,165,233,0.3);}
+.product-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:12px;flex:1;overflow:hidden;
+  align-content:start;
+}
+.product-card{
+  background:var(--bg-raised);
+  border:1px solid var(--border-dim);
+  border-radius:var(--r-lg);
+  padding:14px;cursor:pointer;
+  transition:0.15s;
+}
+.product-card.has-hover{border-color:var(--accent);box-shadow:var(--glow);}
+.product-emoji{font-size:28px;margin-bottom:8px;}
+.product-name{font-size:13px;font-weight:700;color:var(--text-1);margin-bottom:4px;}
+.product-price{font-size:12px;color:var(--accent);font-family:var(--mono);}
+.product-stock{font-size:10px;color:var(--text-3);margin-top:2px;}
+
+/* ORDER PANEL */
+.order-header{
+  padding:16px;
+  border-bottom:1px solid var(--border-dim);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.order-title{font-size:15px;font-weight:800;color:var(--text-1);}
+.order-list{flex:1;padding:12px;overflow:hidden;display:flex;flex-direction:column;gap:8px;}
+.order-item{
+  background:var(--bg-raised);
+  border:1px solid var(--border-dim);
+  border-radius:var(--r-md);
+  padding:10px 12px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.order-item-name{font-size:13px;font-weight:600;color:var(--text-1);}
+.order-item-price{font-size:13px;font-weight:700;color:var(--accent);font-family:var(--mono);}
+.order-item-qty{
+  display:flex;gap:6px;align-items:center;
+}
+.qty-btn{
+  width:24px;height:24px;border-radius:6px;
+  background:var(--bg-hover);color:var(--text-1);
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:700;
+}
+.order-totals{
+  padding:14px 16px;
+  border-top:1px solid var(--border-dim);
+  display:flex;flex-direction:column;gap:8px;
+}
+.total-row{display:flex;justify-content:space-between;align-items:center;}
+.total-label{font-size:12px;color:var(--text-2);}
+.total-val{font-size:13px;font-weight:700;color:var(--text-1);font-family:var(--mono);}
+.grand-row{
+  background:var(--accent-dim);
+  border-radius:var(--r-md);
+  padding:10px 12px;margin-top:4px;
+}
+.grand-label{font-size:14px;font-weight:800;color:var(--accent);}
+.grand-val{font-size:20px;font-weight:900;color:var(--accent);font-family:var(--mono);}
+.pay-btn{
+  margin:12px 16px;
+  background:var(--accent);color:white;
+  border-radius:var(--r-lg);
+  padding:16px;text-align:center;
+  font-size:15px;font-weight:800;
+  cursor:pointer;
+}
+
+/* FINANCE / CHART */
+.fin-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.fin-metric{
+  background:var(--bg-raised);
+  border-radius:var(--r-lg);
+  padding:16px;
+  display:flex;flex-direction:column;gap:4px;
+}
+.fin-metric-label{font-size:11px;color:var(--text-3);font-weight:700;}
+.fin-metric-val{font-size:24px;font-weight:900;color:var(--text-1);font-family:var(--mono);}
+.fin-metric-sub{font-size:11px;color:var(--text-2);}
+
+/* ZATCA CARD */
+.zatca-card{
+  background:var(--bg-surface);
+  border:1px solid var(--border-dim);
+  border-radius:var(--r-xl);
+  padding:18px;
+  display:flex;flex-direction:column;gap:12px;
+}
+.zatca-header{display:flex;align-items:center;gap:10px;}
+.zatca-icon{
+  width:32px;height:32px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;
+}
+.zatca-title{font-size:14px;font-weight:800;color:var(--text-1);}
+.zatca-sub{font-size:11px;color:var(--text-2);}
+.zatca-counters{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.zatca-counter{
+  border-radius:10px;padding:10px 8px;text-align:center;
+}
+.zatca-count-val{font-size:22px;font-weight:900;font-family:var(--mono);}
+.zatca-count-lbl{font-size:10px;font-weight:700;margin-top:2px;}
+.progress-bar{height:5px;background:var(--bg-hover);border-radius:99px;overflow:hidden;}
+.progress-fill{height:100%;border-radius:99px;background:var(--success);}
+.zatca-active{
+  background:rgba(16,185,129,0.1);color:var(--success);
+  padding:3px 10px;border-radius:99px;font-size:11px;font-weight:800;
+}
+
+/* SMART ASSISTANT */
+.assistant-panel{
+  width:340px;flex-shrink:0;
+  background:var(--bg-surface);
+  border-right:1px solid var(--border-dim);
+  display:flex;flex-direction:column;
+  padding:16px;gap:12px;
+}
+.assistant-orb{
+  width:44px;height:44px;
+  background:linear-gradient(135deg,#0EA5E9,#6366F1);
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;margin-bottom:4px;
+  box-shadow:0 0 20px rgba(99,102,241,0.3);
+}
+.assistant-msg{
+  background:var(--bg-raised);
+  border-radius:10px 10px 10px 2px;
+  padding:12px;font-size:13px;color:var(--text-1);line-height:1.6;
+  border:1px solid var(--border-dim);
+}
+.assistant-input{
+  background:var(--bg-raised);
+  border:1px solid var(--border-dim);
+  border-radius:var(--r-lg);
+  padding:12px 14px;
+  display:flex;gap:10px;align-items:center;
+  font-size:13px;color:var(--text-3);
+  margin-top:auto;
+}
+
+/* TABLES SCREEN */
+.tables-grid{
+  display:grid;grid-template-columns:repeat(6,1fr);
+  gap:14px;
+}
+.table-card{
+  aspect-ratio:1;
+  border-radius:var(--r-lg);
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:6px;cursor:pointer;
+  border:2px solid transparent;
+  transition:0.15s;
+}
+.table-card.available{
+  background:rgba(16,185,129,0.08);
+  border-color:rgba(16,185,129,0.25);
+}
+.table-card.occupied{
+  background:rgba(14,165,233,0.1);
+  border-color:rgba(14,165,233,0.3);
+}
+.table-card.reserved{
+  background:rgba(245,158,11,0.08);
+  border-color:rgba(245,158,11,0.25);
+}
+.table-emoji{font-size:28px;}
+.table-name{font-size:13px;font-weight:700;color:var(--text-1);}
+.table-status{font-size:10px;font-weight:700;}
+.table-card.available .table-status{color:var(--success);}
+.table-card.occupied .table-status{color:var(--accent);}
+.table-card.reserved .table-status{color:var(--warning);}
+
+/* STOCK SCREEN */
+.stock-row{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 0;
+  border-bottom:1px solid rgba(55,65,81,0.4);
+}
+.stock-emoji{font-size:22px;width:36px;text-align:center;}
+.stock-name{font-size:13px;font-weight:700;color:var(--text-1);flex:1;}
+.stock-qty{font-size:13px;font-family:var(--mono);font-weight:700;}
+.stock-bar-wrap{width:80px;height:5px;background:var(--bg-hover);border-radius:99px;overflow:hidden;}
+.stock-bar{height:100%;border-radius:99px;}
+
+/* INVOICE PREVIEW */
+.invoice-wrap{
+  background:white;color:#0F172A;
+  border-radius:var(--r-xl);
+  padding:28px;font-family:'IBM Plex Sans Arabic',system-ui;
+  direction:rtl;height:100%;overflow:hidden;
+}
+.inv-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;}
+.inv-title{font-size:24px;font-weight:900;color:#1E3A8A;}
+.inv-sub{font-size:12px;color:#64748B;margin-top:2px;}
+.inv-meta{font-size:12px;color:#475569;margin-top:6px;}
+.inv-qr{
+  width:80px;height:80px;
+  background:#F1F5F9;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:32px;
+}
+.inv-divider{height:2px;background:linear-gradient(90deg,#1E3A8A,#3B82F6,transparent);margin:16px 0;border-radius:99px;}
+.inv-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.inv-card{background:#F8FAFC;border-radius:10px;padding:14px;border:1px solid #E2E8F0;}
+.inv-card-title{font-size:11px;font-weight:800;color:#1E3A8A;text-transform:uppercase;margin-bottom:8px;}
+.inv-row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:#334155;}
+.inv-table{width:100%;border-collapse:collapse;margin-bottom:16px;}
+.inv-table th{background:#1E3A8A;color:white;font-size:11px;padding:8px;text-align:center;}
+.inv-table td{padding:8px;font-size:12px;border:1px solid #E2E8F0;text-align:center;}
+.inv-table tr:nth-child(even) td{background:#F8FAFC;}
+.inv-total{font-size:18px;font-weight:900;color:#1E3A8A;font-family:var(--mono);}
+
+/* ── HERO SCREEN (SLIDE 1) ───────────────────────────────────── */
+.hero-screen{
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:24px;
+  height:100%;
+  background:radial-gradient(ellipse 80% 60% at 50% 40%, rgba(14,165,233,0.08) 0%, transparent 70%);
+}
+.hero-logo{
+  width:88px;height:88px;
+  background:linear-gradient(135deg,#0EA5E9,#6366F1);
+  border-radius:24px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:42px;
+  box-shadow:0 0 60px rgba(14,165,233,0.35), 0 0 120px rgba(14,165,233,0.15);
+}
+.hero-name{
+  font-size:72px;font-weight:900;color:var(--text-1);
+  letter-spacing:-2px;line-height:1;
+}
+.hero-tagline{
+  font-size:26px;color:var(--text-2);font-weight:400;
+  text-align:center;max-width:700px;line-height:1.5;
+}
+.hero-chips{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+.hero-chip{
+  padding:8px 18px;border-radius:99px;
+  font-size:14px;font-weight:700;
+  background:var(--accent-dim);color:var(--accent);
+  border:1px solid rgba(14,165,233,0.25);
+}
+.hero-cta{
+  margin-top:8px;
+  padding:18px 48px;
+  background:var(--accent);color:white;
+  border-radius:var(--r-xl);
+  font-size:18px;font-weight:800;
+  box-shadow:0 0 40px rgba(14,165,233,0.4);
+}
+
+/* KDS SCREEN */
+.kds-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:20px;}
+.kds-ticket{
+  background:var(--bg-raised);border-radius:var(--r-lg);
+  padding:14px;display:flex;flex-direction:column;gap:8px;
+  border-top:3px solid;
+}
+.kds-ticket.new{border-color:var(--danger);}
+.kds-ticket.in-progress{border-color:var(--warning);}
+.kds-ticket.done{border-color:var(--success);}
+.kds-header{display:flex;justify-content:space-between;align-items:center;}
+.kds-order-no{font-size:16px;font-weight:900;color:var(--text-1);font-family:var(--mono);}
+.kds-time{font-size:11px;color:var(--text-3);}
+.kds-type{font-size:10px;font-weight:800;padding:3px 8px;border-radius:99px;}
+.kds-ticket.new .kds-type{background:rgba(239,68,68,0.1);color:var(--danger);}
+.kds-ticket.in-progress .kds-type{background:rgba(245,158,11,0.1);color:var(--warning);}
+.kds-ticket.done .kds-type{background:rgba(16,185,129,0.1);color:var(--success);}
+.kds-item{font-size:13px;color:var(--text-1);padding:6px 0;border-bottom:1px solid var(--border-dim);}
+.kds-item:last-child{border:none;}
+.kds-item-qty{font-weight:800;color:var(--accent);font-family:var(--mono);}
+
+/* ── OVERALL SLIDE LABELS ─────────────────────────────────────── */
+.slide-label{
+  position:absolute;bottom:20px;right:20px;
+  font-size:11px;color:var(--text-3);font-family:var(--mono);
+  opacity:0.6;
+}
+
+/* PROMOTION OVERLAY (cinematic touch) */
+.scene-overlay{
+  position:absolute;inset:0;
+  background:linear-gradient(180deg,transparent 60%,rgba(10,15,26,0.6) 100%);
+  pointer-events:none;
+}
+
+/* RIGHT PANEL FOR DASHBOARD */
+.dash-right{
+  width:340px;flex-shrink:0;
+  display:flex;flex-direction:column;gap:16px;
+  padding:20px 20px 20px 0;
+  overflow:hidden;
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════
+     SLIDE 1 — HERO (Brand Identity)
+     "المشكلة": كل محل عنده فوضى في إدارة مبيعاته
+═══════════════════════════════════════════════════ -->
+<div class="slide" id="s1">
+  <div class="scene-overlay"></div>
+  <div class="hero-screen">
+    <div class="hero-logo">🖥️</div>
+    <div style="text-align:center;">
+      <div class="hero-name">البصمة الذكية</div>
+      <div style="font-size:32px;color:var(--accent);font-weight:300;margin-top:8px;letter-spacing:2px;font-family:var(--mono)">v2</div>
+    </div>
+    <div class="hero-tagline">
+      نظام نقاط البيع السحابي المتكامل لإدارة المبيعات والمخزون
+    </div>
+    <div class="hero-chips">
+      <span class="hero-chip">✓ متوافق مع زاتكا</span>
+      <span class="hero-chip">✓ عربي بالكامل</span>
+      <span class="hero-chip">✓ يعمل بدون إنترنت</span>
+      <span class="hero-chip">✓ ذكاء اصطناعي مدمج</span>
+    </div>
+    <div class="hero-cta">ابدأ مجانًا اليوم</div>
+  </div>
+  <div class="slide-label">SLIDE_01 · HERO · 1920×1080</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SLIDE 2 — DASHBOARD
+     "الحل": لوحة تحكم واحدة تعطيك كل شيء
+═══════════════════════════════════════════════════ -->
+<div class="slide" id="s2">
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    <span class="status-text">البصمة الذكية v2</span>
+    <span class="status-badge">متصل</span>
+    <span class="status-text" style="margin-right:auto;">الأربعاء، 14 أغسطس 2026 · 01:28 ص</span>
+    <span class="status-text">ZATCA ✓ مزامن</span>
+  </div>
+  <div class="app-shell">
+    <nav class="nav-rail">
+      <div class="nav-logo">🖥️</div>
+      <div class="nav-item active">📊</div>
+      <div class="nav-item">🖥️</div>
+      <div class="nav-item">👥</div>
+      <div class="nav-item">📋</div>
+      <div class="nav-item">📦</div>
+      <div class="nav-item">🏦</div>
+      <div class="nav-item">🛡️</div>
+      <div class="nav-item" style="margin-top:auto;">⚙️</div>
+    </nav>
+    <div class="main-content">
+      <div class="page-header">
+        <div>
+          <div class="page-title">لوحة التحكم</div>
+          <div class="page-sub">نظرة شاملة على أداء المنشأة اليوم</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <span style="font-size:12px;color:var(--text-3);">وضع المدير</span>
+          <div style="width:40px;height:20px;background:var(--accent);border-radius:99px;position:relative;cursor:pointer;">
+            <div style="position:absolute;top:2px;left:22px;width:16px;height:16px;background:white;border-radius:50%;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="content-area">
+        <div class="kpi-grid">
+          <div class="kpi blue">
+            <div class="kpi-icon" style="background:rgba(14,165,233,0.12);color:var(--accent);">📈</div>
+            <div class="kpi-label">مبيعات اليوم</div>
+            <div class="kpi-value">12,847</div>
+            <div class="kpi-trend up">+18٪ من أمس</div>
+          </div>
+          <div class="kpi green">
+            <div class="kpi-icon" style="background:rgba(16,185,129,0.12);color:var(--success);">💰</div>
+            <div class="kpi-label">صافي الربح</div>
+            <div class="kpi-value">4,203</div>
+            <div class="kpi-trend up">+12٪</div>
+          </div>
+          <div class="kpi amber">
+            <div class="kpi-icon" style="background:rgba(245,158,11,0.12);color:var(--warning);">📦</div>
+            <div class="kpi-label">تنبيهات المخزون</div>
+            <div class="kpi-value">3</div>
+            <div class="kpi-trend dn">يحتاج تعبئة</div>
+          </div>
+          <div class="kpi purple">
+            <div class="kpi-icon" style="background:rgba(139,92,246,0.12);color:var(--purple);">👥</div>
+            <div class="kpi-label">إجمالي العملاء</div>
+            <div class="kpi-value">1,284</div>
+            <div class="kpi-trend up">+6 هذا الأسبوع</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;flex:1;">
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <!-- Sales Chart -->
+            <div class="card">
+              <div class="card-title">📈 مبيعات آخر 7 أيام</div>
+              <div class="chart-area">
+                <svg viewBox="0 0 700 160" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#0EA5E9" stop-opacity="0.25"/>
+                      <stop offset="100%" stop-color="#0EA5E9" stop-opacity="0"/>
+                    </linearGradient>
+                  </defs>
+                  <path d="M0,140 L100,110 L200,90 L300,100 L400,60 L500,50 L600,30 L700,20" stroke="#0EA5E9" stroke-width="3" fill="none" stroke-linecap="round"/>
+                  <path d="M0,140 L100,110 L200,90 L300,100 L400,60 L500,50 L600,30 L700,20 L700,160 L0,160 Z" fill="url(#g1)"/>
+                  <circle cx="600" cy="30" r="5" fill="#0EA5E9"/>
+                  <circle cx="700" cy="20" r="5" fill="#0EA5E9"/>
+                  <!-- x-axis labels -->
+                  <text x="0" y="158" fill="#6B7280" font-size="11" font-family="IBM Plex Mono">السبت</text>
+                  <text x="100" y="158" fill="#6B7280" font-size="11" font-family="IBM Plex Mono">الأحد</text>
+                  <text x="200" y="158" fill="#6B7280" font-size="11" font-family="IBM Plex Mono">الاثنين</text>
+                  <text x="300" y="158" fill="#6B7280" font-size="11" font-family="IBM Plex Mono">الثلاثاء</text>
+                  <text x="400" y="158" fill="#6B7280" font-size="11" font-family="IBM Plex Mono">الأربعاء</text>
+                  <text x="500" y="158" fill="#6B7280" font-size="11" font-family="IBM Plex Mono">الخميس</text>
+                  <text x="600" y="158" fill="#6B7280" font-size="11" font-family="IBM Plex Mono">الجمعة</text>
+                </svg>
+              </div>
+            </div>
+
+            <!-- Recent Sales Table -->
+            <div class="card" style="flex:1;">
+              <div class="card-title">🧾 آخر المعاملات</div>
+              <table class="data-table">
+                <thead><tr>
+                  <th>رقم الفاتورة</th><th>الوقت</th><th>العميل</th><th>القيمة</th><th>الحالة</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td style="color:var(--accent);font-weight:700;font-family:var(--mono);">#INV-20841</td><td style="color:var(--text-2);">01:12 ص</td><td>محمد الشمري</td><td style="font-family:var(--mono);font-weight:800;">SAR 348.50</td><td><span class="badge green">مُنفَّذة</span></td></tr>
+                  <tr><td style="color:var(--accent);font-weight:700;font-family:var(--mono);">#INV-20840</td><td style="color:var(--text-2);">12:58 ص</td><td>فاطمة العتيبي</td><td style="font-family:var(--mono);font-weight:800;">SAR 192.00</td><td><span class="badge green">مُنفَّذة</span></td></tr>
+                  <tr><td style="color:var(--accent);font-weight:700;font-family:var(--mono);">#INV-20839</td><td style="color:var(--text-2);">12:44 ص</td><td>نقدي عام</td><td style="font-family:var(--mono);font-weight:800;">SAR 75.00</td><td><span class="badge green">مُنفَّذة</span></td></tr>
+                  <tr><td style="color:var(--accent);font-weight:700;font-family:var(--mono);">#INV-20838</td><td style="color:var(--text-2);">12:30 ص</td><td>عبدالله القحطاني</td><td style="font-family:var(--mono);font-weight:800;">SAR 560.00</td><td><span class="badge red">ملغاة</span></td></tr>
+                  <tr><td style="color:var(--accent);font-weight:700;font-family:var(--mono);">#INV-20837</td><td style="color:var(--text-2);">12:15 ص</td><td>نقدي عام</td><td style="font-family:var(--mono);font-weight:800;">SAR 223.75</td><td><span class="badge green">مُنفَّذة</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Right Panel -->
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <!-- ZATCA Card -->
+            <div class="zatca-card">
+              <div class="zatca-header">
+                <div class="zatca-icon" style="background:rgba(16,185,129,0.1);">🛡️</div>
+                <div>
+                  <div class="zatca-title">امتثال زاتكا</div>
+                  <div class="zatca-sub">الجهاز: POS-001</div>
+                </div>
+                <div class="zatca-active" style="margin-right:auto;">نشط ✓</div>
+              </div>
+              <div class="zatca-counters">
+                <div class="zatca-counter" style="background:rgba(245,158,11,0.08);">
+                  <div class="zatca-count-val" style="color:var(--warning);">2</div>
+                  <div class="zatca-count-lbl" style="color:var(--warning);">معلّق</div>
+                </div>
+                <div class="zatca-counter" style="background:rgba(16,185,129,0.08);">
+                  <div class="zatca-count-val" style="color:var(--success);">20,839</div>
+                  <div class="zatca-count-lbl" style="color:var(--success);">مُرسَل</div>
+                </div>
+                <div class="zatca-counter" style="background:rgba(239,68,68,0.08);">
+                  <div class="zatca-count-val" style="color:var(--danger);">0</div>
+                  <div class="zatca-count-lbl" style="color:var(--danger);">مرفوض</div>
+                </div>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-2);margin-bottom:6px;">
+                  <span>معدل القبول</span>
+                  <span style="font-weight:800;color:var(--success);">100%</span>
+                </div>
+                <div class="progress-bar"><div class="progress-fill" style="width:100%;"></div></div>
+              </div>
+              <div style="font-size:11px;color:var(--text-2);">✅ الشهادة سارية حتى 14 أغسطس 2027</div>
+            </div>
+
+            <!-- Top products -->
+            <div class="card" style="flex:1;">
+              <div class="card-title">🏆 الأكثر مبيعًا</div>
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:13px;">☕ قهوة عربية</span>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="width:80px;height:6px;background:var(--bg-hover);border-radius:99px;overflow:hidden;"><div style="width:90%;height:100%;background:var(--accent);border-radius:99px;"></div></div>
+                    <span style="font-size:12px;color:var(--text-2);font-family:var(--mono);">248</span>
+                  </div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:13px;">🍵 شاي كرك</span>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="width:80px;height:6px;background:var(--bg-hover);border-radius:99px;overflow:hidden;"><div style="width:72%;height:100%;background:var(--purple);border-radius:99px;"></div></div>
+                    <span style="font-size:12px;color:var(--text-2);font-family:var(--mono);">179</span>
+                  </div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:13px;">🍔 برغر كلاسيك</span>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="width:80px;height:6px;background:var(--bg-hover);border-radius:99px;overflow:hidden;"><div style="width:55%;height:100%;background:var(--success);border-radius:99px;"></div></div>
+                    <span style="font-size:12px;color:var(--text-2);font-family:var(--mono);">136</span>
+                  </div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:13px;">🍕 بيتزا مارغريتا</span>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="width:80px;height:6px;background:var(--bg-hover);border-radius:99px;overflow:hidden;"><div style="width:40%;height:100%;background:var(--warning);border-radius:99px;"></div></div>
+                    <span style="font-size:12px;color:var(--text-2);font-family:var(--mono);">98</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-label">SLIDE_02 · DASHBOARD · 1920×1080</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SLIDE 3 — POS SCREEN
+     "اللحظة": تجربة البيع الأسرع في السوق
+═══════════════════════════════════════════════════ -->
+<div class="slide" id="s3">
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    <span class="status-text">البصمة الذكية v2</span>
+    <span class="status-badge">متصل</span>
+    <span class="status-text" style="margin-right:auto;">الطاولة #3 · مسعود البقمي</span>
+    <span class="status-text">F2 = دفع · ESC = إلغاء</span>
+  </div>
+  <div class="app-shell">
+    <nav class="nav-rail">
+      <div class="nav-logo">🖥️</div>
+      <div class="nav-item">📊</div>
+      <div class="nav-item active">🖥️</div>
+      <div class="nav-item">👥</div>
+      <div class="nav-item">📋</div>
+      <div class="nav-item">📦</div>
+      <div class="nav-item">🏦</div>
+    </nav>
+    <div class="main-content" style="padding:0;">
+      <div class="pos-grid" style="height:100%;">
+        <!-- Left: products -->
+        <div class="pos-left">
+          <div style="display:flex;gap:10px;">
+            <div class="search-bar" style="flex:1;">
+              <span class="search-icon">🔍</span>
+              <span>ابحث عن منتج أو امسح الباركود...</span>
+            </div>
+          </div>
+          <div class="cat-strip">
+            <div class="cat-btn active">الكل</div>
+            <div class="cat-btn">☕ قهوة</div>
+            <div class="cat-btn">🍵 شاي</div>
+            <div class="cat-btn">🍔 برغر</div>
+            <div class="cat-btn">🍕 بيتزا</div>
+            <div class="cat-btn">🍰 حلويات</div>
+            <div class="cat-btn">🥤 مشروبات</div>
+            <div class="cat-btn">🥗 سلطات</div>
+          </div>
+          <div class="product-grid">
+            <div class="product-card has-hover">
+              <div class="product-emoji">☕</div>
+              <div class="product-name">قهوة عربية</div>
+              <div class="product-price">SAR 8.00</div>
+              <div class="product-stock">مخزون: 50</div>
+            </div>
+            <div class="product-card">
+              <div class="product-emoji">🍵</div>
+              <div class="product-name">شاي كرك</div>
+              <div class="product-price">SAR 6.00</div>
+              <div class="product-stock">مخزون: 80</div>
+            </div>
+            <div class="product-card">
+              <div class="product-emoji">🍔</div>
+              <div class="product-name">برغر كلاسيك</div>
+              <div class="product-price">SAR 32.00</div>
+              <div class="product-stock">مخزون: 24</div>
+            </div>
+            <div class="product-card">
+              <div class="product-emoji">🍕</div>
+              <div class="product-name">بيتزا مارغريتا</div>
+              <div class="product-price">SAR 45.00</div>
+              <div class="product-stock">مخزون: 12</div>
+            </div>
+            <div class="product-card">
+              <div class="product-emoji">🥤</div>
+              <div class="product-name">عصير برتقال</div>
+              <div class="product-price">SAR 12.00</div>
+              <div class="product-stock">مخزون: 40</div>
+            </div>
+            <div class="product-card">
+              <div class="product-emoji">🍰</div>
+              <div class="product-name">كيك شوكولاتة</div>
+              <div class="product-price">SAR 18.00</div>
+              <div class="product-stock">مخزون: 8</div>
+            </div>
+            <div class="product-card">
+              <div class="product-emoji">🥗</div>
+              <div class="product-name">سلطة سيزر</div>
+              <div class="product-price">SAR 22.00</div>
+              <div class="product-stock">مخزون: 15</div>
+            </div>
+            <div class="product-card">
+              <div class="product-emoji">🍗</div>
+              <div class="product-name">دجاج مشوي</div>
+              <div class="product-price">SAR 38.00</div>
+              <div class="product-stock">مخزون: 20</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Order -->
+        <div class="pos-right">
+          <div class="order-header">
+            <div class="order-title">🧾 الطلب الحالي</div>
+            <span class="badge amber">الطاولة #3</span>
+          </div>
+          <!-- Customer -->
+          <div style="padding:10px 16px;border-bottom:1px solid var(--border-dim);">
+            <div style="background:rgba(14,165,233,0.08);border:1px solid rgba(14,165,233,0.2);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:8px;">
+              <span style="font-size:18px;">👤</span>
+              <div>
+                <div style="font-size:13px;font-weight:700;color:var(--text-1);">مسعود البقمي</div>
+                <div style="font-size:11px;color:var(--text-2);">0544 123 456 · 240 نقطة ولاء</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="order-list">
+            <div class="order-item">
+              <div>
+                <div class="order-item-name">☕ قهوة عربية</div>
+                <div style="font-size:11px;color:var(--text-3);">مع هيل · بدون سكر</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;">
+                <div class="order-item-price">SAR 16.00</div>
+                <div class="order-item-qty">
+                  <div class="qty-btn">−</div>
+                  <span style="font-size:14px;font-weight:800;font-family:var(--mono);">2</span>
+                  <div class="qty-btn">+</div>
+                </div>
+              </div>
+            </div>
+            <div class="order-item">
+              <div>
+                <div class="order-item-name">🍔 برغر كلاسيك</div>
+                <div style="font-size:11px;color:var(--text-3);">إضافة جبنة</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;">
+                <div class="order-item-price">SAR 32.00</div>
+                <div class="order-item-qty">
+                  <div class="qty-btn">−</div>
+                  <span style="font-size:14px;font-weight:800;font-family:var(--mono);">1</span>
+                  <div class="qty-btn">+</div>
+                </div>
+              </div>
+            </div>
+            <div class="order-item">
+              <div>
+                <div class="order-item-name">🥤 عصير برتقال</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;">
+                <div class="order-item-price">SAR 12.00</div>
+                <div class="order-item-qty">
+                  <div class="qty-btn">−</div>
+                  <span style="font-size:14px;font-weight:800;font-family:var(--mono);">1</span>
+                  <div class="qty-btn">+</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="order-totals">
+            <div class="total-row">
+              <span class="total-label">المجموع قبل الضريبة</span>
+              <span class="total-val">SAR 52.17</span>
+            </div>
+            <div class="total-row">
+              <span class="total-label">ضريبة القيمة المضافة (15%)</span>
+              <span class="total-val">SAR 7.83</span>
+            </div>
+            <div class="total-row grand-row">
+              <span class="grand-label">الإجمالي</span>
+              <span class="grand-val">SAR 60.00</span>
+            </div>
+          </div>
+
+          <div style="padding:0 16px;display:flex;gap:8px;margin-bottom:8px;">
+            <div style="flex:1;background:var(--bg-raised);border:1px solid var(--border-dim);border-radius:10px;padding:10px;text-align:center;font-size:12px;color:var(--text-2);cursor:pointer;">⏸️ تعليق</div>
+            <div style="flex:1;background:var(--bg-raised);border:1px solid var(--border-dim);border-radius:10px;padding:10px;text-align:center;font-size:12px;color:var(--text-2);cursor:pointer;">🧑‍🍳 للمطبخ</div>
+          </div>
+          <div class="pay-btn" style="border-radius:14px;">
+            💳 &nbsp; ادفع الآن — SAR 60.00
+          </div>
+          <div style="padding:8px 16px 12px;display:flex;gap:6px;justify-content:center;">
+            <span style="font-size:12px;color:var(--text-3);">نقدي</span>
+            <span style="font-size:12px;color:var(--accent);font-weight:700;">·</span>
+            <span style="font-size:12px;color:var(--text-3);">بطاقة</span>
+            <span style="font-size:12px;color:var(--accent);font-weight:700;">·</span>
+            <span style="font-size:12px;color:var(--text-3);">STC Pay</span>
+            <span style="font-size:12px;color:var(--accent);font-weight:700;">·</span>
+            <span style="font-size:12px;color:var(--text-3);">آجل</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-label">SLIDE_03 · POS · 1920×1080</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SLIDE 4 — ZATCA / COMPLIANCE
+     "الثقة": 100% متوافق مع الحكومة
+═══════════════════════════════════════════════════ -->
+<div class="slide" id="s4">
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    <span class="status-text">البصمة الذكية v2</span>
+    <span class="status-badge">ZATCA Phase 2 ✓</span>
+  </div>
+  <div class="app-shell">
+    <nav class="nav-rail">
+      <div class="nav-logo">🖥️</div>
+      <div class="nav-item">📊</div>
+      <div class="nav-item">🖥️</div>
+      <div class="nav-item active">🛡️</div>
+    </nav>
+    <div class="main-content">
+      <div class="page-header">
+        <div>
+          <div class="page-title">🛡️ الامتثال الضريبي — زاتكا</div>
+          <div class="page-sub">الفوترة الإلكترونية المرحلة الثانية · Phase 2</div>
+        </div>
+      </div>
+      <div class="content-area" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <!-- Invoice Preview -->
+        <div class="invoice-wrap">
+          <div class="inv-header">
+            <div>
+              <div class="inv-title">فاتورة ضريبية</div>
+              <div class="inv-sub">Tax Invoice — المملكة العربية السعودية</div>
+              <div class="inv-meta">رقم: #INV-20841 · 14 أغسطس 2026 · 01:12 ص</div>
+            </div>
+            <div>
+              <div class="inv-qr">▦</div>
+              <div style="font-size:10px;text-align:center;color:#64748B;margin-top:4px;">زاتكا QR</div>
+            </div>
+          </div>
+          <div class="inv-divider"></div>
+          <div class="inv-grid">
+            <div class="inv-card">
+              <div class="inv-card-title">بيانات المورد</div>
+              <div class="inv-row"><span style="color:#64748B;">المنشأة:</span><span style="font-weight:700;">مقهى البصمة</span></div>
+              <div class="inv-row"><span style="color:#64748B;">الرقم الضريبي:</span><span style="font-family:monospace;font-weight:700;">310099999900003</span></div>
+              <div class="inv-row"><span style="color:#64748B;">العنوان:</span><span>الرياض، حي العليا</span></div>
+            </div>
+            <div class="inv-card">
+              <div class="inv-card-title">بيانات العميل</div>
+              <div class="inv-row"><span style="color:#64748B;">الاسم:</span><span style="font-weight:700;">محمد الشمري</span></div>
+              <div class="inv-row"><span style="color:#64748B;">الهاتف:</span><span style="font-family:monospace;">0501234567</span></div>
+              <div class="inv-row"><span style="color:#64748B;">الرقم الضريبي:</span><span style="font-family:monospace;">—</span></div>
+            </div>
+          </div>
+          <table class="inv-table">
+            <thead><tr>
+              <th>#</th><th>الصنف</th><th>سعر الوحدة</th><th>الكمية</th><th>الضريبة</th><th>الإجمالي</th>
+            </tr></thead>
+            <tbody>
+              <tr><td>1</td><td>قهوة عربية × 2</td><td>6.96</td><td>2</td><td>2.09</td><td>16.00</td></tr>
+              <tr><td>2</td><td>برغر كلاسيك</td><td>27.83</td><td>1</td><td>4.17</td><td>32.00</td></tr>
+              <tr><td>3</td><td>عصير برتقال</td><td>10.43</td><td>1</td><td>1.57</td><td>12.00</td></tr>
+            </tbody>
+          </table>
+          <div style="display:flex;justify-content:flex-end;">
+            <div style="min-width:200px;">
+              <div class="inv-row" style="border-bottom:1px solid #E2E8F0;padding-bottom:6px;margin-bottom:6px;"><span style="color:#64748B;">المجموع</span><span style="font-weight:700;">SAR 52.17</span></div>
+              <div class="inv-row" style="border-bottom:1px solid #E2E8F0;padding-bottom:6px;margin-bottom:6px;"><span style="color:#64748B;">ضريبة القيمة المضافة</span><span style="font-weight:700;color:#1E3A8A;">SAR 7.83</span></div>
+              <div class="inv-row"><span style="color:#1E3A8A;font-weight:800;">الإجمالي النهائي</span><span class="inv-total">SAR 60.00</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ZATCA Status Panel -->
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div class="card" style="background:rgba(16,185,129,0.05);border-color:rgba(16,185,129,0.25);">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+              <div style="width:48px;height:48px;background:rgba(16,185,129,0.1);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;">✅</div>
+              <div>
+                <div style="font-size:16px;font-weight:800;color:var(--text-1);">مُوثَّق ومُفعَّل</div>
+                <div style="font-size:12px;color:var(--text-2);">شهادة الإنتاج سارية المفعول</div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div style="background:var(--bg-raised);border-radius:10px;padding:12px;">
+                <div style="font-size:11px;color:var(--text-3);">رقم الجهاز</div>
+                <div style="font-size:14px;font-weight:800;color:var(--text-1);font-family:var(--mono);">POS-001</div>
+              </div>
+              <div style="background:var(--bg-raised);border-radius:10px;padding:12px;">
+                <div style="font-size:11px;color:var(--text-3);">صلاحية الشهادة</div>
+                <div style="font-size:14px;font-weight:800;color:var(--success);font-family:var(--mono);">أغسطس 2027</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">📊 إحصائيات الإرسال</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+              <div style="text-align:center;padding:16px;background:rgba(16,185,129,0.08);border-radius:12px;">
+                <div style="font-size:28px;font-weight:900;color:var(--success);font-family:var(--mono);">20,839</div>
+                <div style="font-size:11px;color:var(--success);font-weight:700;margin-top:4px;">مُرسَلة ✓</div>
+              </div>
+              <div style="text-align:center;padding:16px;background:rgba(245,158,11,0.08);border-radius:12px;">
+                <div style="font-size:28px;font-weight:900;color:var(--warning);font-family:var(--mono);">2</div>
+                <div style="font-size:11px;color:var(--warning);font-weight:700;margin-top:4px;">معلّقة ⏳</div>
+              </div>
+              <div style="text-align:center;padding:16px;background:rgba(239,68,68,0.08);border-radius:12px;">
+                <div style="font-size:28px;font-weight:900;color:var(--danger);font-family:var(--mono);">0</div>
+                <div style="font-size:11px;color:var(--danger);font-weight:700;margin-top:4px;">مرفوضة ✗</div>
+              </div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-2);margin-bottom:8px;">
+                <span>معدل القبول الكلي</span>
+                <span style="font-weight:800;color:var(--success);">100%</span>
+              </div>
+              <div class="progress-bar" style="height:8px;">
+                <div class="progress-fill" style="width:100%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="background:linear-gradient(135deg,rgba(14,165,233,0.05),rgba(99,102,241,0.05));border-color:rgba(14,165,233,0.2);">
+            <div style="font-size:14px;font-weight:800;color:var(--text-1);margin-bottom:12px;">🔏 التشفير والأمان</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-2);">
+                <span style="color:var(--success);">●</span> تشفير ECDSA P-256 نهاية إلى نهاية
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-2);">
+                <span style="color:var(--success);">●</span> توقيع رقمي على كل فاتورة
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-2);">
+                <span style="color:var(--success);">●</span> بيانات محلية 100% — لا سحابة خارجية
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-2);">
+                <span style="color:var(--success);">●</span> XML معياري وفق UBL 2.1
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-label">SLIDE_04 · ZATCA · 1920×1080</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SLIDE 5 — SMART ASSISTANT + KDS
+     "الذكاء": مساعد ذكي + متابعة المطبخ
+═══════════════════════════════════════════════════ -->
+<div class="slide" id="s5">
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    <span class="status-text">البصمة الذكية v2</span>
+    <span class="status-badge">KDS نشط</span>
+  </div>
+  <div class="app-shell">
+    <nav class="nav-rail">
+      <div class="nav-logo">🖥️</div>
+      <div class="nav-item">📊</div>
+      <div class="nav-item">🖥️</div>
+      <div class="nav-item active">🧑‍🍳</div>
+    </nav>
+    <div class="main-content" style="flex-direction:row;padding:0;">
+      <!-- KDS Main Area -->
+      <div style="flex:1;padding:20px;display:flex;flex-direction:column;gap:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div class="page-title" style="padding:0;">🧑‍🍳 شاشة المطبخ — KDS</div>
+          <div style="display:flex;gap:8px;">
+            <span class="badge amber">جديد: 3</span>
+            <span class="badge" style="background:rgba(245,158,11,0.1);color:var(--warning);">قيد التحضير: 2</span>
+            <span class="badge green">جاهز: 1</span>
+          </div>
+        </div>
+        <div class="kds-grid" style="flex:1;align-content:start;">
+          <div class="kds-ticket new">
+            <div class="kds-header">
+              <span class="kds-order-no">#841</span>
+              <span class="kds-type">جديد</span>
+              <span class="kds-time">01:28 ص</span>
+            </div>
+            <div style="font-size:11px;color:var(--text-3);">طاولة #3 · محلي</div>
+            <div class="kds-item"><span class="kds-item-qty">×2</span> قهوة عربية <span style="font-size:11px;color:var(--text-3);">مع هيل</span></div>
+            <div class="kds-item"><span class="kds-item-qty">×1</span> برغر كلاسيك <span style="font-size:11px;color:var(--text-3);">جبنة إضافية</span></div>
+          </div>
+          <div class="kds-ticket in-progress">
+            <div class="kds-header">
+              <span class="kds-order-no">#840</span>
+              <span class="kds-type">يُحضَّر</span>
+              <span class="kds-time">01:20 ص</span>
+            </div>
+            <div style="font-size:11px;color:var(--text-3);">طاولة #1 · توصيل</div>
+            <div class="kds-item"><span class="kds-item-qty">×1</span> بيتزا مارغريتا</div>
+            <div class="kds-item"><span class="kds-item-qty">×2</span> عصير برتقال</div>
+          </div>
+          <div class="kds-ticket new">
+            <div class="kds-header">
+              <span class="kds-order-no">#839</span>
+              <span class="kds-type">جديد</span>
+              <span class="kds-time">01:25 ص</span>
+            </div>
+            <div style="font-size:11px;color:var(--text-3);">كاونتر · سفري</div>
+            <div class="kds-item"><span class="kds-item-qty">×3</span> شاي كرك</div>
+            <div class="kds-item"><span class="kds-item-qty">×1</span> كيك شوكولاتة</div>
+          </div>
+          <div class="kds-ticket done">
+            <div class="kds-header">
+              <span class="kds-order-no">#838</span>
+              <span class="kds-type">جاهز ✓</span>
+              <span class="kds-time">01:15 ص</span>
+            </div>
+            <div style="font-size:11px;color:var(--text-3);">طاولة #5 · محلي</div>
+            <div class="kds-item"><span class="kds-item-qty">×2</span> دجاج مشوي</div>
+            <div class="kds-item"><span class="kds-item-qty">×1</span> سلطة سيزر</div>
+          </div>
+        </div>
+      </div>
+      <!-- Smart Assistant Panel -->
+      <div class="assistant-panel">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+          <div class="assistant-orb">🤖</div>
+          <div>
+            <div style="font-size:15px;font-weight:800;color:var(--text-1);">المساعد الذكي</div>
+            <div style="font-size:11px;color:var(--accent);">● متصل ومستعد</div>
+          </div>
+        </div>
+        <div class="assistant-msg">
+          مرحبًا! لاحظت أن مبيعات <strong>قهوة عربية</strong> ارتفعت 40% هذا الأسبوع. هل تريد رفع الكمية في المخزون؟
+        </div>
+        <div class="assistant-msg" style="border-radius:10px 10px 2px 10px;background:rgba(14,165,233,0.08);border-color:rgba(14,165,233,0.2);">
+          كيف كانت مبيعات اليوم؟
+        </div>
+        <div class="assistant-msg">
+          مبيعات اليوم: <strong style="color:var(--success);">SAR 12,847</strong> ✅<br/>
+          أفضل صنف: ☕ قهوة عربية<br/>
+          عدد الفواتير: 203
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <div style="padding:6px 12px;background:var(--accent-dim);border:1px solid rgba(14,165,233,0.25);border-radius:99px;font-size:12px;color:var(--accent);cursor:pointer;">المبيعات اليوم</div>
+          <div style="padding:6px 12px;background:var(--accent-dim);border:1px solid rgba(14,165,233,0.25);border-radius:99px;font-size:12px;color:var(--accent);cursor:pointer;">تنبيهات المخزون</div>
+          <div style="padding:6px 12px;background:var(--accent-dim);border:1px solid rgba(14,165,233,0.25);border-radius:99px;font-size:12px;color:var(--accent);cursor:pointer;">أفضل العملاء</div>
+        </div>
+        <div class="assistant-input">
+          <span>اسأل أي سؤال عن المنشأة...</span>
+          <span style="margin-right:auto;font-size:18px;">🎙️</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-label">SLIDE_05 · KDS + AI · 1920×1080</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SLIDE 6 — TABLES + STOCK
+     "التحكم الكامل": كل طاولة، كل منتج
+═══════════════════════════════════════════════════ -->
+<div class="slide" id="s6">
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    <span class="status-text">البصمة الذكية v2</span>
+  </div>
+  <div class="app-shell">
+    <nav class="nav-rail">
+      <div class="nav-logo">🖥️</div>
+      <div class="nav-item">📊</div>
+      <div class="nav-item">🖥️</div>
+      <div class="nav-item active">🪑</div>
+      <div class="nav-item">📦</div>
+    </nav>
+    <div class="main-content">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;height:100%;">
+        <!-- Tables Side -->
+        <div style="padding:20px 14px 20px 20px;border-left:1px solid var(--border-dim);display:flex;flex-direction:column;gap:16px;">
+          <div>
+            <div class="page-title">🪑 إدارة الطاولات</div>
+            <div style="display:flex;gap:10px;margin-top:10px;">
+              <span class="badge green">متاحة: 8</span>
+              <span class="badge" style="background:rgba(14,165,233,0.1);color:var(--accent);">مشغولة: 6</span>
+              <span class="badge amber">محجوزة: 2</span>
+            </div>
+          </div>
+          <div class="tables-grid">
+            <div class="table-card occupied"><div class="table-emoji">🪑</div><div class="table-name">طاولة 1</div><div class="table-status">مشغولة · SAR 120</div></div>
+            <div class="table-card available"><div class="table-emoji">🪑</div><div class="table-name">طاولة 2</div><div class="table-status">متاحة</div></div>
+            <div class="table-card occupied"><div class="table-emoji">🪑</div><div class="table-name">طاولة 3</div><div class="table-status">مشغولة · SAR 60</div></div>
+            <div class="table-card reserved"><div class="table-emoji">🪑</div><div class="table-name">طاولة 4</div><div class="table-status">محجوزة</div></div>
+            <div class="table-card occupied"><div class="table-emoji">🪑</div><div class="table-name">طاولة 5</div><div class="table-status">مشغولة · SAR 240</div></div>
+            <div class="table-card available"><div class="table-emoji">🪑</div><div class="table-name">طاولة 6</div><div class="table-status">متاحة</div></div>
+            <div class="table-card available"><div class="table-emoji">🪑</div><div class="table-name">طاولة 7</div><div class="table-status">متاحة</div></div>
+            <div class="table-card occupied"><div class="table-emoji">🪑</div><div class="table-name">طاولة 8</div><div class="table-status">مشغولة · SAR 89</div></div>
+            <div class="table-card reserved"><div class="table-emoji">🪑</div><div class="table-name">طاولة 9</div><div class="table-status">محجوزة</div></div>
+            <div class="table-card occupied"><div class="table-emoji">🪑</div><div class="table-name">طاولة 10</div><div class="table-status">مشغولة · SAR 175</div></div>
+            <div class="table-card available"><div class="table-emoji">🪑</div><div class="table-name">طاولة 11</div><div class="table-status">متاحة</div></div>
+            <div class="table-card available"><div class="table-emoji">🪑</div><div class="table-name">طاولة 12</div><div class="table-status">متاحة</div></div>
+          </div>
+        </div>
+
+        <!-- Stock Side -->
+        <div style="padding:20px 20px 20px 14px;display:flex;flex-direction:column;gap:16px;">
+          <div>
+            <div class="page-title">📦 المخزون</div>
+            <div style="display:flex;gap:10px;margin-top:10px;">
+              <span class="badge green">✓ متاح: 28</span>
+              <span class="badge amber">⚠️ منخفض: 3</span>
+              <span class="badge" style="background:rgba(239,68,68,0.1);color:var(--danger);">✗ نفد: 1</span>
+            </div>
+          </div>
+          <div class="card" style="flex:1;overflow:hidden;">
+            <div class="card-title">حالة المخزون</div>
+            <div class="stock-row">
+              <div class="stock-emoji">☕</div>
+              <div class="stock-name">بن قهوة عربية</div>
+              <div style="flex:1;padding:0 12px;"><div class="stock-bar-wrap"><div class="stock-bar" style="width:85%;background:var(--success);"></div></div></div>
+              <div class="stock-qty" style="color:var(--success);">42 كغ</div>
+            </div>
+            <div class="stock-row">
+              <div class="stock-emoji">🍵</div>
+              <div class="stock-name">شاي أحمر</div>
+              <div style="flex:1;padding:0 12px;"><div class="stock-bar-wrap"><div class="stock-bar" style="width:60%;background:var(--success);"></div></div></div>
+              <div class="stock-qty" style="color:var(--success);">30 علبة</div>
+            </div>
+            <div class="stock-row">
+              <div class="stock-emoji">🍔</div>
+              <div class="stock-name">لحم برغر</div>
+              <div style="flex:1;padding:0 12px;"><div class="stock-bar-wrap"><div class="stock-bar" style="width:25%;background:var(--warning);"></div></div></div>
+              <div class="stock-qty" style="color:var(--warning);">12 كغ ⚠️</div>
+            </div>
+            <div class="stock-row">
+              <div class="stock-emoji">🧀</div>
+              <div class="stock-name">جبن شيدر</div>
+              <div style="flex:1;padding:0 12px;"><div class="stock-bar-wrap"><div class="stock-bar" style="width:15%;background:var(--warning);"></div></div></div>
+              <div class="stock-qty" style="color:var(--warning);">5 كغ ⚠️</div>
+            </div>
+            <div class="stock-row">
+              <div class="stock-emoji">🥤</div>
+              <div class="stock-name">عصير برتقال</div>
+              <div style="flex:1;padding:0 12px;"><div class="stock-bar-wrap"><div class="stock-bar" style="width:70%;background:var(--success);"></div></div></div>
+              <div class="stock-qty" style="color:var(--success);">35 زجاجة</div>
+            </div>
+            <div class="stock-row">
+              <div class="stock-emoji">🍕</div>
+              <div class="stock-name">عجينة بيتزا</div>
+              <div style="flex:1;padding:0 12px;"><div class="stock-bar-wrap"><div class="stock-bar" style="width:5%;background:var(--danger);"></div></div></div>
+              <div class="stock-qty" style="color:var(--danger);">0 — نفد ✗</div>
+            </div>
+            <div class="stock-row">
+              <div class="stock-emoji">🥗</div>
+              <div class="stock-name">خس رومي</div>
+              <div style="flex:1;padding:0 12px;"><div class="stock-bar-wrap"><div class="stock-bar" style="width:45%;background:var(--success);"></div></div></div>
+              <div class="stock-qty" style="color:var(--success);">8 كغ</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-label">SLIDE_06 · TABLES + STOCK · 1920×1080</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SLIDE 7 — FINANCE HUB
+     "الوضوح المالي": أرقامك في لحظة
+═══════════════════════════════════════════════════ -->
+<div class="slide" id="s7">
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    <span class="status-text">البصمة الذكية v2</span>
+  </div>
+  <div class="app-shell">
+    <nav class="nav-rail">
+      <div class="nav-logo">🖥️</div>
+      <div class="nav-item">📊</div>
+      <div class="nav-item">🖥️</div>
+      <div class="nav-item active">🏦</div>
+    </nav>
+    <div class="main-content">
+      <div class="page-header">
+        <div>
+          <div class="page-title">🏦 مركز المالية</div>
+          <div class="page-sub">تقارير الأرباح والخسائر · الميزانية · التدفق النقدي</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <div style="padding:8px 16px;background:var(--bg-raised);border:1px solid var(--border-dim);border-radius:var(--r-md);font-size:13px;color:var(--text-2);">أغسطس 2026</div>
+          <div style="padding:8px 16px;background:var(--accent);border-radius:var(--r-md);font-size:13px;color:white;font-weight:700;">تصدير PDF</div>
+        </div>
+      </div>
+      <div class="content-area" style="overflow:auto;">
+        <!-- Top Metrics -->
+        <div class="fin-grid" style="margin-bottom:16px;">
+          <div class="fin-metric" style="border-right:3px solid var(--success);">
+            <div class="fin-metric-label">إجمالي الإيرادات</div>
+            <div class="fin-metric-val" style="color:var(--success);">SAR 312,840</div>
+            <div class="fin-metric-sub">+22% مقارنة بيوليو 2026</div>
+          </div>
+          <div class="fin-metric" style="border-right:3px solid var(--accent);">
+            <div class="fin-metric-label">تكلفة البضاعة المباعة</div>
+            <div class="fin-metric-val" style="color:var(--accent);">SAR 124,520</div>
+            <div class="fin-metric-sub">39.8% من الإيرادات</div>
+          </div>
+          <div class="fin-metric" style="border-right:3px solid var(--purple);">
+            <div class="fin-metric-label">إجمالي الربح</div>
+            <div class="fin-metric-val" style="color:var(--purple);">SAR 188,320</div>
+            <div class="fin-metric-sub">هامش 60.2%</div>
+          </div>
+          <div class="fin-metric" style="border-right:3px solid var(--warning);">
+            <div class="fin-metric-label">المصروفات التشغيلية</div>
+            <div class="fin-metric-val" style="color:var(--warning);">SAR 62,400</div>
+            <div class="fin-metric-sub">إيجار · رواتب · مرافق</div>
+          </div>
+          <div class="fin-metric" style="border-right:3px solid var(--success);">
+            <div class="fin-metric-label">صافي الربح</div>
+            <div class="fin-metric-val" style="color:var(--success);">SAR 125,920</div>
+            <div class="fin-metric-sub">هامش 40.2% ↑</div>
+          </div>
+          <div class="fin-metric" style="border-right:3px solid var(--danger);">
+            <div class="fin-metric-label">ضريبة القيمة المضافة</div>
+            <div class="fin-metric-val" style="color:var(--danger);">SAR 40,669</div>
+            <div class="fin-metric-sub">مستحقة للتوريد</div>
+          </div>
+        </div>
+
+        <!-- P&L Chart -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-title">📊 الأرباح والخسائر — آخر 6 أشهر</div>
+          <div style="height:200px;">
+            <svg viewBox="0 0 900 180" preserveAspectRatio="none" width="100%" height="100%">
+              <defs>
+                <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#0EA5E9" stop-opacity="0.2"/>
+                  <stop offset="100%" stop-color="#0EA5E9" stop-opacity="0"/>
+                </linearGradient>
+                <linearGradient id="profGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#10B981" stop-opacity="0.2"/>
+                  <stop offset="100%" stop-color="#10B981" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <!-- Revenue line -->
+              <path d="M0,140 L150,120 L300,100 L450,90 L600,70 L750,55 L900,40" stroke="#0EA5E9" stroke-width="3" fill="none" stroke-linecap="round"/>
+              <path d="M0,140 L150,120 L300,100 L450,90 L600,70 L750,55 L900,40 L900,180 L0,180 Z" fill="url(#revGrad)"/>
+              <!-- Profit line -->
+              <path d="M0,160 L150,145 L300,130 L450,115 L600,95 L750,75 L900,55" stroke="#10B981" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="none"/>
+              <path d="M0,160 L150,145 L300,130 L450,115 L600,95 L750,75 L900,55 L900,180 L0,180 Z" fill="url(#profGrad)"/>
+              <!-- Month labels -->
+              <text x="0" y="178" fill="#6B7280" font-size="12">مارس</text>
+              <text x="150" y="178" fill="#6B7280" font-size="12">أبريل</text>
+              <text x="300" y="178" fill="#6B7280" font-size="12">مايو</text>
+              <text x="450" y="178" fill="#6B7280" font-size="12">يونيو</text>
+              <text x="600" y="178" fill="#6B7280" font-size="12">يوليو</text>
+              <text x="750" y="178" fill="#6B7280" font-size="12">أغسطس</text>
+            </svg>
+          </div>
+          <div style="display:flex;gap:16px;margin-top:8px;">
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);">
+              <div style="width:20px;height:3px;background:var(--accent);border-radius:99px;"></div> الإيرادات
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);">
+              <div style="width:20px;height:3px;background:var(--success);border-radius:99px;"></div> صافي الربح
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-label">SLIDE_07 · FINANCE HUB · 1920×1080</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SLIDE 8 — CLOSING CTA
+     "الدعوة": انضم لآلاف التجار
+═══════════════════════════════════════════════════ -->
+<div class="slide" id="s8">
+  <div style="position:absolute;inset:0;background:radial-gradient(ellipse 120% 80% at 50% 50%, rgba(14,165,233,0.07) 0%, transparent 70%);"></div>
+  <div style="position:absolute;inset:0;background:radial-gradient(ellipse 60% 40% at 80% 20%, rgba(99,102,241,0.06) 0%, transparent 60%);"></div>
+
+  <div style="display:flex;height:100%;flex-direction:row-reverse;">
+    <!-- Left stats panel -->
+    <div style="width:440px;background:var(--bg-surface);border-right:1px solid var(--border-dim);padding:48px 36px;display:flex;flex-direction:column;gap:28px;justify-content:center;">
+      <div style="font-size:13px;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:2px;font-family:var(--mono);">الأرقام تتحدث</div>
+      <div style="display:flex;flex-direction:column;gap:20px;">
+        <div style="padding:20px;background:var(--bg-raised);border-radius:var(--r-lg);border-right:3px solid var(--success);">
+          <div style="font-size:42px;font-weight:900;color:var(--success);font-family:var(--mono);">+3,800</div>
+          <div style="font-size:14px;color:var(--text-2);margin-top:4px;">منشأة تجارية تستخدم النظام</div>
+        </div>
+        <div style="padding:20px;background:var(--bg-raised);border-radius:var(--r-lg);border-right:3px solid var(--accent);">
+          <div style="font-size:42px;font-weight:900;color:var(--accent);font-family:var(--mono);">20M+</div>
+          <div style="font-size:14px;color:var(--text-2);margin-top:4px;">فاتورة إلكترونية أُصدرت</div>
+        </div>
+        <div style="padding:20px;background:var(--bg-raised);border-radius:var(--r-lg);border-right:3px solid var(--warning);">
+          <div style="font-size:42px;font-weight:900;color:var(--warning);font-family:var(--mono);">99.98%</div>
+          <div style="font-size:14px;color:var(--text-2);margin-top:4px;">معدل قبول زاتكا</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main hero -->
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:32px;padding:60px;">
+      <div style="display:flex;align-items:center;gap:16px;">
+        <div style="width:72px;height:72px;background:linear-gradient(135deg,#0EA5E9,#6366F1);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:36px;box-shadow:0 0 50px rgba(14,165,233,0.3);">🖥️</div>
+        <div>
+          <div style="font-size:52px;font-weight:900;color:var(--text-1);letter-spacing:-1px;line-height:1;">البصمة الذكية</div>
+          <div style="font-size:24px;color:var(--accent);font-weight:300;font-family:var(--mono);letter-spacing:4px;">v2 · 2026</div>
+        </div>
+      </div>
+
+      <div style="text-align:center;max-width:680px;">
+        <div style="font-size:36px;font-weight:800;color:var(--text-1);line-height:1.3;">
+          شريكك الموثوق في نمو أعمالك<br/>
+          <span style="color:var(--accent);">من نقطة البيع وحتى التقارير المالية</span>
+        </div>
+        <div style="font-size:18px;color:var(--text-2);margin-top:16px;line-height:1.7;">
+          POS · Dashboard · زاتكا · KDS · مخزون · مالية · عملاء · مساعد ذكي
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
+        <div style="padding:8px 18px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:99px;font-size:13px;font-weight:700;color:var(--success);">✓ متوافق مع زاتكا المرحلة 2</div>
+        <div style="padding:8px 18px;background:rgba(14,165,233,0.1);border:1px solid rgba(14,165,233,0.25);border-radius:99px;font-size:13px;font-weight:700;color:var(--accent);">✓ عربي 100%</div>
+        <div style="padding:8px 18px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.25);border-radius:99px;font-size:13px;font-weight:700;color:var(--purple);">✓ يعمل بدون إنترنت</div>
+        <div style="padding:8px 18px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);border-radius:99px;font-size:13px;font-weight:700;color:var(--warning);">✓ ذكاء اصطناعي مدمج</div>
+      </div>
+
+      <div style="display:flex;gap:16px;margin-top:8px;">
+        <div style="padding:20px 56px;background:var(--accent);color:white;border-radius:var(--r-xl);font-size:18px;font-weight:800;box-shadow:0 0 40px rgba(14,165,233,0.35);cursor:pointer;">
+          ابدأ تجربتك المجانية
+        </div>
+        <div style="padding:20px 36px;background:var(--bg-raised);border:1px solid var(--border-bright);color:var(--text-1);border-radius:var(--r-xl);font-size:18px;font-weight:700;cursor:pointer;">
+          شاهد العرض التجريبي
+        </div>
+      </div>
+
+      <div style="font-size:13px;color:var(--text-3);">
+        📞 0533174895 &nbsp;·&nbsp; 🌐 albasma.sa &nbsp;·&nbsp; 📧 ea.gaber10@gmail.com
+      </div>
+    </div>
+  </div>
+  <div class="slide-label">SLIDE_08 · CTA · 1920×1080</div>
+</div>
+
+<script>
+function resizeSlides() {
+  const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+  document.querySelectorAll('.slide').forEach(s => {
+    s.style.transformOrigin = 'top center';
+    s.style.transform = `scale(${scale})`;
+    s.style.marginBottom = `${-1080 * (1 - scale)}px`;
+  });
+  document.body.style.display = 'flex';
+  document.body.style.flexDirection = 'column';
+  document.body.style.alignItems = 'center';
+}
+window.addEventListener('resize', resizeSlides);
+resizeSlides();
+</script>
+</body>
+</html>

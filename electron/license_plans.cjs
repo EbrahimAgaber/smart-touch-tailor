@@ -131,11 +131,11 @@ const FEATURE_GATES = {
 
 // ── Staff account limits by tier ──────────────────────────────────────────────
 const STAFF_LIMITS = {
-  S: 1,
-  G: 5,
-  P: Infinity,
-  E: Infinity,
-  X: Infinity,
+  S: 100,
+  G: 100,
+  P: 100,
+  E: 100,
+  X: 100,
 };
 
 // ── Add-on module codes (positions 3,4,5,6 of v4A key) ───────────────────────
@@ -177,7 +177,7 @@ function addonCanAccess(addons, featureKey) {
 
 // ── Helper: get staff limit for a tier char ───────────────────────────────────
 function getStaffLimit(tierChar) {
-  return STAFF_LIMITS[tierChar.toUpperCase()] ?? 1;
+  return STAFF_LIMITS[tierChar.toUpperCase()] ?? 100;
 }
 
 module.exports = {

@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>POS 3D SaaS Video Studio & Motion Renderer</title>
+  
+  <!-- Fonts & Libraries -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #050811;
+      --card-bg: rgba(17, 24, 39, 0.85);
+      --primary: #6366F1;
+      --accent-green: #10B981;
+      --accent-purple: #8B5CF6;
+      --accent-cyan: #06B6D4;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Cairo', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: #F8FAFC;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* TOP STUDIO BAR */
+    .studio-bar {
+      height: 60px;
+      background: #0B0F19;
+      border-bottom: 1px solid #1E293B;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 100;
+    }
+
+    .studio-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .badge-3d {
+      background: linear-gradient(135deg, var(--primary), var(--accent-purple));
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 1px;
+    }
+
+    .controls-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      background: #1E293B;
+      color: #FFF;
+      border: 1px solid #334155;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+      font-size: 14px;
+    }
+
+    .btn:hover {
+      background: #334155;
+      border-color: var(--primary);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), var(--accent-purple));
+      border: none;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .btn-record {
+      background: #DC2626;
+      border: none;
+    }
+
+    .btn-record.recording {
+      animation: pulse-red 1s infinite alternate;
+    }
+
+    @keyframes pulse-red {
+      0% { background: #DC2626; box-shadow: 0 0 10px rgba(220, 38, 38, 0.5); }
+      100% { background: #991B1B; box-shadow: 0 0 25px rgba(220, 38, 38, 0.9); }
+    }
+
+    /* 3D VIEWPORT CONTAINER */
+    .viewport-container {
+      flex: 1;
+      position: relative;
+      perspective: 1400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 40%, #111827 0%, #050811 100%);
+      overflow: hidden;
+    }
+
+    /* Ambient Lighting Mesh */
+    .light-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+      opacity: 0.35;
+    }
+
+    .orb-1 { width: 600px; height: 600px; background: var(--primary); top: -100px; right: -100px; }
+    .orb-2 { width: 550px; height: 550px; background: var(--accent-green); bottom: -150px; left: -100px; }
+    .orb-3 { width: 400px; height: 400px; background: var(--accent-purple); top: 50%; left: 50%; transform: translate(-50%, -50%); }
+
+    /* Grid Overlay */
+    .tech-grid {
+      position: absolute;
+      width: 200%;
+      height: 200%;
+      background-image: 
+        linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 50px 50px;
+      transform: rotateX(60deg) translateZ(-200px);
+      pointer-events: none;
+    }
+
+    /* 3D CAMERA WORLD CONTAINER */
+    #world {
+      width: 1400px;
+      height: 800px;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.1s cubic-bezier(0.1, 0.8, 0.2, 1);
+    }
+
+    /* MAIN APP STAGE CANVAS */
+    .app-canvas {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      background: #0C101D;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 
+        0 30px 100px rgba(0, 0, 0, 0.8),
+        0 0 50px rgba(99, 102, 241, 0.15);
+      transform-style: preserve-3d;
+      overflow: hidden;
+    }
+
+    /* APP UI COMPONENTS WITH POP-OUT Z-INDEX ELEVATION */
+    .window-bar {
+      height: 50px;
+      background: #141B2D;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      border-bottom: 1px solid #1E293B;
+    }
+
+    .mac-dots {
+      display: flex;
+      gap: 8px;
+    }
+
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot-red { background: #EF4444; }
+    .dot-yellow { background: #F59E0B; }
+    .dot-green { background: #10B981; }
+
+    .app-body {
+      display: flex;
+      height: calc(100% - 50px);
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: 220px;
+      background: #0F172A;
+      border-left: 1px solid #1E293B;
+      padding: 20px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .nav-item {
+      padding: 12px 16px;
+      border-radius: 10px;
+      color: #94A3B8;
+      font-weight: 600;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .nav-item.active {
+      background: linear-gradient(135deg, var(--primary), var(--accent-purple));
+      color: #FFF;
+    }
+
+    /* MAIN VIEWPORT BODY */
+    .main-viewport {
+      flex: 1;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: relative;
+      transform-style: preserve-3d;
+    }
+
+    /* METRIC CARDS ROW */
+    .cards-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      transform-style: preserve-3d;
+    }
+
+    .metric-card {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 18px;
+      transform-style: preserve-3d;
+      transition: transform 0.4s ease, box-shadow 0.4s ease;
+    }
+
+    /* 3D POP-OUT EFFECT CLASSES */
+    .pop-out-level-1 {
+      transform: translateZ(40px);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+
+    .pop-out-level-2 {
+      transform: translateZ(80px);
+      box-shadow: 0 30px 60px rgba(0,0,0,0.6), 0 0 30px rgba(139, 92, 246, 0.3);
+    }
+
+    .pop-out-level-3 {
+      transform: translateZ(120px) scale(1.05);
+      box-shadow: 0 40px 80px rgba(0,0,0,0.8), 0 0 40px rgba(16, 185, 129, 0.4);
+    }
+
+    .card-title { font-size: 13px; color: #94A3B8; margin-bottom: 8px; }
+    .card-val { font-size: 26px; font-weight: 900; color: #FFF; }
+    .card-tag { font-size: 11px; padding: 3px 8px; border-radius: 12px; margin-top: 8px; display: inline-block; font-weight: 700; }
+    .tag-green { background: rgba(16, 185, 129, 0.2); color: #34D399; }
+    .tag-blue { background: rgba(56, 189, 248, 0.2); color: #38BDF8; }
+
+    /* CONTENT GRID */
+    .content-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+      flex: 1;
+      transform-style: preserve-3d;
+    }
+
+    .chart-panel, .table-panel {
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid #1E293B;
+      border-radius: 16px;
+      padding: 20px;
+      transform-style: preserve-3d;
+    }
+
+    /* AI CHATBOT 3D POP-OUT CARD OVERLAY */
+    #ai-drawer-overlay {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      width: 420px;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(20px);
+      border: 2px solid var(--accent-purple);
+      border-radius: 20px;
+      padding: 20px;
+      transform-style: preserve-3d;
+      transform: translateZ(100px);
+      box-shadow: 0 30px 70px rgba(0,0,0,0.9), 0 0 50px rgba(139, 92, 246, 0.4);
+    }
+
+    .ai-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      margin-bottom: 14px;
+      color: #E2E8F0;
+    }
+
+    .ai-bot-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-purple), #EC4899);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .chat-bubble {
+      background: #1E293B;
+      padding: 12px 16px;
+      border-radius: 14px;
+      font-size: 13px;
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+
+    .chat-bubble-ai {
+      background: rgba(46, 16, 101, 0.8);
+      border: 1px solid var(--accent-purple);
+      color: #F1F5F9;
+    }
+
+    .btn-action-xml {
+      background: linear-gradient(135deg, var(--accent-green), #059669);
+      color: #FFF;
+      border: none;
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      font-weight: 800;
+      font-size: 13px;
+      margin-top: 8px;
+      cursor: pointer;
+    }
+
+    /* LEGACY ERP CHAOS OVERLAY FOR SCENE 1 */
+    #legacy-erp-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #2B2B2B;
+      border-radius: 20px;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      font-family: 'Courier New', monospace;
+      color: #000;
+      opacity: 0;
+      pointer-events: none;
+      transform-style: preserve-3d;
+    }
+
+    .legacy-window {
+      background: #C0C0C0;
+      border: 3px inset #FFF;
+      padding: 15px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .legacy-header {
+      background: #000080;
+      color: #FFF;
+      padding: 4px 10px;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* SUBTITLES & CINEMATIC NARRATION BANNER */
+    .subtitle-banner {
+      position: absolute;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(11, 15, 25, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(15px);
+      padding: 14px 32px;
+      border-radius: 40px;
+      font-weight: 800;
+      font-size: 20px;
+      color: #F8FAFC;
+      z-index: 200;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      text-align: center;
+    }
+
+    .scene-indicator {
+      background: var(--primary);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    /* TIMELINE CONTAINER AT BOTTOM */
+    .timeline-bar {
+      height: 70px;
+      background: #0B0F19;
+      border-top: 1px solid #1E293B;
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 20px;
+      z-index: 100;
+    }
+
+    .timeline-track {
+      flex: 1;
+      height: 8px;
+      background: #1E293B;
+      border-radius: 4px;
+      position: relative;
+      cursor: pointer;
+      overflow: hidden;
+    }
+
+    .timeline-progress {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--primary), var(--accent-green));
+      border-radius: 4px;
+    }
+
+    .time-display {
+      font-size: 14px;
+      font-weight: 700;
+      color: #94A3B8;
+      width: 100px;
+    }
+
+    /* OUTRO SCENE OVERLAY */
+    #outro-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at 50% 50%, #0F172A 0%, #030712 100%);
+      z-index: 60;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      text-align: center;
+    }
+
+    .outro-card {
+      background: rgba(30, 41, 59, 0.8);
+      border: 2px solid var(--accent-purple);
+      border-radius: 24px;
+      padding: 40px 60px;
+      backdrop-filter: blur(25px);
+      box-shadow: 0 40px 100px rgba(0,0,0,0.9), 0 0 60px rgba(139, 92, 246, 0.5);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- STUDIO CONTROL TOPBAR -->
+  <div class="studio-bar">
+    <div class="studio-title">
+      <span>🎬 POS 3D SaaS Video Studio</span>
+      <span class="badge-3d">ZELIOS 3D CAM ENGINE</span>
+    </div>
+
+    <div class="controls-group">
+      <button class="btn" id="btn-tilt-toggle">🔄 3D Iso Angle On</button>
+      <button class="btn btn-primary" id="btn-play">▶ تشغيل العرض</button>
+      <button class="btn btn-record" id="btn-record">🔴 تسجيل فيديو MP4</button>
+    </div>
+  </div>
+
+  <!-- 3D VIEWPORT STAGE -->
+  <div class="viewport-container">
+    <!-- Ambient Orbs -->
+    <div class="light-orb orb-1"></div>
+    <div class="light-orb orb-2"></div>
+    <div class="light-orb orb-3"></div>
+    <div class="tech-grid"></div>
+
+    <!-- 3D WORLD -->
+    <div id="world">
+      <div class="app-canvas" id="app-stage">
+        
+        <!-- MAC WINDOW TOPBAR -->
+        <div class="window-bar">
+          <div class="mac-dots">
+            <div class="dot dot-red"></div>
+            <div class="dot dot-yellow"></div>
+            <div class="dot dot-green"></div>
+          </div>
+          <div style="font-size: 14px; font-weight: 700; color: #94A3B8;">
+            نظام إدارة المبيعات والإقرار الضريبي الذكي v2
+          </div>
+          <div style="background: rgba(16, 185, 129, 0.2); color: #34D399; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 800; border: 1px solid #10B981;">
+            ZATCA Phase 2 Compliant ✓
+          </div>
+        </div>
+
+        <div class="app-body">
+          <!-- SIDEBAR -->
+          <div class="sidebar">
+            <div style="font-size: 20px; font-weight: 900; color: #FFF; margin-bottom: 20px; text-align: center; background: linear-gradient(135deg, var(--primary), var(--accent-purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+              POS SMART
+            </div>
+            <div class="nav-item active">📊 لوحة التحكم</div>
+            <div class="nav-item">🖥️ نقطة البيع</div>
+            <div class="nav-item">🧾 الفواتير (ZATCA)</div>
+            <div class="nav-item">🏛️ الإقرار الضريبي</div>
+            <div class="nav-item" style="color: var(--accent-purple);">🤖 المساعد الذكي AI</div>
+          </div>
+
+          <!-- MAIN CONTENT VIEWPORT -->
+          <div class="main-viewport">
+            
+            <!-- METRICS CARDS ROW WITH POP-OUT 3D ELEVATION -->
+            <div class="cards-row">
+              <div class="metric-card pop-out-level-1" id="card-1">
+                <div class="card-title">إجمالي المبيعات (المعتمدة)</div>
+                <div class="card-val">١٤٢,٨٥٠<span style="font-size:16px; fill:#94A3B8"> ر.س</span></div>
+                <span class="card-tag tag-green">↑ +٢٤.٥% نمو</span>
+              </div>
+
+              <div class="metric-card pop-out-level-2" id="card-2">
+                <div class="card-title">ضريبة القيمة المضافة VAT</div>
+                <div class="card-val" style="color: #34D399;">٢١,٤٢٧.٥٠<span style="font-size:16px;"> ر.س</span></div>
+                <span class="card-tag tag-green">جاهز للإقرار الضريبي ✓</span>
+              </div>
+
+              <div class="metric-card pop-out-level-1" id="card-3">
+                <div class="card-title">فواتير المرحلة الثانية ZATCA</div>
+                <div class="card-val" style="color: #38BDF8;">١,٤٨٢</div>
+                <span class="card-tag tag-blue">تشفير ECDSA معتمد</span>
+              </div>
+
+              <div class="metric-card pop-out-level-1" id="card-4">
+                <div class="card-title">مصروفات التشغيل</div>
+                <div class="card-val" style="color: #F43F5E;">٣٤,٢٠٠<span style="font-size:16px;"> ر.س</span></div>
+                <span class="card-tag" style="background:rgba(244,63,94,0.2); color:#FDA4AF;">دقيقة 100%</span>
+              </div>
+            </div>
+
+            <!-- CONTENT PANELS ROW -->
+            <div class="content-grid">
+              <div class="chart-panel pop-out-level-1" id="chart-panel">
+                <div style="font-weight: 800; font-size: 16px; margin-bottom: 12px; display:flex; justify-content:space-between; align-items:center;">
+                  <span>📈 حركة المبيعات وتكامل زكاة المباشر</span>
+                  <span style="font-size: 12px; color: var(--accent-green);">ربط سحابي حي ⚡</span>
+                </div>
+                
+                <!-- SVG Animated Chart -->
+                <svg width="100%" height="220" viewBox="0 0 700 220" style="overflow: visible;">
+                  <defs>
+                    <linearGradient id="chart-grad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#6366F1" stop-opacity="0.4"/>
+                      <stop offset="100%" stop-color="#6366F1" stop-opacity="0"/>
+                    </linearGradient>
+                  </defs>
+                  <path d="M 0 180 Q 150 140, 300 90 T 550 70 T 700 20" fill="none" stroke="#6366F1" stroke-width="4"/>
+                  <path d="M 0 180 Q 150 140, 300 90 T 550 70 T 700 20 L 700 220 L 0 220 Z" fill="url(#chart-grad)"/>
+                  <circle cx="300" cy="90" r="6" fill="#8B5CF6"/>
+                  <circle cx="700" cy="20" r="7" fill="#10B981"/>
+                </svg>
+              </div>
+
+              <!-- RECENT INVOICES PANEL -->
+              <div class="table-panel pop-out-level-1" id="invoices-panel">
+                <div style="font-weight: 800; font-size: 16px; margin-bottom: 12px;">🧾 أحدث فواتير ZATCA</div>
+                <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+                  <div style="display:flex; justify-content:space-between; background:#1E293B; padding:10px; border-radius:8px;">
+                    <span>INV-2026-089</span>
+                    <span style="color:#34D399; font-weight:700;">موقعة وموثقة ✓</span>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; background:#1E293B; padding:10px; border-radius:8px;">
+                    <span>INV-2026-088</span>
+                    <span style="color:#34D399; font-weight:700;">موقعة وموثقة ✓</span>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; background:#1E293B; padding:10px; border-radius:8px;">
+                    <span>INV-2026-087</span>
+                    <span style="color:#34D399; font-weight:700;">موقعة وموثقة ✓</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- AI CHATBOT 3D POP-OUT OVERLAY -->
+            <div id="ai-drawer-overlay">
+              <div class="ai-header">
+                <div class="ai-bot-avatar">⚡</div>
+                <span>مساعد المبيعات والضرائب AI</span>
+              </div>
+              <div class="chat-bubble">استخرج الإقرار الضريبي للربع الحالي متوافق مع زكاة</div>
+              <div class="chat-bubble chat-bubble-ai">
+                تم تجهيز الإقرار الضريبي وحساب VAT 15% بنجاح!
+                <br><b>• المبلغ المستحق: ٢١,٤٢٧.٥٠ ر.س</b>
+                <button class="btn-action-xml">تصدير ملخص XML المعتمد ⬇</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- LEGACY ERP SCENE OVERLAY -->
+        <div id="legacy-erp-overlay">
+          <div class="legacy-window">
+            <div class="legacy-header">
+              <span>MicroSmart ERP 1998 v3.2 - [SYSTEM ERROR: UNHANDLED EXCEPTION]</span>
+              <span>[X]</span>
+            </div>
+            <div style="background:#FFF; padding:20px; height:100%; border:2px inset #777;">
+              <h3 style="color:#800000;">❌ خطأ في الإقرار الضريبي وحساب VAT</h3>
+              <p style="margin-top:10px;">النظام غير متوافق مع هيئة الزكاة المرحلة الثانية (ZATCA Phase 2)!</p>
+              <p>فشل تشفير التوقيع الرقمي ECDSA secp256r1.</p>
+              <div style="margin-top:40px; display:flex; gap:10px;">
+                <button style="padding:6px 16px;">إعادة المحاولة</button>
+                <button style="padding:6px 16px;">إلغاء الأمر</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- OUTRO CALL TO ACTION SCENE OVERLAY -->
+        <div id="outro-overlay">
+          <div class="outro-card">
+            <div style="font-size: 36px; font-weight: 900; color: #FFF; margin-bottom: 12px; background: linear-gradient(135deg, var(--accent-green), var(--accent-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+              انتقل الآن إلى مستقبل إدارة المبيعات والضرائب
+            </div>
+            <p style="font-size: 18px; color: #94A3B8; margin-bottom: 24px;">سهولة متناهية • ربط زكاة المرحلة الثانية بضغطة زر • مساعد ذكي 24/7</p>
+            
+            <div style="display:flex; justify-content:center; gap:20px; margin-top:20px;">
+              <div style="background:#1E293B; border:1px solid #334155; padding:12px 24px; border-radius:12px; text-align:right;">
+                <div style="font-size:12px; color:#94A3B8;">البريد الإلكتروني</div>
+                <div style="font-size:16px; font-weight:800; color:#38BDF8;">ea.gaber10@gmail.com</div>
+              </div>
+
+              <div style="background:#1E293B; border:1px solid #334155; padding:12px 24px; border-radius:12px; text-align:right;">
+                <div style="font-size:12px; color:#94A3B8;">واتساب / المبيعات المباشرة</div>
+                <div style="font-size:16px; font-weight:800; color:#34D399;" dir="ltr">+966 53 317 4895</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- DYNAMIC KINETIC SUBTITLE OVERLAY -->
+    <div class="subtitle-banner">
+      <span class="scene-indicator" id="scene-tag">المشهد 1</span>
+      <span id="subtitle-text">هل تعاني من الأنظمة المحاسبية القديمة والمعقدة؟</span>
+    </div>
+  </div>
+
+  <!-- BOTTOM TIMELINE BAR -->
+  <div class="timeline-bar">
+    <div class="time-display" id="time-val">00:00 / 00:36</div>
+    <div class="timeline-track" id="timeline-track">
+      <div class="timeline-progress" id="timeline-progress"></div>
+    </div>
+  </div>
+
+  <script>
+    // --- 3D CAMERA & SCENE MOTION ENGINE ---
+    const world = document.getElementById('world');
+    const appStage = document.getElementById('app-stage');
+    const legacyOverlay = document.getElementById('legacy-erp-overlay');
+    const outroOverlay = document.getElementById('outro-overlay');
+    const aiDrawer = document.getElementById('ai-drawer-overlay');
+    const subtitleText = document.getElementById('subtitle-text');
+    const sceneTag = document.getElementById('scene-tag');
+    const timelineProgress = document.getElementById('timeline-progress');
+    const timeVal = document.getElementById('time-val');
+    
+    let isIsoOn = true;
+    let isPlaying = false;
+    let mainTl = gsap.timeline({ paused: true, onUpdate: updateTimelineUI });
+
+    // SET INITIAL 3D ISOMETRIC VIEW (ZELIOS BENCHMARK STYLE)
+    function setIsoCamera(rotX = 22, rotY = -18, scale = 0.85, z = 0) {
+      gsap.to(world, {
+        rotateX: isIsoOn ? rotX : 0,
+        rotateY: isIsoOn ? rotY : 0,
+        scale: scale,
+        z: z,
+        duration: 1.5,
+        ease: "power3.out"
+      });
+    }
+
+    setIsoCamera();
+
+    // MOUSE PARALLAX EFFECT FOR LIVE USER INTERACTION
+    document.addEventListener('mousemove', (e) => {
+      if(isPlaying) return; // Don't interrupt automated timeline animation
+      const xRatio = (e.clientX / window.innerWidth - 0.5) * 2;
+      const yRatio = (e.clientY / window.innerHeight - 0.5) * 2;
+      
+      gsap.to(world, {
+        rotateY: -18 + (xRatio * 10),
+        rotateX: 22 - (yRatio * 10),
+        duration: 0.8,
+        ease: "power2.out"
+      });
+    });
+
+    // BUILD 36-SECOND BROADCAST-GRADE COMMERCIAL ANIMATION
+    function buildCommercialTimeline() {
+      mainTl.clear();
+
+      // SCENE 1: (0s - 6s) LEGACY ERP CHAOS VS QUANTUM SHIFT
+      mainTl.add(() => {
+        sceneTag.innerText = "المشهد 1/6";
+        subtitleText.innerText = "تخلص من الأنظمة القديمة والبطيئة التي تعطل تجارتك وتسبب الأخطاء الضريبية.";
+      }, 0);
+
+      mainTl.to(legacyOverlay, { opacity: 1, duration: 0.5 }, 0);
+      mainTl.to(world, { rotateX: 10, rotateY: 5, scale: 0.9, duration: 3, ease: "power1.inOut" }, 0);
+      mainTl.to(legacyOverlay, { opacity: 0, scale: 1.1, filter: "blur(20px)", duration: 1.2, ease: "power2.in" }, 4.5);
+
+      // SCENE 2: (6s - 12s) MODERN SAAS DASHBOARD HERO PUSH-IN
+      mainTl.add(() => {
+        sceneTag.innerText = "المشهد 2/6";
+        subtitleText.innerText = "اكتشف النظام المحاسبي الذكي الحديث: لوحة تحكم فورية، تصميم أنيق، ومتابعة فائقة الدقة.";
+      }, 6);
+
+      mainTl.to(world, { rotateX: 25, rotateY: -20, scale: 0.95, duration: 3, ease: "power2.out" }, 6);
+      mainTl.to('#card-2', { z: 120, duration: 1.5, ease: "back.out(1.7)" }, 7.5);
+      mainTl.to('#card-2', { z: 40, duration: 1.5, ease: "power2.inOut" }, 10);
+
+      // SCENE 3: (12s - 18s) AI CHATBOT HOLOGRAPHIC POP-OUT
+      mainTl.add(() => {
+        sceneTag.innerText = "المشهد 3/6";
+        subtitleText.innerText = "مساعد ذكي AI يقدم لك استشارات ضريبية، ويستخرج الإقرارات بضغطة زر واحدة.";
+      }, 12);
+
+      mainTl.to(world, { rotateX: 15, rotateY: 20, scale: 1.1, x: 200, y: -100, duration: 2.5, ease: "power3.inOut" }, 12);
+      mainTl.fromTo(aiDrawer, 
+        { z: 0, opacity: 0, scale: 0.8 },
+        { z: 160, opacity: 1, scale: 1.05, duration: 2, ease: "back.out(1.7)" }, 
+        13.5
+      );
+
+      // SCENE 4: (18s - 24s) INSTANT ZATCA PHASE 2 COMPLIANCE
+      mainTl.add(() => {
+        sceneTag.innerText = "المشهد 4/6";
+        subtitleText.innerText = "ربط مباشر ومعتمد مع هيئة الزكاة والضريبة والجمارك Phase 2 وتشفير إلكتروني فوراً.";
+      }, 18);
+
+      mainTl.to(aiDrawer, { z: 40, opacity: 0.8, scale: 0.95, duration: 1.5 }, 18);
+      mainTl.to(world, { rotateX: 30, rotateY: -10, scale: 1.2, x: -150, y: 100, duration: 3, ease: "power2.inOut" }, 18);
+
+      // SCENE 5: (24s - 30s) VAT TAX RETURN & ZERO ERROR
+      mainTl.add(() => {
+        sceneTag.innerText = "المشهد 5/6";
+        subtitleText.innerText = "توليد تلقائي للإقرار الضريبي VAT 15% وتصدير ملخصات XML دون أي أخطاء بشرية.";
+      }, 24);
+
+      mainTl.to(world, { rotateX: 5, rotateY: 0, scale: 1.0, x: 0, y: 0, duration: 3, ease: "power3.inOut" }, 24);
+
+      // SCENE 6: (30s - 36s) OUTRO & HIGH CONVERTING CALL TO ACTION
+      mainTl.add(() => {
+        sceneTag.innerText = "المشهد 6/6";
+        subtitleText.innerText = "ابدأ تجربتك اليوم وحوّل إدارتك المالية إلى المستقبل!";
+      }, 30);
+
+      mainTl.to(outroOverlay, { opacity: 1, duration: 1.5, pointerEvents: "all" }, 30);
+      mainTl.to(world, { rotateX: 0, rotateY: 0, scale: 0.9, duration: 2 }, 30);
+    }
+
+    buildCommercialTimeline();
+
+    // PLAY / PAUSE CONTROLLER
+    const btnPlay = document.getElementById('btn-play');
+    btnPlay.addEventListener('click', () => {
+      if(isPlaying) {
+        mainTl.pause();
+        btnPlay.innerText = "▶ تشغيل الععرض";
+      } else {
+        if(mainTl.progress() === 1) mainTl.restart();
+        else mainTl.play();
+        btnPlay.innerText = "⏸ إيقاف مؤقت";
+      }
+      isPlaying = !isPlaying;
+    });
+
+    // TIMELINE PROGRESS UPDATE
+    function updateTimelineUI() {
+      const prog = mainTl.progress();
+      timelineProgress.style.width = (prog * 100) + '%';
+      const curSec = Math.floor(prog * 36);
+      timeVal.innerText = `00:${curSec < 10 ? '0' : ''}${curSec} / 00:36`;
+    }
+
+    // CLICK ON TIMELINE TRACK TO SEEK
+    document.getElementById('timeline-track').addEventListener('click', (e) => {
+      const rect = e.target.getBoundingClientRect();
+      const clickRatio = (e.clientX - rect.left) / rect.width;
+      mainTl.progress(clickRatio);
+      updateTimelineUI();
+    });
+
+    // ISOMETRIC TOGGLE
+    document.getElementById('btn-tilt-toggle').addEventListener('click', () => {
+      isIsoOn = !isIsoOn;
+      document.getElementById('btn-tilt-toggle').innerText = isIsoOn ? "🔄 3D Iso Angle On" : "📐 Flat Angle On";
+      setIsoCamera();
+    });
+
+    // WEBRTC / CANVAS RECORDING TO MP4/WEBM
+    const btnRecord = document.getElementById('btn-record');
+    let mediaRecorder;
+    let recordedChunks = [];
+
+    btnRecord.addEventListener('click', async () => {
+      if(mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+        btnRecord.classList.remove('recording');
+        btnRecord.innerText = "🔴 تسجيل فيديو MP4";
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { frameRate: 60, width: 1920, height: 1080 }
+        });
+
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'POS_SaaS_3D_Promo_Commercial.webm';
+          a.click();
+        };
+
+        mediaRecorder.start();
+        btnRecord.classList.add('recording');
+        btnRecord.innerText = "⏹ إيقاف وتسجيل الفيديو";
+
+        // Restart commercial timeline automatically on recording start
+        mainTl.restart();
+        isPlaying = true;
+        btnPlay.innerText = "⏸ إيقاف مؤقت";
+
+      } catch (err) {
+        alert("لميتم منح إذن تسجيل الشاشة: " + err.message);
+      }
+    });
+
+  </script>
+</body>
+</html>

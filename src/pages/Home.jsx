@@ -18,6 +18,8 @@ export default function Home() {
   const [shift, setShift] = useState(null);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ todaySalesCount: 0, todaySalesTotal: 0 });
+  const [tailorStats, setTailorStats] = useState(null);
+  const [hiddenClicks, setHiddenClicks] = useState(0);
 
   useEffect(() => {
     async function loadHomeData() {
@@ -46,6 +48,14 @@ export default function Home() {
           todaySalesCount: todaySales.length,
           todaySalesTotal: total
         });
+
+        // Tailor-specific stats
+        if (businessType === 'tailor') {
+          try {
+            const ts = await window.api?.tailor?.getDashboardStats?.();
+            setTailorStats(ts || null);
+          } catch { setTailorStats(null); }
+        }
       } catch (e) {
         console.error('Failed to load home page data:', e);
       } finally {
@@ -53,10 +63,71 @@ export default function Home() {
       }
     }
     loadHomeData();
-  }, []);
+  }, [businessType]);
 
   // Filter launch modules by user permissions and license tier
-  const MODULES = [
+  const MODULES = businessType === 'tailor' ? [
+    {
+      id: 'tailor-pos',
+      title: 'طلب تفصيل جديد',
+      desc: 'استقبال عميل جديد، أخذ المقاسات، وتسجيل الطلب',
+      icon: <Play size={24} />,
+      color: '#6366f1',
+      path: '/tailor-pos',
+      permission: null,
+      feature: null
+    },
+    {
+      id: 'orders-board',
+      title: 'شاشة المعمل',
+      desc: 'متابعة مراحل الإنتاج: قص، خياطة، تشطيب، كوي، جاهز',
+      icon: <Package size={24} />,
+      color: '#10b981',
+      path: '/orders-board',
+      permission: null,
+      feature: null
+    },
+    {
+      id: 'customers',
+      title: 'العملاء وسجل المقاسات',
+      desc: 'إدارة العملاء، عرض بروفايلات المقاسات وسجل الطلبات',
+      icon: <Users size={24} />,
+      color: '#8b5cf6',
+      path: '/customers',
+      permission: null,
+      feature: 'customers'
+    },
+    {
+      id: 'stock',
+      title: 'مخزون الأقمشة والمواد',
+      desc: 'متابعة الأقمشة المتوفرة، كميات الأمتار، وتنبيهات النفاد',
+      icon: <BarChart2 size={24} />,
+      color: '#f59e0b',
+      path: '/stock',
+      permission: 'view_stock',
+      feature: 'stock.view'
+    },
+    {
+      id: 'dashboard',
+      title: 'لوحة التحكم والتحليلات',
+      desc: 'مراقبة الإيرادات والأرباح والأداء العام للمحل',
+      icon: <CreditCard size={24} />,
+      color: '#ec4899',
+      path: '/dashboard',
+      permission: 'view_dashboard',
+      feature: 'dashboard'
+    },
+    {
+      id: 'settings',
+      title: 'إعدادات النظام',
+      desc: 'هوية المنشأة، الطابعات، وربط هيئة الزكاة',
+      icon: <Settings size={24} />,
+      color: '#64748b',
+      path: '/settings',
+      permission: 'manage_settings',
+      feature: null
+    },
+  ] : [
     {
       id: 'pos',
       title: 'نقطة البيع الكاشير',
@@ -125,6 +196,7 @@ export default function Home() {
     return true;
   });
 
+
   const getGreeting = () => {
     const hrs = new Date().getHours();
     if (hrs < 12) return 'صباح الخير';
@@ -152,9 +224,25 @@ export default function Home() {
           gap: '20px'
         }}>
           <div style={{ zIndex: 2 }}>
-            <h2 style={{ fontSize: '24px', fontWeight: '900', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h2 
+              onClick={async () => {
+                const c = hiddenClicks + 1;
+                setHiddenClicks(c);
+                if (c >= 5) {
+                  if (window.confirm('تحذير: سيتم إلغاء تنشيط النظام وقفل التطبيق. هل أنت متأكد؟')) {
+                    try {
+                      await window.api.saveSettings({ activation_key: '' });
+                      window.location.reload();
+                    } catch(e){}
+                  } else {
+                    setHiddenClicks(0);
+                  }
+                }
+              }}
+              style={{ fontSize: '24px', fontWeight: '900', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'default', userSelect: 'none' }}
+            >
               <span>{getGreeting()}، {userName || 'المستخدم'}</span>
-              <span className="animate-bounce">👋</span>
+              <span className="animate-bounce"></span>
             </h2>
             <p style={{ color: '#94a3b8', fontSize: '14px', fontWeight: '500' }}>
               مرحباً بك في لوحة تشغيل ورديتك الحالية. ابدأ يومك التشغيلي أو تصفح الأقسام أدناه.
@@ -171,7 +259,7 @@ export default function Home() {
               <Coffee size={20} color="#3b82f6" />
               <div>
                 <div style={{ fontSize: '11px', color: '#94a3b8' }}>صلاحية الموظف</div>
-                <div style={{ fontSize: '13px', fontWeight: '800' }}>{role === 'Admin' ? '🛡️ مدير النظام' : role === 'Manager' ? '👔 مشرف' : '💼 كاشير'}</div>
+                <div style={{ fontSize: '13px', fontWeight: '800' }}>{role === 'Admin' ? '️ مدير النظام' : role === 'Manager' ? ' مشرف' : ' كاشير'}</div>
               </div>
             </div>
             {shift && (
@@ -186,7 +274,48 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Shift Dashboard Stats */}
+        {/* KPI Stats — tailor mode vs retail mode */}
+        {businessType === 'tailor' && tailorStats ? (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+              <div style={{ background: 'var(--bg-card)', padding: '18px', borderRadius: '18px', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(99,102,241,0.1)', color:'#6366f1', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px', flexShrink:0 }}>️</div>
+              <div><div style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:'700' }}>طلبات اليوم</div><div style={{ fontSize:'22px', fontWeight:'900', color:'var(--text-main)' }}>{tailorStats.newOrdersToday}</div></div>
+            </div>
+            <div style={{ background: 'var(--bg-card)', padding: '18px', borderRadius: '18px', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(16,185,129,0.1)', color:'#10b981', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px', flexShrink:0 }}></div>
+              <div><div style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:'700' }}>إيراد اليوم</div><div style={{ fontSize:'22px', fontWeight:'900', color:'var(--text-main)' }}>SAR {Number(tailorStats.todayRevenue || 0).toFixed(2)}</div></div>
+            </div>
+            <button onClick={() => navigate('/orders-board')} style={{ background:'#ecfdf5', padding:'18px', borderRadius:'18px', border:'2px solid #a7f3d0', display:'flex', alignItems:'center', gap:'14px', cursor:'pointer', fontFamily:'inherit', textAlign:'right' }}>
+              <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(16,185,129,0.2)', color:'#10b981', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px', flexShrink:0 }}></div>
+              <div><div style={{ fontSize:'11px', color:'#065f46', fontWeight:'800' }}>جاهز للاستلام</div><div style={{ fontSize:'26px', fontWeight:'900', color:'#10b981' }}>{tailorStats.readyForPickup}</div></div>
+            </button>
+            {tailorStats.overdue > 0 && (
+              <button onClick={() => navigate('/orders-board')} style={{ background:'#fef2f2', padding:'18px', borderRadius:'18px', border:'2px solid #fecaca', display:'flex', alignItems:'center', gap:'14px', cursor:'pointer', fontFamily:'inherit', textAlign:'right' }}>
+                <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(239,68,68,0.15)', color:'#ef4444', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px', flexShrink:0 }}>️</div>
+                <div><div style={{ fontSize:'11px', color:'#7f1d1d', fontWeight:'800' }}>طلبات متأخرة</div><div style={{ fontSize:'26px', fontWeight:'900', color:'#ef4444' }}>{tailorStats.overdue}</div></div>
+              </button>
+            )}
+          </div>
+          {/* Mulam Control Center Widgets */}
+          {businessType === 'tailor' && tailorStats && (
+            <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+               <div onClick={() => navigate('/stock')} style={{ cursor:'pointer', background: 'var(--bg-card)', padding: '18px', borderRadius: '18px', border: tailorStats.lowFabrics > 0 ? '2px solid #f59e0b' : '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                 <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(245,158,11,0.1)', color:'#f59e0b', display:'flex', alignItems:'center', justifyContent:'center' }}>⚠️</div>
+                 <div><div style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:'700' }}>أقمشة على وشك النفاد</div><div style={{ fontSize:'22px', fontWeight:'900', color: tailorStats.lowFabrics > 0 ? '#d97706' : 'var(--text-main)' }}>{tailorStats.lowFabrics} طاقة</div></div>
+               </div>
+               <div style={{ background: 'var(--bg-card)', padding: '18px', borderRadius: '18px', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                 <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(59,130,246,0.1)', color:'#3b82f6', display:'flex', alignItems:'center', justifyContent:'center' }}>📅</div>
+                 <div><div style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:'700' }}>بروفات مجدولة اليوم</div><div style={{ fontSize:'22px', fontWeight:'900', color:'var(--text-main)' }}>{tailorStats.todayFittings}</div></div>
+               </div>
+               <div style={{ background: 'var(--bg-card)', padding: '18px', borderRadius: '18px', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                 <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(139,92,246,0.1)', color:'#8b5cf6', display:'flex', alignItems:'center', justifyContent:'center' }}>🚚</div>
+                 <div><div style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:'700' }}>شحنات موردين (٧ أيام)</div><div style={{ fontSize:'22px', fontWeight:'900', color:'var(--text-main)' }}>{tailorStats.recentDeliveries} استلام</div></div>
+               </div>
+            </div>
+          )}
+        </>
+        ) : (
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
@@ -222,6 +351,7 @@ export default function Home() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Launch Cards Grid */}
         <div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AppLayout from '../components/AppLayout';
 import { 
   Plus, Search, Filter, Trash2, Calendar, 
@@ -21,12 +21,24 @@ export default function Expenditures() {
   const [total, setTotal] = useState(0);
   const limit = 20;
 
+  // Supplier suggestions for combobox
+  const [supplierSuggestions, setSupplierSuggestions] = useState([]);
+
   const [form, setForm] = useState({
     supplier_name: '', invoice_ref: '', category: 'أخرى', 
     amount: '', vat_eligible: false, 
     date: new Date().toISOString().split('T')[0], 
     description: ''
   });
+
+  // Load supplier suggestions when modal opens
+  useEffect(() => {
+    if (showModal && window.api?.getExpenseSupplierSuggestions) {
+      window.api.getExpenseSupplierSuggestions()
+        .then(list => setSupplierSuggestions(list || []))
+        .catch(() => setSupplierSuggestions([]));
+    }
+  }, [showModal]);
 
   useEffect(() => {
     loadExpenses();
@@ -54,8 +66,8 @@ export default function Expenditures() {
     if (!form.amount) return alert("يرجى إدخال المبلغ");
 
     const amountNum = parseFloat(form.amount);
-    const net = form.vat_eligible ? (amountNum / 1.15) : amountNum;
-    const vat = form.vat_eligible ? (amountNum - net) : 0;
+    const net = form.vat_eligible ? Math.round((amountNum / 1.15) * 100) / 100 : amountNum;
+    const vat = form.vat_eligible ? Math.round((amountNum - net) * 100) / 100 : 0;
 
     const data = {
       ...form,
@@ -255,27 +267,52 @@ export default function Expenditures() {
             </div>
             
             <form onSubmit={handleAdd} style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'20px' }}>
-              <Input label="اسم المورد / الجهة" value={form.supplier_name} onChange={v => setForm({...form, supplier_name:v})} placeholder="مثال: شركة الكهرباء" />
-              <Input label="رقم الفاتورة" value={form.invoice_ref} onChange={v => setForm({...form, invoice_ref:v})} placeholder="INV-2024" />
+              <div style={{ gridColumn: 'span 2' }}>
+                <SupplierCombobox
+                  label="اسم المورد / الجهة"
+                  value={form.supplier_name}
+                  onChange={v => setForm({...form, supplier_name:v})}
+                  suggestions={supplierSuggestions}
+                  placeholder="ابحث عن مورد أو أدخل اسماً جديداً..."
+                />
+              </div>
+
+              <Input label="رقم الفاتورة" value={form.invoice_ref} onChange={v => setForm({...form, invoice_ref:v})} placeholder="مثال: INV-2024-001" />
+
               <div style={inputGroupStyle}>
                 <label style={labelStyle}>الفئة</label>
                 <select value={form.category} onChange={e => setForm({...form, category:e.target.value})} style={selectStyleFull}>
                   {CATEGORIES.filter(c => c !== 'الكل').map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
+
               <Input label="التاريخ" type="date" value={form.date} onChange={v => setForm({...form, date:v})} />
-              <Input label="المبلغ الإجمالي (SAR)" type="number" value={form.amount} onChange={v => setForm({...form, amount:v})} required />
+              <Input label="المبلغ الإجمالي (SAR)" type="number" value={form.amount} onChange={v => setForm({...form, amount:v})} required placeholder="0.00" />
               
-              <div style={{ display:'flex', alignItems:'center', gap:'12px', background:'var(--bg-card)', padding:'12px', borderRadius:'14px', border:'1px solid #e2e8f0', gridColumn:'span 1' }}>
-                <input type="checkbox" checked={form.vat_eligible} onChange={e => setForm({...form, vat_eligible:e.target.checked})} style={{ width:'20px', height:'20px' }} />
-                <span style={{ fontSize:'13px', fontWeight:'700', color:'var(--text-muted)' }}>فاتورة ضريبية (15%)</span>
+              <div style={{
+                display:'flex', alignItems:'center', gap:'12px',
+                background: form.vat_eligible ? '#eff6ff' : '#f8fafc',
+                padding:'14px 18px', borderRadius:'14px',
+                border:`1.5px solid ${form.vat_eligible ? '#93c5fd' : '#e2e8f0'}`,
+                gridColumn:'span 2', cursor:'pointer', transition:'all 0.2s'
+              }} onClick={() => setForm({...form, vat_eligible: !form.vat_eligible})}>
+                <input
+                  type="checkbox"
+                  checked={form.vat_eligible}
+                  onChange={e => setForm({...form, vat_eligible: e.target.checked})}
+                  style={{ width:'20px', height:'20px', cursor:'pointer' }}
+                />
+                <div>
+                  <div style={{ fontSize:'13px', fontWeight:'800', color: form.vat_eligible ? '#1e40af' : '#374151' }}>فاتورة ضريبية (15%)</div>
+                  <div style={{ fontSize:'11px', color:'#64748b' }}>حساب ضريبة المدخلات تلقائياً (تخصم في الإقرار الضريبي)</div>
+                </div>
               </div>
 
               <div style={{ gridColumn:'span 2' }}>
                 <Input label="ملاحظات إضافية" value={form.description} onChange={v => setForm({...form, description:v})} placeholder="اختياري..." />
               </div>
 
-              <div style={{ gridColumn:'span 2', marginTop:'20px' }}>
+              <div style={{ gridColumn:'span 2', marginTop:'10px' }}>
                 <button type="submit" style={submitBtnStyle}>{editItem ? 'تحديث المصروف' : 'حفظ المصروف وتحديث القيود'}</button>
               </div>
             </form>
@@ -309,6 +346,153 @@ function Input({ label, value, onChange, placeholder, type='text', required=fals
         placeholder={placeholder} required={required}
         style={inputStyle}
       />
+    </div>
+  );
+}
+
+// Searchable Supplier Combobox — allows free-text entry + dropdown suggestions (RTL optimized)
+function SupplierCombobox({ label, value, onChange, suggestions = [], placeholder }) {
+  const [open, setOpen] = useState(false);
+  const [highlightIdx, setHighlightIdx] = useState(-1);
+  const wrapperRef = useRef(null);
+  const listRef = useRef(null);
+
+  const query = (value || '').trim().toLowerCase();
+  const filtered = query
+    ? suggestions.filter(s => s.toLowerCase().includes(query))
+    : suggestions;
+  const displayList = filtered.slice(0, 8); // show max 8 items
+  const isNew = query && !suggestions.some(s => s.toLowerCase() === query);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (listRef.current && highlightIdx >= 0) {
+      const el = listRef.current.children[highlightIdx];
+      if (el) el.scrollIntoView({ block: 'nearest' });
+    }
+  }, [highlightIdx]);
+
+  const handleKeyDown = (e) => {
+    if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      setOpen(true);
+      setHighlightIdx(0);
+      e.preventDefault();
+      return;
+    }
+    if (!open) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightIdx(i => Math.min(i + 1, displayList.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightIdx(i => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter' && highlightIdx >= 0 && displayList[highlightIdx]) {
+      e.preventDefault();
+      onChange(displayList[highlightIdx]);
+      setOpen(false);
+      setHighlightIdx(-1);
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+      setHighlightIdx(-1);
+    }
+  };
+
+  const selectItem = (name) => {
+    onChange(name);
+    setOpen(false);
+    setHighlightIdx(-1);
+  };
+
+  return (
+    <div style={inputGroupStyle} ref={wrapperRef}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <label style={labelStyle}>{label}</label>
+        {isNew && (
+          <span style={{
+            fontSize: '11px', fontWeight: '800',
+            background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white',
+            padding: '2px 10px', borderRadius: '8px', letterSpacing: '0.02em'
+          }}>مورد جديد ✦</span>
+        )}
+      </div>
+      <div style={{ position: 'relative', width: '100%' }}>
+        <Building2
+          size={18}
+          color={open ? '#3b82f6' : '#94a3b8'}
+          style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', zIndex: 2 }}
+        />
+        <input
+          type="text"
+          value={value}
+          onChange={e => { onChange(e.target.value); setOpen(true); setHighlightIdx(-1); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          autoComplete="off"
+          style={{
+            ...inputStyle,
+            paddingRight: '42px',
+            paddingLeft: value ? '36px' : '16px',
+            borderColor: open ? '#3b82f6' : '#e2e8f0',
+            boxShadow: open ? '0 0 0 3.5px rgba(59,130,246,0.12)' : 'none',
+            fontSize: '14px',
+            height: '46px',
+            transition: 'all 0.2s',
+            width: '100%',
+            boxSizing: 'border-box'
+          }}
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={() => { onChange(''); setOpen(true); }}
+            style={{
+              position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+              background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer',
+              fontSize: '14px', padding: '4px', display: 'flex', alignItems: 'center'
+            }}
+          >
+            ✕
+          </button>
+        )}
+        {open && displayList.length > 0 && (
+          <div ref={listRef} style={{
+            position: 'absolute', top: 'calc(100% + 6px)', right: 0, left: 0, zIndex: 1000,
+            background: 'white', border: '1px solid #e2e8f0',
+            borderRadius: '16px', maxHeight: '220px', overflowY: 'auto',
+            boxShadow: '0 12px 32px rgba(0,0,0,0.15)',
+            direction: 'rtl'
+          }}>
+            {displayList.map((name, i) => (
+              <div
+                key={name}
+                onMouseDown={() => selectItem(name)}
+                onMouseEnter={() => setHighlightIdx(i)}
+                style={{
+                  padding: '11px 16px', cursor: 'pointer', fontSize: '13.5px', fontWeight: '700',
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  background: highlightIdx === i ? '#eff6ff' : 'transparent',
+                  color: highlightIdx === i ? '#2563eb' : '#1e293b',
+                  borderBottom: i < displayList.length - 1 ? '1px solid #f8fafc' : 'none',
+                  transition: 'background 0.1s',
+                }}
+              >
+                <Building2 size={15} color={highlightIdx === i ? '#3b82f6' : '#cbd5e1'} />
+                {name}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

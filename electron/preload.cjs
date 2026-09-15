@@ -6,9 +6,13 @@ contextBridge.exposeInMainWorld('api', {
   addMenuItem:          (d)      => ipcRenderer.invoke('db:addMenuItem', d),
   editMenuItem:         (d)      => ipcRenderer.invoke('db:editMenuItem', d),
   deleteMenuItem:       (id)     => ipcRenderer.invoke('db:deleteMenuItem', id),
+  toggleProductActive:  (id)     => ipcRenderer.invoke('db:toggleProductActive', id),
+  duplicateProduct:     (id)     => ipcRenderer.invoke('db:duplicateProduct', id),
   updateStock:          (d)      => ipcRenderer.invoke('db:updateStock', d),
   updateProductCost:    (d)      => ipcRenderer.invoke('db:updateProductCost', d),
   importCSV:            (p)      => ipcRenderer.invoke('db:importCSV', p),
+  getGlobalCatalog:            (f) => ipcRenderer.invoke('db:getGlobalCatalog', f),
+  getGlobalCatalogCategories:  ()  => ipcRenderer.invoke('db:getGlobalCatalogCategories'),
 
   // ── Held Orders ───────────────────────────────
   getHeldOrders:        ()       => ipcRenderer.invoke('db:getHeldOrders'),
@@ -21,6 +25,7 @@ contextBridge.exposeInMainWorld('api', {
   getSalesHistory:      (f)      => ipcRenderer.invoke('db:getSalesHistory', f),
   getSaleByInvoice:     (id)     => ipcRenderer.invoke('db:getSaleByInvoice', id),
   updateSaleStatus:     (d)      => ipcRenderer.invoke('db:updateSaleStatus', d),
+  correctPaymentMethod: (d)      => ipcRenderer.invoke('db:correctPaymentMethod', d),
   exportSalesCSV:       (f)      => ipcRenderer.invoke('db:exportSalesCSV', f),
   updateHeldOrderStatus: (id, s) => ipcRenderer.invoke('db:updateHeldOrderStatus', { id, status: s }),
 
@@ -31,11 +36,32 @@ contextBridge.exposeInMainWorld('api', {
   updateTablePosition:  (id, x, y) => ipcRenderer.invoke('db:updateTablePosition', { id, x, y }),
   deleteTable:          (id)     => ipcRenderer.invoke('db:deleteTable', id),
 
+  // ── QR Web Orders ─────────────────────────────
+  getMenuPublicUrl:      ()          => ipcRenderer.invoke('menu:getPublicUrl'),
+  getTunnelStatus:       ()          => ipcRenderer.invoke('menu:getTunnelStatus'),
+  getPendingWebOrders:   (status)    => ipcRenderer.invoke('webOrder:getAll', status),
+  acceptWebOrder:        (id)        => ipcRenderer.invoke('webOrder:accept', id),
+  rejectWebOrder:        (id, reason)=> ipcRenderer.invoke('webOrder:reject', id, reason),
+  markWebOrderReady:     (id)        => ipcRenderer.invoke('webOrder:markReady', id),
+  markWebOrderServed:    (id)        => ipcRenderer.invoke('webOrder:markServed', id),
+  getWebOrderPendingCount: ()        => ipcRenderer.invoke('webOrder:getPendingCount'),
+  onIncomingWebOrder:    (cb)        => {
+      const handler = (_event, order) => cb(order);
+      ipcRenderer.on('incoming-web-order', handler);
+      return () => ipcRenderer.removeListener('incoming-web-order', handler);
+  },
+  onTunnelUrlUpdated:    (cb)        => {
+      const handler = (_event, url) => cb(url);
+      ipcRenderer.on('tunnel-url-updated', handler);
+      return () => ipcRenderer.removeListener('tunnel-url-updated', handler);
+  },
+
   // ── Expenditures ─────────────────────────────
   addExpenditure:       (d)      => ipcRenderer.invoke('db:addExpenditure', d),
   editExpenditure:      (d)      => ipcRenderer.invoke('db:editExpenditure', d),
   deleteExpenditure:    (id)     => ipcRenderer.invoke('db:deleteExpenditure', id),
   getExpenditures:      (f)      => ipcRenderer.invoke('db:getExpenditures', f),
+  getExpenseSupplierSuggestions: () => ipcRenderer.invoke('db:getExpenseSupplierSuggestions'),
 
   // ── Reports ───────────────────────────────────
   getFinancialReport:   (r)      => ipcRenderer.invoke('db:getFinancialReport', r),
@@ -49,6 +75,8 @@ contextBridge.exposeInMainWorld('api', {
   saveSettings:         (d)      => ipcRenderer.invoke('settings:save', d),
   pickImageFile:        ()       => ipcRenderer.invoke('dialog:pickImage'),
   pickCSVFile:          ()       => ipcRenderer.invoke('dialog:pickCSV'),
+  pickInvoiceFile:      ()       => ipcRenderer.invoke('dialog:pickImage'), // We can reuse pickImage or add a specific one later
+  processInvoiceFile:   (path)   => ipcRenderer.invoke('ai:processInvoice', path),
 
   // ── Accounting ────────────────────────────────
   getAccounts:          ()       => ipcRenderer.invoke('db:getAccounts'),
@@ -89,6 +117,12 @@ contextBridge.exposeInMainWorld('api', {
   redeemLoyaltyPoints:  (d)      => ipcRenderer.invoke('db:redeemLoyaltyPoints', d),
   recordWhatsAppShare:  (d)      => ipcRenderer.invoke('db:recordWhatsAppShare', d),
 
+  // ── Sponsors ──────────────────────────────────────────
+  getSponsors:          (f)      => ipcRenderer.invoke('db:getSponsors', f),
+  addSponsor:           (d)      => ipcRenderer.invoke('db:addSponsor', d),
+  updateSponsor:        (d)      => ipcRenderer.invoke('db:updateSponsor', d),
+  deleteSponsor:        (id)     => ipcRenderer.invoke('db:deleteSponsor', id),
+
   // ── Staff ─────────────────────────────────────
   getStaff:             ()       => ipcRenderer.invoke('db:getStaff'),
   addStaff:             (d)      => ipcRenderer.invoke('db:addStaff', d),
@@ -111,6 +145,7 @@ contextBridge.exposeInMainWorld('api', {
   // ── Stock History & Purchases ─────────────────
   getStockHistory:      (id)     => ipcRenderer.invoke('db:getStockHistory', id),
   adjustStock:          (d)      => ipcRenderer.invoke('db:adjustStock', d),
+  getProductMovementReport: (d)  => ipcRenderer.invoke('stock:movement-report', d),
   getPurchaseOrders:    ()       => ipcRenderer.invoke('db:getPurchaseOrders'),
   createPurchaseOrder:  (d)      => ipcRenderer.invoke('db:createPurchaseOrder', d),
   updatePurchaseOrder:  (id, d)  => ipcRenderer.invoke('db:updatePurchaseOrder', id, d),
@@ -169,6 +204,7 @@ contextBridge.exposeInMainWorld('api', {
   zatcaResumeQueue:     ()       => ipcRenderer.invoke('zatca:resumeQueue'),
   zatcaGetCertExpiry:   ()       => ipcRenderer.invoke('zatca:getCertExpiry'),
   onboardZatcaDevice:   (d)      => ipcRenderer.invoke('zatca:onboardDevice', d),
+  zatcaDevResetForReonboard: ()  => ipcRenderer.invoke('zatca-dev-reset-for-reonboard'),
   getSignedXML:         (d)      => ipcRenderer.invoke('zatca:getSignedXML', d),
   getClearanceStatus:   (id)     => ipcRenderer.invoke('zatca:getClearanceStatus', id),
   runSimulationTests:   ()       => ipcRenderer.invoke('zatca:runComplianceChecks'),
@@ -311,4 +347,55 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('updater:status', subscription);
     return () => ipcRenderer.removeListener('updater:status', subscription);
   },
+  
+  // ── Customer Display ─────────────────────────────────
+  onCartUpdate: (cb) => {
+    const subscription = (event, data) => cb(data);
+    ipcRenderer.on('cart:update', subscription);
+    return () => ipcRenderer.removeListener('cart:update', subscription);
+  },
+  sendToMain: (channel, data) => ipcRenderer.send(channel, data),
+  
+  // ── Assistant NLP API ─────────────────────────────────
+  assistant: {
+    chat: (message) => ipcRenderer.invoke('assistant:chat', message),
+    confirmAction: (actionId) => ipcRenderer.invoke('assistant:confirmAction', actionId),
+    cancelAction: (actionId) => ipcRenderer.invoke('assistant:cancelAction', actionId)
+  },
+
+  // ── Tailor Shop ───────────────────────────────────
+  tailor: {
+    
+    createAlteration: (d) => ipcRenderer.invoke('tailor:createAlteration', d),
+    getAlterations: () => ipcRenderer.invoke('tailor:getAlterations'),
+    updateAlterationStatus: (d) => ipcRenderer.invoke('tailor:updateAlterationStatus', d),
+
+    createOrder:        (d)  => ipcRenderer.invoke('tailor:createOrder', d),
+    saveProfile:        (d)  => ipcRenderer.invoke('tailor:saveProfile', d),
+    getOrderBySale:     (id) => ipcRenderer.invoke('tailor:getOrderBySale', id),
+    getOrders:          (f)  => ipcRenderer.invoke('tailor:getOrders', f),
+    getGarments:        (id) => ipcRenderer.invoke('tailor:getGarments', id),
+    updateStage:        (d)  => ipcRenderer.invoke('tailor:updateStage', d),
+    getMeasurements:    (d)  => ipcRenderer.invoke('tailor:getMeasurements', d),
+    completeOrder:      (d)  => ipcRenderer.invoke('tailor:completeOrder', d),
+    getDashboardStats:  ()   => ipcRenderer.invoke('tailor:getDashboardStats'),
+    getPayroll:         (d)  => ipcRenderer.invoke('tailor:getPayroll', d),
+    getCutterPayroll:   (d)  => ipcRenderer.invoke('tailor:getCutterPayroll', d),
+    assignGarmentWorker: (d) => ipcRenderer.invoke('tailor:assignGarmentWorker', d),
+    getFabricRolls:     (id) => ipcRenderer.invoke('tailor:getFabricRolls', id),
+    addFabricRoll:      (d)  => ipcRenderer.invoke('tailor:addFabricRoll', d),
+    recordDefect:       (d)  => ipcRenderer.invoke('tailor:recordDefect', d),
+    getGarmentDefects:  (id) => ipcRenderer.invoke('tailor:getGarmentDefects', id),
+    // Phase 1 - New Tailor Tools
+    getAttachments:     (id) => ipcRenderer.invoke('tailor:getAttachments', id),
+    saveAttachment:     (d)  => ipcRenderer.invoke('tailor:saveAttachment', d),
+    readAttachment:     (path) => ipcRenderer.invoke('tailor:readAttachment', path),
+    mergeCustomers:     (d)  => ipcRenderer.invoke('tailor:mergeCustomers', d),
+    
+    // Category 3 Finance
+    addPayment:         (d)  => ipcRenderer.invoke('tailor:addPayment', d),
+    refundOrder:        (d)  => ipcRenderer.invoke('tailor:refundOrder', d),
+  },
+  getPayroll: (d) => ipcRenderer.invoke('tailor:getPayroll', d),
+  getCutterPayroll: (d) => ipcRenderer.invoke('tailor:getCutterPayroll', d),
 });

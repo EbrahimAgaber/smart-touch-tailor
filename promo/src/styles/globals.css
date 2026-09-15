@@ -1,0 +1,101 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Inter:wght@300;400;600;700&display=swap');
+@import "tailwindcss";
+@config "../../tailwind.config.js";
+
+:root {
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background-color: #F4F6FB;
+  color: #0F172A;
+  font-family: 'Cairo', sans-serif;
+  overflow-x: hidden;
+}
+
+#root {
+  width: 100%;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Cairo', sans-serif;
+  color: #0F172A;
+}
+
+h1 {
+  font-size: clamp(2.5rem, 4vw + 1rem, 4rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin: 0 0 1rem 0;
+}
+
+h2 {
+  font-size: clamp(1.8rem, 3vw + 1rem, 3rem);
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 0 0 1rem 0;
+}
+
+p {
+  color: #475569;
+  font-size: 1.125rem;
+  line-height: 1.6;
+}
+
+@layer utilities {
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(24px) saturate(1.5);
+    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+    border: 1px solid #DDE3EF;
+  }
+
+  .text-gradient {
+    background: linear-gradient(to left, #3D52D5, #0891B2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .perspective-2000 {
+    perspective: 2000px;
+  }
+
+  .transform-style-3d {
+    transform-style: preserve-3d;
+  }
+  
+  .tz-10 { transform: translateZ(10px); }
+  .tz-20 { transform: translateZ(20px); }
+  .tz-30 { transform: translateZ(30px); }
+  .tz-40 { transform: translateZ(40px); }
+  .tz-50 { transform: translateZ(50px); }
+  .tz-60 { transform: translateZ(60px); }
+  .tz-80 { transform: translateZ(80px); }
+  .tz-100 { transform: translateZ(100px); }
+
+  /* Vibrant Mesh Background */
+  .vibrant-mesh {
+    background: 
+      radial-gradient(circle at 15% 50%, rgba(61, 82, 213, 0.4), transparent 50%),
+      radial-gradient(circle at 85% 30%, rgba(8, 145, 178, 0.4), transparent 50%),
+      radial-gradient(circle at 50% 80%, rgba(13, 175, 122, 0.3), transparent 50%);
+    background-size: 200% 200%;
+    animation: mesh-flow 15s ease infinite;
+    filter: blur(60px);
+  }
+
+  @keyframes mesh-flow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+}

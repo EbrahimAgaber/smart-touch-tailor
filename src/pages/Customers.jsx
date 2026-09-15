@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import { useAppSettings } from '../App';
 import AppLayout from '../components/AppLayout';
 import {
   Search, UserPlus, Phone, Mail, MapPin, Award,
-  X, Save, Edit3, ChevronDown, ChevronUp, ShoppingBag, Star, FileText, PlusCircle
+  X, Save, Edit3, ChevronDown, ChevronUp, ShoppingBag, Star, FileText, PlusCircle, Ruler, GitMerge
 } from 'lucide-react';
 
 const BLANK = { 
   name: '', phone: '', email: '', address: '', tax_id: '',
   id_type: 'CRN', id_value: '',
   na_short: '', na_building: '', na_street: '', na_secondary: '',
-  na_district: '', na_postal: '', na_city: '', na_country: 'المملكة العربية السعودية'
+  na_district: '', na_postal: '', na_city: '', na_country: 'المملكة العربية السعودية',
+  tags: '', notes: ''
 };
 
 // ID_TYPES labels are translated at render time via t()
@@ -18,6 +21,8 @@ const ID_TYPE_KEYS = ['CRN','PAS','MOM','MLS','SAG','GCC','OTH'];
 
 export default function Customers() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { businessType } = useAppSettings();
   const [customers, setCustomers] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -39,12 +44,25 @@ export default function Customers() {
   const [stmtPayLoading, setStmtPayLoading] = useState(false);
   const [stmtPayError, setStmtPayError]  = useState('');
 
-  useEffect(() => { fetchCustomers(); }, [search]);
+  // CRM Campaign state
+  const [tierFilter, setTierFilter] = useState('');
+  const [showCampaign, setShowCampaign] = useState(false);
+  const [campaignMessage, setCampaignMessage] = useState('مرحباً، لدينا عرض خاص لك!');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+  
+  // Phase 1 - Merge Tool
+  const [mergePrimary, setMergePrimary] = useState(null);
+  const [mergeSearch, setMergeSearch] = useState('');
+  const [mergeCandidates, setMergeCandidates] = useState([]);
+  const [mergeDuplicate, setMergeDuplicate] = useState(null);
+  const [merging, setMerging] = useState(false);
+
+  useEffect(() => { fetchCustomers(); }, [search, tierFilter]);
 
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const data = await window.api.getCustomers({ search });
+      const data = await window.api.getCustomers({ search, tier: tierFilter || undefined });
       setCustomers(data || []);
     } catch (e) { console.error(e); }
     setLoading(false);
@@ -64,7 +82,8 @@ export default function Customers() {
       id_type: c.id_type || 'CRN', id_value: c.id_value || '',
       na_short: c.na_short || '', na_building: c.na_building || '', na_street: c.na_street || '', 
       na_secondary: c.na_secondary || '', na_district: c.na_district || '', na_postal: c.na_postal || '', 
-      na_city: c.na_city || '', na_country: c.na_country || 'المملكة العربية السعودية'
+      na_city: c.na_city || '', na_country: c.na_country || 'المملكة العربية السعودية',
+      tags: c.tags || '', notes: c.notes || ''
     });
     setFormError('');
     setShowModal(true);
@@ -135,6 +154,32 @@ export default function Customers() {
     return                        { bg: '#fef9f0', color: '#b45309', label: t('customers.tiers.bronze') };
   };
 
+  const handleMergeSearch = async () => {
+      if (!mergeSearch.trim()) return;
+      try {
+          const res = await window.api.getCustomers({ search: mergeSearch });
+          setMergeCandidates((res || []).filter(c => c.id !== mergePrimary?.id));
+      } catch (err) {
+          console.error(err);
+      }
+  };
+
+  const executeMerge = async () => {
+      if (!mergePrimary || !mergeDuplicate) return;
+      setMerging(true);
+      try {
+          await window.api.tailor?.mergeCustomers({ primary_id: mergePrimary.id, duplicate_id: mergeDuplicate.id });
+          setMergePrimary(null);
+          setMergeDuplicate(null);
+          setMergeSearch('');
+          setMergeCandidates([]);
+          fetchCustomers();
+      } catch (err) {
+          alert('Error merging: ' + err.message);
+      }
+      setMerging(false);
+  };
+
   const totalPoints = customers.reduce((s, c) => s + (c.loyalty_points || 0), 0);
   const totalSpent  = customers.reduce((s, c) => s + (c.total_spent   || 0), 0);
 
@@ -161,18 +206,35 @@ export default function Customers() {
 
         {/* CONTROLS */}
         <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center bg-white p-4 sm:p-5 rounded-2xl border border-subtle gap-4 shadow-sm">
-          <div className="relative flex-1 max-w-md">
-            <Search size={18} style={{ position:'absolute', right:'14px', top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)' }} />
-            <input
-              type="text" value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder={t('customers.controls.search_placeholder')}
-              style={{ width:'100%', padding:'11px 44px 11px 16px', borderRadius:'12px', border:'1px solid #e2e8f0', outline:'none', fontSize:'14px', fontFamily:'inherit' }}
-            />
+          <div className="flex items-center gap-4 flex-1">
+            <div className="relative flex-1 max-w-md">
+              <Search size={18} style={{ position:'absolute', right:'14px', top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)' }} />
+              <input
+                type="text" value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder={t('customers.controls.search_placeholder')}
+                style={{ width:'100%', padding:'11px 44px 11px 16px', borderRadius:'12px', border:'1px solid #e2e8f0', outline:'none', fontSize:'14px', fontFamily:'inherit' }}
+              />
+            </div>
+            <select
+              value={tierFilter}
+              onChange={e => setTierFilter(e.target.value)}
+              style={{ padding:'11px 16px', borderRadius:'12px', border:'1px solid #e2e8f0', outline:'none', fontSize:'14px', fontFamily:'inherit', backgroundColor:'#f8fafc', color:'var(--text-main)' }}
+            >
+              <option value="">جميع الفئات</option>
+              <option value="bronze">برونزي</option>
+              <option value="silver">فضي</option>
+              <option value="gold">ذهبي</option>
+            </select>
           </div>
-          <button onClick={openAdd} style={primaryBtnStyle}>
-            <UserPlus size={18} /> {t('customers.controls.add_btn')}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowCampaign(true)} style={{ ...primaryBtnStyle, background:'#10b981', color:'white' }}>
+              💬 حملة واتساب
+            </button>
+            <button onClick={openAdd} style={primaryBtnStyle}>
+              <UserPlus size={18} /> {t('customers.controls.add_btn')}
+            </button>
+          </div>
         </div>
 
         {/* CUSTOMER TABLE */}
@@ -214,7 +276,18 @@ export default function Customers() {
                     </td>
                     <td style={tdStyle}>
                       <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-                        {c.phone || <span style={{ color:'#cbd5e1' }}>—</span>}
+                        {c.phone ? (
+                          <span 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.api?.openExternal?.(`https://wa.me/${c.phone.replace(/\\D/g,'')}`);
+                            }}
+                            style={{ cursor: 'pointer', color: '#0369a1', textDecoration: 'underline' }}
+                            title={t('customers.table.whatsapp_title')}
+                          >
+                            {c.phone}
+                          </span>
+                        ) : <span style={{ color:'#cbd5e1' }}>—</span>}
                         {c.phone && (
                           <button onClick={() => window.api?.openExternal?.(`https://wa.me/${c.phone.replace(/\D/g,'')}`)} style={{ background:'transparent', border:'none', cursor:'pointer', color:'#10b981', display:'flex', alignItems:'center', padding:'2px' }} title={t('customers.table.whatsapp_title')}>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -245,8 +318,29 @@ export default function Customers() {
                           <ShoppingBag size={15} />
                         </button>
                         <button onClick={() => openEdit(c)} style={iconBtn('#f59e0b','#fef3c7')} title={t('customers.table.edit_title')}>
-                          <Edit3 size={15} />
+                          <Edit3 size={16} />
                         </button>
+                        <button onClick={() => setMergePrimary(c)} style={iconBtn('#8b5cf6','#ede9fe')} title="دمج ملف العميل">
+                          <GitMerge size={16} />
+                        </button>
+                        {businessType === 'tailor' && (
+                          <>
+                            <button
+                              onClick={() => navigate(`/tailor-pos?customerId=${c.id}&phone=${encodeURIComponent(c.phone || '')}&name=${encodeURIComponent(c.name || '')}`)}
+                              style={{ ...iconBtn('#10b981', '#ecfdf5'), display: 'inline-flex', alignItems: 'center', gap: '4px', width: 'auto', padding: '0 8px', fontSize: '11px', fontWeight: 800 }}
+                              title="✂️ تفصيل جديد لهذا العميل"
+                            >
+                              <span>✂️</span> <span>تفصيل</span>
+                            </button>
+                            <button
+                              onClick={() => navigate(`/measurements?customer_id=${c.id}`)}
+                              style={{ ...iconBtn('#6366f1', '#eef2ff'), display: 'inline-flex', alignItems: 'center', gap: '4px', width: 'auto', padding: '0 8px', fontSize: '11px', fontWeight: 800 }}
+                              title="📐 عرض وتعديل المقاسات"
+                            >
+                              <Ruler size={13} /> <span>المقاسات</span>
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -422,6 +516,13 @@ export default function Customers() {
                   <textarea value={form.address} onChange={e => setForm({...form, address: e.target.value})}
                     style={{ ...cInput, minHeight:'70px', resize:'vertical' }} placeholder={t('customers.modal.address_placeholder')} />
                 </div>
+                
+                <CField label="Tags (e.g. VIP, Wholesale)" value={form.tags} onChange={v => setForm({...form, tags: v})} placeholder="Comma separated tags" />
+                <div>
+                  <label style={cLabel}>Notes (Preferences, allergies, etc.)</label>
+                  <textarea value={form.notes} onChange={e => setForm({...form, notes: e.target.value})}
+                    style={{ ...cInput, minHeight:'70px', resize:'vertical' }} placeholder="Customer preferences..." />
+                </div>
 
                 {/* National Address section */}
                 <div style={{ borderTop:'1px dashed #e2e8f0', paddingTop:'16px', marginTop:'4px' }}>
@@ -500,6 +601,85 @@ export default function Customers() {
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── CAMPAIGN MODAL ─────────────────────── */}
+      {showCampaign && (
+        <div style={overlayStyle}>
+          <div style={{ background:'var(--bg-card)', borderRadius:'24px', maxWidth:'600px', width:'95%', maxHeight:'90vh', display:'flex', flexDirection:'column', overflow:'hidden' }} dir="rtl">
+            <div style={{ padding:'24px 32px', display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'1px solid #f1f5f9', flexShrink: 0 }}>
+              <h2 style={{ fontWeight:'900', fontSize:'20px', margin:0 }}>🚀 حملة واتساب الترويجية</h2>
+              <button onClick={() => setShowCampaign(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)' }}><X size={22} /></button>
+            </div>
+            <div style={{ padding:'24px 32px', overflowY:'auto', flex: 1, display:'flex', flexDirection:'column', gap:'16px' }}>
+              <div>
+                <label style={cLabel}>قالب الرسالة</label>
+                <textarea
+                  value={campaignMessage}
+                  onChange={e => setCampaignMessage(e.target.value)}
+                  style={{ ...cInput, minHeight:'100px', resize:'vertical' }}
+                  placeholder="أدخل رسالتك الترويجية هنا..."
+                />
+              </div>
+              <div style={{ fontWeight:'700', color:'var(--text-muted)' }}>العملاء المستهدفين ({customers.filter(c => c.phone).length})</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
+                {customers.filter(c => c.phone).map(c => (
+                  <div key={c.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px', background:'#f8fafc', borderRadius:'12px', border:'1px solid #e2e8f0' }}>
+                    <div>
+                      <div style={{ fontWeight:'700' }}>{c.name}</div>
+                      <div style={{ fontSize:'12px', color:'var(--text-muted)' }}>{c.phone}</div>
+                    </div>
+                    <button
+                      onClick={() => window.api?.openExternal?.(`https://wa.me/${c.phone.replace(/\\D/g,'')}?text=${encodeURIComponent(campaignMessage)}`)}
+                      style={{ background:'#10b981', color:'white', border:'none', borderRadius:'8px', padding:'6px 12px', cursor:'pointer', fontWeight:'700', fontSize:'12px' }}
+                    >
+                      إرسال رسالة
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Merge Modal */}
+      {mergePrimary && (
+        <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, padding:'20px' }}>
+          <div style={{ background:'var(--bg-card)', padding:'30px', borderRadius:'20px', width:'100%', maxWidth:'600px', boxShadow:'0 10px 40px rgba(0,0,0,0.2)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px' }}>
+              <h2 style={{ fontWeight:'900', fontSize:'20px', margin:0, color:'var(--text-main)' }}>دمج ملف العميل</h2>
+              <button onClick={() => setMergePrimary(null)} style={{ background:'transparent', border:'none', color:'var(--text-muted)', cursor:'pointer' }}><X size={24} /></button>
+            </div>
+            
+            <p style={{ color:'var(--text-muted)' }}>اختر العميل المكرر لدمجه في الملف الأساسي: <strong>{mergePrimary.name} ({mergePrimary.phone})</strong></p>
+            <div style={{ display:'flex', gap:'10px', marginBottom:'20px' }}>
+              <input type="text" value={mergeSearch} onChange={e => setMergeSearch(e.target.value)} placeholder="بحث بالاسم أو الجوال..." style={{ flex:1, padding:'12px', borderRadius:'10px', border:'1px solid var(--border-subtle)', background:'var(--bg-app)', color:'var(--text-main)' }} />
+              <button onClick={handleMergeSearch} style={{ padding:'12px 20px', background:'#3b82f6', color:'#fff', border:'none', borderRadius:'10px', cursor:'pointer' }}>بحث</button>
+            </div>
+            
+            <div style={{ maxHeight:'200px', overflowY:'auto', marginBottom:'20px' }}>
+              {mergeCandidates.map(c => (
+                <div key={c.id} onClick={() => setMergeDuplicate(c)} style={{ padding:'12px', border:'1px solid', borderColor: mergeDuplicate?.id === c.id ? '#10b981' : 'var(--border-subtle)', borderRadius:'10px', marginBottom:'10px', cursor:'pointer', background: mergeDuplicate?.id === c.id ? '#ecfdf5' : 'var(--bg-app)' }}>
+                  <div style={{ fontWeight:'bold', color:'var(--text-main)' }}>{c.name}</div>
+                  <div style={{ fontSize:'12px', color:'var(--text-muted)' }}>{c.phone} | طلبات: {c.total_spent > 0 ? 'يوجد' : 'لا يوجد'}</div>
+                </div>
+              ))}
+            </div>
+
+            {mergeDuplicate && (
+              <div style={{ padding:'15px', background:'#fee2e2', color:'#ef4444', borderRadius:'10px', marginBottom:'20px', fontSize:'14px' }}>
+                <strong>تحذير:</strong> سيتم دمج جميع طلبات ومقاسات "{mergeDuplicate.name}" إلى "{mergePrimary.name}". وسيتم حذف الملف المكرر نهائياً.
+              </div>
+            )}
+
+            <div style={{ display:'flex', justifyContent:'flex-end', gap:'12px' }}>
+              <button onClick={() => setMergePrimary(null)} style={{ padding:'12px 24px', borderRadius:'12px', background:'var(--bg-app)', color:'var(--text-main)', border:'1px solid var(--border-subtle)', cursor:'pointer', fontWeight:700 }}>إلغاء</button>
+              <button onClick={executeMerge} disabled={!mergeDuplicate || merging} style={{ padding:'12px 24px', borderRadius:'12px', background: !mergeDuplicate ? '#999' : '#ef4444', color:'white', border:'none', cursor: !mergeDuplicate ? 'not-allowed' : 'pointer', fontWeight:900 }}>
+                {merging ? 'جاري الدمج...' : 'تأكيد الدمج'}
+              </button>
             </div>
           </div>
         </div>

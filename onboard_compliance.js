@@ -136,7 +136,7 @@ app.whenReady().then(async () => {
                 production_cert_pem: certPem,
                 cert_expires_at: certExpiresAt,
                 current_icv: 0,
-                last_pih: 'NWZkY2M0ZDU2YjY3Y2I0OTlhYTQ3MDk4Y2U5YTEwYmQ4Y2IyMzQyMDFlODFlOTQ4YjJmYTI4Mzg0OTQ1MTBhOQ==',
+                last_pih: 'NWZlY2Q3YmU1YTIzYmU3YTYzYTk3YmQ4NzY0ODk2ODM3NGJhOWI5NjgxYTNpYmQyNzhjNTU4NTUxYWI5ZWYyZg==',
             });
             // Mark any older queue/sale records to legacy
             database.prepare("UPDATE zatca_queue SET status = 'legacy_pre_onboarding' WHERE status IN ('pending', 'failed', 'pre_onboarding')").run();

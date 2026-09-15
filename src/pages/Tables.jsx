@@ -13,6 +13,8 @@ const STATUS_COLORS = {
   dirty:     { bg: '#fffbeb', color: '#d97706', label: 'بحاجة لتنظيف' },
 };
 
+import QRCode from 'qrcode';
+
 export default function Tables() {
   const navigate = useNavigate();
   const [tables, setTables] = useState([]);
@@ -21,10 +23,109 @@ export default function Tables() {
   const [isMapView, setIsMapView] = useState(false);
   const [activeZone, setActiveZone] = useState('');
   const [newTable, setNewTable] = useState({ name: '', zone: 'الصالة الرئيسية', capacity: 4 });
+  const [qrModal, setQrModal] = useState({ show: false, url: '', table: null });
+  const [publicUrl, setPublicUrl] = useState('');
+  const [tunnelStatus, setTunnelStatus] = useState({ connected: false });
+  const [pendingOrdersCount, setPendingOrdersCount] = useState({});
 
   useEffect(() => {
     fetchTables();
+    fetchTunnelStatus();
+    fetchPendingOrders();
+    
+    const tunnelInterval = setInterval(fetchTunnelStatus, 30000);
+    const ordersInterval = setInterval(fetchPendingOrders, 15000);
+
+    let cleanupUrl = () => {};
+    let cleanupOrders = () => {};
+    
+    if (window.api?.onTunnelUrlUpdated) {
+      cleanupUrl = window.api.onTunnelUrlUpdated(url => {
+        setPublicUrl(url);
+        fetchTunnelStatus();
+      });
+    }
+    
+    if (window.api?.onIncomingWebOrder) {
+      cleanupOrders = window.api.onIncomingWebOrder(() => {
+        fetchPendingOrders();
+      });
+    }
+
+    return () => {
+      clearInterval(tunnelInterval);
+      clearInterval(ordersInterval);
+      cleanupUrl();
+      cleanupOrders();
+    };
   }, []);
+
+  const fetchTunnelStatus = async () => {
+    try {
+      const status = await window.api?.getTunnelStatus?.();
+      if (status) {
+        setTunnelStatus(status);
+        setPublicUrl(status.url);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchPendingOrders = async () => {
+    try {
+      const orders = await window.api?.getPendingWebOrders?.() || [];
+      const counts = {};
+      orders.forEach(o => {
+        if (o.status === 'pending') {
+          counts[o.table_id] = (counts[o.table_id] || 0) + 1;
+        }
+      });
+      setPendingOrdersCount(counts);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleGenerateQR = async (e, table) => {
+    e.stopPropagation();
+    if (!publicUrl) return alert('الرابط العام غير متوفر بعد. يرجى الانتظار.');
+    const url = publicUrl + '/#/customer-menu/' + table.id;
+    try {
+      const dataUrl = await QRCode.toDataURL(url, { width: 300, margin: 2 });
+      setQrModal({ show: true, url: dataUrl, table });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handlePrintQR = () => {
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head><title>QR - طاولة ${qrModal.table?.name}</title></head>
+        <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;font-family:sans-serif;">
+          <h1 style="font-size:3rem;margin-bottom:20px;">طاولة ${qrModal.table?.name}</h1>
+          <img src="${qrModal.url}" style="width:400px;height:400px;" />
+          <p style="font-size:1.5rem;margin-top:20px;">امسح الرمز للطلب</p>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
+  const handleDownloadQR = () => {
+    const a = document.createElement('a');
+    a.href = qrModal.url;
+    a.download = `table-${qrModal.table?.name}-qr.png`;
+    a.click();
+  };
+
 
   const fetchTables = async () => {
     setLoading(true);
@@ -84,7 +185,7 @@ export default function Tables() {
         
         {/* Header Actions */}
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <div style={{ display:'flex', gap:'12px' }}>
+          <div style={{ display:'flex', gap:'12px', alignItems: 'center' }}>
              <button onClick={() => setIsMapView(!isMapView)} style={{ ...toggleBtn(isMapView), padding:'10px 20px' }}>
                {isMapView ? '📋 عرض القائمة' : '🗺️ عرض الخريطة'}
              </button>
@@ -93,6 +194,10 @@ export default function Tables() {
                   {Array.from(new Set(tables.map(t => t.zone))).map(z => <option key={z} value={z}>{z}</option>)}
                 </select>
              )}
+             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 12px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '13px', fontWeight: 'bold' }}>
+               <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: tunnelStatus.connected ? '#10b981' : '#ef4444' }}></div>
+               {tunnelStatus.connected ? 'متصل بالإنترنت' : 'غير متصل (جاري المحاولة...)'}
+             </div>
           </div>
           <button onClick={() => setShowAddModal(true)} style={primaryBtn}>
             <Plus size={18} /> إضافة طاولة جديدة
@@ -164,7 +269,14 @@ export default function Tables() {
                        {table.capacity > 6 ? '🛋️' : '🪑'}
                      </div>
                      <div>
-                       <div style={{ fontWeight: '900', fontSize: '18px', color: '#0f172a' }}>{table.name}</div>
+                       <div style={{ fontWeight: '900', fontSize: '18px', color: '#0f172a' }}>
+                         {table.name}
+                         {pendingOrdersCount[table.id] > 0 && (
+                           <span style={{ marginLeft: '8px', background: '#ef4444', color: 'white', fontSize: '12px', padding: '2px 8px', borderRadius: '12px' }}>
+                             {pendingOrdersCount[table.id]} طلب جديد
+                           </span>
+                         )}
+                       </div>
                        <div style={{ fontSize: '13px', color: '#64748b', marginTop: '6px', display: 'flex', gap: '10px', alignItems: 'center' }}>
                          <span>📍 {table.zone}</span>
                          <span>•</span>
@@ -172,8 +284,11 @@ export default function Tables() {
                        </div>
                      </div>
                    </div>
-                   <div style={{ background: status.bg, color: status.color, padding: '8px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: '800' }}>
-                     {status.label}
+                   <div style={{ display:'flex', flexDirection:'column', gap:'8px', alignItems:'flex-end' }}>
+                     <div style={{ background: status.bg, color: status.color, padding: '8px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: '800' }}>
+                       {status.label}
+                     </div>
+                     <button onClick={(e) => handleGenerateQR(e, table)} style={{ background:'#E55B13', color:'white', border:'none', padding:'6px 12px', borderRadius:'8px', fontSize:'12px', fontWeight:'bold', cursor:'pointer' }}>QR Code</button>
                    </div>
                  </div>
                );
@@ -181,6 +296,24 @@ export default function Tables() {
           </div>
         )}
       </div>
+
+      {/* QR Modal */}
+      {qrModal.show && (
+        <div style={overlay}>
+          <div style={{...modal, textAlign:'center'}} dir="rtl">
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }}>
+              <h2 style={{ fontWeight:'900', fontSize:'20px' }}>QR - طاولة {qrModal.table?.name}</h2>
+              <button onClick={() => setQrModal({show:false, url:'', table:null})} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8' }}><X size={24} /></button>
+            </div>
+            <img src={qrModal.url} alt="QR Code" style={{ margin:'0 auto', borderRadius:'12px', boxShadow:'0 4px 12px rgba(0,0,0,0.1)' }} />
+            <p style={{ marginTop:'16px', color:'#64748b', fontSize:'14px', marginBottom: '20px' }}>يمكن للعميل مسح هذا الرمز للوصول لقائمة الطعام والطلب مباشرة.</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={handlePrintQR} style={{ ...primaryBtn, flex: 1, justifyContent: 'center' }}>طباعة</button>
+              <button onClick={handleDownloadQR} style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>تحميل</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Table Modal */}
       {showAddModal && (

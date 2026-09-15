@@ -14,7 +14,8 @@ const BLANK = {
   min_spend: 0,
   active: 1,
   start_date: '',
-  end_date: ''
+  end_date: '',
+  apply_mode: 'AUTO' // 'AUTO' | 'MANUAL'
 };
 
 export default function Promotions() {
@@ -108,9 +109,14 @@ export default function Promotions() {
                       </div>
                     </div>
                     <h4 style={{ fontWeight:'800', fontSize:'16px', marginBottom:'4px' }}>{p.name}</h4>
-                    <p style={{ fontSize:'12px', color:'var(--text-muted)', marginBottom:'16px' }}>
-                      {p.type === 'BOGO' ? 'اشترِ قطعة واحصل على أخرى' : p.type === 'BULK' ? 'خصم على كمية المنتج' : 'خصم على إجمالي الطلب'}
-                    </p>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                      <span style={{ fontSize:'12px', color:'var(--text-muted)' }}>
+                        {p.type === 'BOGO' ? 'اشترِ قطعة واحصل على أخرى' : p.type === 'BULK' ? 'خصم على كمية المنتج' : 'خصم على إجمالي الطلب'}
+                      </span>
+                      <span style={{ fontSize:'11px', background: p.apply_mode === 'MANUAL' ? '#fff7ed' : '#f0f9ff', color: p.apply_mode === 'MANUAL' ? '#ea580c' : '#0284c7', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
+                        {p.apply_mode === 'MANUAL' ? 'يدوي (تحديد من الكاشير)' : 'تلقائي (للجميع)'}
+                      </span>
+                    </div>
                     
                     <div style={{ background:'var(--bg-card)', borderRadius:'12px', padding:'12px', fontSize:'13px', color:'var(--text-muted)' }}>
                       {p.type === 'TOTAL' && <span>خصم <strong>{p.discount_value}{p.discount_type==='pct'?'%':' ريال'}</strong> عند الشراء بمبلغ أكبر من {p.min_spend} ريال.</span>}
@@ -156,6 +162,22 @@ export default function Promotions() {
                         style={{ padding:'16px 12px', borderRadius:'16px', border: form.type===t.id ? '2px solid #3b82f6' : '1px solid #f1f5f9', background: form.type===t.id ? '#eff6ff' : '#f8fafc', cursor:'pointer', textAlign:'center', transition:'all 0.2s' }}>
                         <div style={{ fontWeight:'800', color: form.type===t.id ? '#3b82f6' : '#1e293b', fontSize:'14px' }}>{t.l}</div>
                         <div style={{ fontSize:'10px', color:'var(--text-muted)', marginTop:'4px' }}>{t.d}</div>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <section>
+                  <label style={lbl}>طريقة التطبيق (من يحصل على العرض؟)</label>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px' }}>
+                    {[
+                      { id: 'AUTO', l: 'تلقائي (للجميع)', d: 'يُطبق تلقائياً إذا تحققت الشروط' },
+                      { id: 'MANUAL', l: 'يدوي (فئات محددة)', d: 'يجب على الكاشير اختياره يدوياً لتطبيقه' }
+                    ].map(m => (
+                      <button key={m.id} onClick={() => setForm({...form, apply_mode: m.id})}
+                        style={{ padding:'12px', borderRadius:'12px', border: (form.apply_mode || 'AUTO') === m.id ? '2px solid #8b5cf6' : '1px solid #f1f5f9', background: (form.apply_mode || 'AUTO') === m.id ? '#f5f3ff' : '#f8fafc', cursor:'pointer', textAlign:'center', transition:'all 0.2s' }}>
+                        <div style={{ fontWeight:'800', color: (form.apply_mode || 'AUTO') === m.id ? '#8b5cf6' : '#1e293b', fontSize:'14px' }}>{m.l}</div>
+                        <div style={{ fontSize:'11px', color:'var(--text-muted)', marginTop:'4px' }}>{m.d}</div>
                       </button>
                     ))}
                   </div>
@@ -225,6 +247,16 @@ export default function Promotions() {
                       <section>
                         <label style={lbl}>ابحث عن المنتج</label>
                         <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="اسم الصنف..." style={inp} />
+                        {searchTerm && (
+                          <div style={{ maxHeight:'150px', overflowY:'auto', background:'var(--bg-card)', border:'1px solid #e2e8f0', borderRadius:'12px', marginTop:'4px' }}>
+                            {filteredMenu.map(m => (
+                              <div key={m.ID} onClick={() => { setForm({...form, buy_product_id: m.ID}); setSearchTerm(''); }}
+                                style={{ padding:'10px', cursor:'pointer', fontSize:'13px', borderBottom:'1px solid #f1f5f9' }}>
+                                {m.Name} - SAR {m.Price}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {form.buy_product_id && <div style={{ marginTop:'8px', fontWeight:'700', fontSize:'13px' }}>✅ {menu.find(x=>x.ID===form.buy_product_id)?.Name}</div>}
                       </section>
                       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'20px' }}>

@@ -24,7 +24,7 @@ function runRecoveryMigration(db, appVersion) {
         const minorVer = parseInt(versionParts[1] || '0', 10);
         const patchVer = parseInt(versionParts[2] || '0', 10);
         
-        // If we somehow moved past 1.0.15, we do not run auto-recovery. 
+        // If we somehow moved past 1.1.x, we do not run auto-recovery. 
         // This gate ensures this migration only applies during the critical update window.
         if (minorVer > 0 || patchVer > 15) {
             return;

@@ -101,6 +101,75 @@ function _validateLicenseV5(key, settings) {
     };
 }
 
+// ── V6 Base Key Validator (With Salt) ─────────────────────────────────────────
+function _validateLicenseV6(key, settings) {
+    if (!key) return { valid: false, reason: 'bad_format' };
+    const k = key.trim().toUpperCase();
+    if (k.length !== 16)          return { valid: false, reason: 'bad_format' };
+    if (k.slice(0, 2) !== 'V6')   return { valid: false, reason: 'bad_format' };
+
+    const tierCode    = k[2];
+    const billingCode = k[3];
+    const durationB36 = k.slice(4, 7);
+    const salt        = k.slice(7, 9);
+    const sigProvided = k.slice(9);   // 7 chars
+
+    const VALID_TIERS    = ['S','G','P','E','O','X'];
+    const VALID_BILLINGS = ['L','M','Y','T','O'];
+    if (!VALID_TIERS.includes(tierCode))       return { valid: false, reason: 'bad_format' };
+    if (!VALID_BILLINGS.includes(billingCode)) return { valid: false, reason: 'bad_format' };
+
+    // Recompute SIG
+    const payload    = `V6|${tierCode}|${billingCode}|${durationB36}|${salt}`;
+    const raw        = _licCrypto.createHmac('sha256', _LICENSE_SECRET).update(payload).digest('hex');
+    const num        = BigInt('0x' + raw.slice(0, 20));
+    const expectedSig = num.toString(36).toUpperCase().padStart(7, '0').slice(-7);
+    if (sigProvided !== expectedSig) return { valid: false, reason: 'invalid_key' };
+
+    // Decode billing/tier metadata
+    const BILLING_NAME = { L: 'lifetime', M: 'monthly', Y: 'yearly', T: 'trial', O: 'owner' };
+    const TIER_NAME    = { S: 'starter',  G: 'growth',  P: 'pro',    E: 'enterprise', O: 'owner', X: 'trial' };
+    const billing   = BILLING_NAME[billingCode];
+    const tierName  = TIER_NAME[tierCode];
+    const days      = _b36ToDays(durationB36);
+    const isLifetime = days === 0;
+
+    // Activation-anchored expiry
+    const fingerprint = k.slice(0, 9);
+    let daysLeft = Infinity;
+    let expired  = false;
+
+    if (!isLifetime) {
+        let activatedAt = _getActivatedAt(settings, fingerprint);
+        if (!activatedAt) {
+            // First time seeing this key — write activatedAt now
+            if (settings) _writeActivatedAt(settings, fingerprint);
+            activatedAt = new Date();
+        }
+        const expiryTs = activatedAt.getTime() + days * 86400000;
+        daysLeft = Math.ceil((expiryTs - Date.now()) / 86400000);
+        if (daysLeft <= 0) {
+            expired = true;
+            if (billing === 'trial') {
+                return { valid: false, reason: 'trial_expired' };
+            }
+            return { valid: false, reason: 'expired' };
+        }
+    }
+
+    return {
+        valid: true,
+        keyType:  'base',
+        tier:     tierCode,
+        tierName,
+        billing,
+        plan:     billing,
+        daysLeft,
+        isOwner:  tierCode === 'O',
+        activeAddons: [],
+    };
+}
+
 // ── V5 Addon Key Validator ────────────────────────────────────────────────────
 // Format: VA [ADDON:1][BILLING:1][DUR_B36:3][SIG:11] = 18 chars total
 // ADDON:   R F Z S W
@@ -170,7 +239,7 @@ function _checkAllLicenses(settings) {
     const baseKey  = settings && settings.activation_key;
     if (!baseKey) return { valid: false, reason: 'no_key' };
 
-    const baseResult = _validateLicenseV5(baseKey, settings);
+    const baseResult = _validateLicenseMain(baseKey, null, settings);
 
     // Parse addon keys array
     let addonKeys = [];
@@ -213,6 +282,11 @@ function _checkAllLicenses(settings) {
 function _validateLicenseMain(key, _hwid, settings) {
     if (!key) return { valid: false, reason: 'bad_format' };
     const k = key.trim().toUpperCase();
+
+    // V6 base key
+    if (k.length === 16 && k.startsWith('V6')) {
+        return _validateLicenseV6(k, settings || {});
+    }
 
     // V5 base key
     if (k.length === 16 && k.startsWith('V5')) {
@@ -267,6 +341,53 @@ function _gated(fn) {
         return fn(e, ...args);
     };
 }
+// ── Session State & Role-Based Access Control (RBAC) ──────────────────────────
+let _activeSession = null;
+
+function _setSession(staff) {
+    if (!staff) {
+        _activeSession = null;
+        if (typeof db !== 'undefined' && db && typeof db.setAuditUserId === 'function') {
+            db.setAuditUserId(null);
+        }
+        return;
+    }
+    _activeSession = {
+        id: staff.id,
+        name: staff.name,
+        role: String(staff.role || 'Cashier').toLowerCase(),
+        permissions: typeof staff.permissions_json === 'string' 
+            ? JSON.parse(staff.permissions_json || '[]') 
+            : (staff.permissions || []),
+        loginAt: Date.now()
+    };
+    if (typeof db !== 'undefined' && db && typeof db.setAuditUserId === 'function') {
+        db.setAuditUserId(staff.id);
+    }
+}
+
+function _requireRole(allowedRoles = ['admin'], fn) {
+    return async (e, ...args) => {
+        if (!_isLicenseActive()) {
+            return { success: false, error: 'LICENSE_REQUIRED', message: 'الترخيص غير صالح أو منتهي الصلاحية' };
+        }
+        if (!_activeSession) {
+            return { success: false, error: 'UNAUTHENTICATED', message: 'يجب تسجيل الدخول أولاً للقيام بهذه العملية' };
+        }
+        const userRole = (_activeSession.role || '').toLowerCase();
+        const normalizedAllowed = allowedRoles.map(r => String(r).toLowerCase());
+
+        // Admin always has full bypass authority
+        if (userRole !== 'admin' && !normalizedAllowed.includes(userRole)) {
+            console.warn(`[RBAC] Access denied for user ${_activeSession.name} (${userRole}) to restricted endpoint.`);
+            return { success: false, error: 'FORBIDDEN', message: 'غير مصرح لك بتنفيذ هذا الإجراء' };
+        }
+        if (typeof db !== 'undefined' && db && typeof db.setAuditUserId === 'function') {
+            db.setAuditUserId(_activeSession.id);
+        }
+        return fn(e, ...args);
+    };
+}
 // ──────────────────────────────────────────────────────────────────────────────
 
 async function _getHWID() {
@@ -297,6 +418,7 @@ const syncEngine = require('./syncEngine.cjs');
 const zatcaPhase2 = require('./zatca_phase2_impl.cjs');
 const zatcaReporter = require('./zatca_reporter.cjs');
 const compliance   = require('./compliance_sa.cjs');
+const menuServer   = require('./menuServer.cjs');
 
 if (!app) { console.error('FATAL: Electron app object undefined.'); process.exit(1); }
 
@@ -308,14 +430,49 @@ let posWindow = null; // Dedicated POS window (optional second window)
 
 function registerIpcHandlers() {
     registerZatcaHandlers(db);
+    
+    ipcMain.on('loyalty-signup', (event, phone) => {
+      console.log('[Loyalty] Signup request:', phone);
+      // Forward to main window if needed
+      if (global.mainWindow) global.mainWindow.webContents.send('loyalty:signup', phone);
+    });
+
+    // ── QR Web Order Handlers ──────────────────────────────
+    ipcMain.handle('menu:getPublicUrl', () => menuServer.getPublicUrl());
+    ipcMain.handle('menu:getTunnelStatus', () => menuServer.getTunnelStatus());
+    ipcMain.handle('webOrder:getAll', (e, status) => db.getWebOrders(status));
+    ipcMain.handle('webOrder:getById', (e, id) => db.getWebOrderById(id));
+    ipcMain.handle('webOrder:accept', (e, id) => {
+        db.updateWebOrderStatus(id, 'accepted');
+        const heldId = db.convertWebOrderToHeldOrder(id);
+        return { success: true, heldOrderId: heldId };
+    });
+    ipcMain.handle('webOrder:reject', (e, id, reason) => {
+        db.updateWebOrderStatus(id, 'rejected', reason);
+        return { success: true };
+    });
+    ipcMain.handle('webOrder:markReady', (e, id) => {
+        db.updateWebOrderStatus(id, 'ready');
+        return { success: true };
+    });
+    ipcMain.handle('webOrder:markServed', (e, id) => {
+        db.updateWebOrderStatus(id, 'served');
+        return { success: true };
+    });
+    ipcMain.handle('webOrder:getPendingCount', () => db.getWebOrderCountByStatus('pending'));
+
     // ── Products ───────────────────────────────────────
     ipcMain.handle('db:getMenu',           ()       => db.getMenu());
     ipcMain.handle('db:addMenuItem',       _gated((e, d)   => db.addItem(d)));
     ipcMain.handle('db:editMenuItem',      _gated((e, d)   => db.editItem(d)));
     ipcMain.handle('db:deleteMenuItem',    _gated((e, id)  => db.deleteItem(id)));
+    ipcMain.handle('db:toggleProductActive', (e, id) => db.toggleProductActive(id));
+    ipcMain.handle('db:duplicateProduct', (e, id) => db.duplicateProduct(id));
     ipcMain.handle('db:updateStock',       _gated((e, d)   => db.updateStock(d?.id, d?.newStock)));
     ipcMain.handle('db:updateProductCost', _gated((e, d)   => db.updateProductCost(d?.id, d?.newCost)));
     ipcMain.handle('db:importCSV',         (e, p)   => db.importProductsFromCSV(p));
+    ipcMain.handle('db:getGlobalCatalog',  (e, f)   => db.getGlobalCatalog(f));
+    ipcMain.handle('db:getGlobalCatalogCategories', () => db.getGlobalCatalogCategories());
 
     // ── Held Orders ────────────────────────────────────
     ipcMain.handle('db:getHeldOrders',     ()       => db.getHeldOrders());
@@ -343,10 +500,17 @@ function registerIpcHandlers() {
             return { success: false, error: err.message };
         }
     }));
-    ipcMain.handle('db:voidSale',          _gated((e, d)   => db.voidSale(d?.invoiceId, d?.reason)));
+    ipcMain.handle('db:voidSale',          _requireRole(['admin', 'manager'], (e, d) => db.voidSale(d?.invoiceId, d?.reason)));
     ipcMain.handle('db:getSalesHistory',   (e, f)   => db.getSalesHistory(f));
     ipcMain.handle('db:getSaleByInvoice',  (e, id)  => db.getSaleByInvoice(id));
     ipcMain.handle('db:updateSaleStatus',  (e, d)   => db.updateSaleStatus(d?.invoiceId, d?.status));
+    ipcMain.handle('db:correctPaymentMethod', _requireRole(['admin', 'manager'], (e, d) => {
+        try {
+            return db.correctPaymentMethod(d.invoiceId, d.newMethod, d.staffId || _activeSession?.id);
+        } catch(err) {
+            return { success: false, error: err.message };
+        }
+    }));
     ipcMain.handle('db:exportSalesCSV',    (e, f)   => db.exportSalesCSV(f));
 
     // ── Expenditures ───────────────────────────────────
@@ -354,6 +518,7 @@ function registerIpcHandlers() {
     ipcMain.handle('db:editExpenditure',   _gated((e, d)   => db.editExpenditure(d)));
     ipcMain.handle('db:deleteExpenditure', _gated((e, id)  => db.deleteExpenditure(id)));
     ipcMain.handle('db:getExpenditures',   (e, f)   => db.getExpenditures(f));
+    ipcMain.handle('db:getExpenseSupplierSuggestions', () => db.getExpenseSupplierSuggestions());
 
     // ── Reports ────────────────────────────────────────
     ipcMain.handle('db:getFinancialReport',   (e, r) => db.getFinancialReport(r));
@@ -364,7 +529,7 @@ function registerIpcHandlers() {
 
     // ── Settings ───────────────────────────────────────
     ipcMain.handle('settings:get',  ()      => db.getSettings());
-    ipcMain.handle('settings:save', (e, d)  => db.saveSettings(d));
+    ipcMain.handle('settings:save', _requireRole(['admin'], (e, d) => db.saveSettings(d)));
 
     // ── Accounting ─────────────────────────────────────
     ipcMain.handle('db:getAccounts',      ()      => db.getAccounts());
@@ -386,8 +551,8 @@ function registerIpcHandlers() {
     ipcMain.handle('acct:addAccountNew',          _gated((e, d) => { try { return db.addAccountNew(d); } catch(err) { return { success: false, error: err.message }; } }));
     ipcMain.handle('acct:getPeriods',             () => { try { return db.getPeriods(); } catch(_) { return []; } });
     ipcMain.handle('acct:savePeriod',             _gated((e, d) => { try { return db.savePeriod(d); } catch(err) { return { success: false, error: err.message }; } }));
-    ipcMain.handle('acct:lockPeriod',             _gated((e, d) => { try { return db.lockPeriod(d.periodId, d.lockType, d.userId); } catch(err) { return { success: false, error: err.message }; } }));
-    ipcMain.handle('acct:unlockPeriod',           _gated((e, d) => { try { return db.unlockPeriod(d.periodId); } catch(err) { return { success: false, error: err.message }; } }));
+    ipcMain.handle('acct:lockPeriod',             _requireRole(['admin'], (e, d) => { try { return db.lockPeriod(d.periodId, d.lockType, d.userId || _activeSession?.id || 1); } catch(err) { return { success: false, error: err.message }; } }));
+    ipcMain.handle('acct:unlockPeriod',           _requireRole(['admin'], (e, d) => { try { return db.unlockPeriod(d.periodId); } catch(err) { return { success: false, error: err.message }; } }));
     ipcMain.handle('acct:nextJvRef',              () => { try { return db.nextJvRef(); } catch(_) { return 'JV-AUTO'; } });
 
     // ── Accounting Phase 2 & 3 IPC handlers ─────────────────────────
@@ -525,18 +690,23 @@ function registerIpcHandlers() {
         } catch(err) { return { success: false, error: err.message }; }
     }));
     // GAP-03 VAT 311 XML
-    ipcMain.handle('compliance:exportVAT311', _gated(async (e, d) => {
+    ipcMain.handle('compliance:exportVAT311', async (e, d) => {
         try {
-            const xmlContent = compliance.generateVAT311XML(d.startDate, d.endDate);
+            const sDate = d?.startDate || d?.period_start || new Date().toISOString().split('T')[0];
+            const eDate = d?.endDate || d?.period_end || new Date().toISOString().split('T')[0];
+            const xmlContent = compliance.generateVAT311XML(sDate, eDate);
             const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-                defaultPath: `VAT311_${d.startDate}_${d.endDate}.xml`,
+                defaultPath: `VAT311_${sDate}_${eDate}.xml`,
                 filters: [{ name: 'XML File', extensions: ['xml'] }]
             });
-            if (canceled || !filePath) return { success: false };
+            if (canceled || !filePath) return { success: false, canceled: true };
             fs.writeFileSync(filePath, xmlContent, 'utf8');
             return { success: true, filePath };
-        } catch(err) { return { success: false, error: err.message }; }
-    }));
+        } catch(err) {
+            console.error('exportVAT311 error:', err);
+            return { success: false, error: err.message };
+        }
+    });
     // GAP-04 AP Aging
     ipcMain.handle('compliance:getAPAging',     (e, d) => { try { return compliance.getAPAgingReport(d?.asOfDate); } catch(err) { return { error: err.message }; } });
     // GAP-05 Closing Wizard
@@ -588,21 +758,153 @@ function registerIpcHandlers() {
     ipcMain.handle('db:redeemLoyaltyPoints', _gated((e, d)  => db.redeemLoyaltyPoints(d?.customerId, d?.points)));
     ipcMain.handle('db:recordWhatsAppShare', (e, d)  => db.recordWhatsAppShare(d?.customerId, d?.invoiceId));
 
+    // ── Sponsors ───────────────────────────────────────
+    ipcMain.handle('db:getSponsors',         (e, f)  => db.getSponsors(f));
+    ipcMain.handle('db:addSponsor',          _gated((e, d)  => db.addSponsor(d)));
+    ipcMain.handle('db:updateSponsor',       _gated((e, d)  => db.updateSponsor(d)));
+    ipcMain.handle('db:deleteSponsor',       _gated((e, id) => db.deleteSponsor(id)));
+
     // ── Staff ──────────────────────────────────────────
     ipcMain.handle('db:getStaff',              ()      => db.getStaff());
-    ipcMain.handle('db:addStaff', _gated(async (e, d) => {
-        const staffRows  = db.getDbInstance().prepare('SELECT COUNT(*) as cnt FROM staff WHERE active != 0 OR active IS NULL').get();
+    ipcMain.handle('db:addStaff', _requireRole(['admin'], async (e, d) => {
+        let staffRows;
+        try {
+            staffRows = db.getDbInstance().prepare('SELECT COUNT(*) as cnt FROM staff WHERE active != 0 OR active IS NULL').get();
+        } catch(err) {
+            staffRows = db.getDbInstance().prepare('SELECT COUNT(*) as cnt FROM staff').get();
+        }
         const staffLimit = getStaffLimit(_activeLicense?.tier || 'P');
         if (staffRows.cnt >= staffLimit) {
             return { success: false, error: `STAFF_LIMIT_REACHED:${staffLimit}` };
         }
         return db.addStaff(d);
     }));
-    ipcMain.handle('db:updateStaff',           _gated((e, d)  => db.updateStaff(d)));
-    ipcMain.handle('db:deleteStaff',           _gated((e, id) => db.deleteStaff(id)));
-    ipcMain.handle('db:updateStaffPermissions',(e, d)  => db.updateStaffPermissions(d?.id, d?.perms));
-    ipcMain.handle('db:verifyStaffPin',        (e, { pin, staffId }) => db.verifyStaffPin(pin, staffId));
+    ipcMain.handle('db:updateStaff',           _requireRole(['admin'], (e, d)  => db.updateStaff(d)));
+    ipcMain.handle('db:deleteStaff',           _requireRole(['admin'], (e, id) => db.deleteStaff(id)));
+    ipcMain.handle('db:updateStaffPermissions',_requireRole(['admin'], (e, d)  => db.updateStaffPermissions(d?.id, d?.perms)));
+    ipcMain.handle('db:verifyStaffPin',        (e, { pin, staffId }) => {
+        const staff = db.verifyStaffPin(pin, staffId);
+        if (staff) {
+            _setSession(staff);
+        }
+        return staff;
+    });
+    ipcMain.handle('auth:logout',              () => {
+        _setSession(null);
+        return { success: true };
+    });
+    ipcMain.handle('auth:getCurrentSession',   () => _activeSession);
+    ipcMain.handle('auth:setSession',          (e, staff) => {
+        _setSession(staff);
+        return { success: true, session: _activeSession };
+    });
     ipcMain.handle('db:getAuditLogs',          (e, l)  => db.getAuditLogs(l));
+
+    // ── Tailor Shop ────────────────────────────────────
+    
+    ipcMain.handle('tailor:createAlteration', async (e, d) => db.createAlterationTicket(d));
+    ipcMain.handle('tailor:getAlterations', async () => db.getAlterations());
+    ipcMain.handle('tailor:updateAlterationStatus', async (e, d) => db.updateAlterationStatus(d));
+
+    ipcMain.handle('tailor:createOrder',       _gated((e, d) => { try { return db.createTailorOrder(d); } catch(err) { return { success: false, error: err.message }; } }));
+    ipcMain.handle('tailor:saveProfile',       _gated((e, d) => { try { return db.saveTailorProfile(d.customer_id, d.garment_type, d.measurements, d.status); } catch(err) { return { success: false, error: err.message }; } }));
+    ipcMain.handle('tailor:getOrderBySale',    _gated((e, id) => db.getTailorOrderBySaleInvoice(id)));
+    ipcMain.handle('tailor:getOrders',         (e, f)  => db.getTailorOrders(f));
+    ipcMain.handle('tailor:getGarments',       (e, id) => db.getTailorOrderGarments(id));
+    ipcMain.handle('tailor:updateStage',       _gated((e, d) => { try { return db.updateGarmentStage(d); } catch(err) { return { success: false, error: err.message }; } }));
+    ipcMain.handle('tailor:getMeasurements',   (e, d)  => db.getMeasurementProfiles(d));
+    ipcMain.handle('tailor:completeOrder',     _gated((e, d) => { try { return db.completeTailorOrder(d); } catch(err) { return { success: false, error: err.message }; } }));
+    ipcMain.handle('tailor:getDashboardStats', ()      => db.getTailorDashboardStats());
+    ipcMain.handle('tailor:getPayroll',        (e, d)  => db.getTailorPayroll(d));
+    ipcMain.handle('tailor:getCutterPayroll',  (e, d)  => db.getCutterPayroll(d));
+    ipcMain.handle('tailor:assignGarmentWorker', _gated((e, d) => db.assignGarmentWorker(d)));
+    ipcMain.handle('tailor:getFabricRolls',    (e, id) => db.getFabricRolls(id));
+    ipcMain.handle('tailor:addFabricRoll',     _gated((e, d) => db.addFabricRoll(d)));
+    ipcMain.handle('tailor:recordDefect',      _gated((e, d) => db.recordDefect(d)));
+    ipcMain.handle('tailor:getGarmentDefects', (e, id) => db.getGarmentDefects(id));
+    
+    // Phase 1 - New Tailor Tools
+    ipcMain.handle('tailor:getAttachments',    (e, customer_id) => db.getCustomerAttachments(customer_id));
+    ipcMain.handle('tailor:mergeCustomers',    _gated((e, d) => { try { return db.mergeCustomers(d.primary_id, d.duplicate_id); } catch(err) { return { success: false, error: err.message }; } }));
+    
+    // Category 3 Finance
+    ipcMain.handle('tailor:addPayment',        _gated((e, d) => { try { return db.addTailorPayment(d.order_id, d.amount_paid, d.payment_method); } catch(err) { return { success: false, error: err.message }; } }));
+    ipcMain.handle('tailor:refundOrder',       _requireRole(['admin', 'manager'], (e, d) => { try { return db.refundTailorOrder(d.order_id, d.is_cut, d.penalty_amount); } catch(err) { return { success: false, error: err.message }; } }));
+    
+    ipcMain.handle('tailor:saveAttachment',    _gated(async (e, d) => {
+        try {
+            const { customer_id, fileName, base64Data, notes } = d;
+            const attachmentsDir = path.join(app.getPath('userData'), 'attachments');
+            if (!fs.existsSync(attachmentsDir)) fs.mkdirSync(attachmentsDir, { recursive: true });
+            const uniqueName = Date.now() + '_' + fileName.replace(/[^a-zA-Z0-9.\-_]/g, '');
+            const filePath = path.join(attachmentsDir, uniqueName);
+            const buffer = Buffer.from(base64Data.split(',')[1] || base64Data, 'base64');
+            fs.writeFileSync(filePath, buffer);
+            return db.saveCustomerAttachment(customer_id, filePath, notes);
+        } catch(err) {
+            return { success: false, error: err.message };
+        }
+    }));
+    
+    // File Server for rendering attachments in UI securely with Path Traversal Prevention
+    ipcMain.handle('tailor:readAttachment', async (e, filePath) => {
+        try {
+            if (!filePath || typeof filePath !== 'string') {
+                return { success: false, error: 'INVALID_PATH: File path must be a non-empty string.' };
+            }
+
+            const attachmentsDir = path.resolve(app.getPath('userData'), 'attachments');
+            if (!fs.existsSync(attachmentsDir)) {
+                fs.mkdirSync(attachmentsDir, { recursive: true });
+            }
+
+            // Canonical resolution: support either relative filename or full path
+            const resolvedPath = path.isAbsolute(filePath)
+                ? path.resolve(filePath)
+                : path.resolve(attachmentsDir, filePath);
+
+            // Strict boundary check: resolvedPath MUST reside within attachmentsDir
+            const relative = path.relative(attachmentsDir, resolvedPath);
+            const isContained = !relative.startsWith('..') && !path.isAbsolute(relative);
+            if (!isContained) {
+                console.warn(`[Security Alert] Blocked directory traversal attempt: ${filePath}`);
+                return { success: false, error: 'ACCESS_DENIED: Path outside permitted attachments directory.' };
+            }
+
+            if (!fs.existsSync(resolvedPath)) {
+                return { success: false, error: 'FILE_NOT_FOUND' };
+            }
+
+            const stat = fs.statSync(resolvedPath);
+            if (!stat.isFile()) {
+                return { success: false, error: 'NOT_A_FILE' };
+            }
+
+            // Detect appropriate MIME type
+            const ext = path.extname(resolvedPath).toLowerCase();
+            const mimeTypes = {
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.gif': 'image/gif',
+                '.webp': 'image/webp',
+                '.svg': 'image/svg+xml',
+                '.pdf': 'application/pdf'
+            };
+            const mime = mimeTypes[ext] || 'application/octet-stream';
+            const data = fs.readFileSync(resolvedPath);
+
+            return {
+                success: true,
+                base64: `data:${mime};base64,${data.toString('base64')}`,
+                fileName: path.basename(resolvedPath),
+                size: stat.size,
+                mimeType: mime
+            };
+        } catch(err) {
+            return { success: false, error: err.message };
+        }
+    });
 
     // ── Suppliers ──────────────────────────────────────
     ipcMain.handle('db:getSuppliers',        ()      => db.getSuppliers());
@@ -617,6 +919,7 @@ function registerIpcHandlers() {
     // ── Stock History & Purchases ──────────────────────
     ipcMain.handle('db:getStockHistory',      (e, id) => db.getStockHistory(id));
     ipcMain.handle('db:adjustStock',          _gated((e, d)  => db.addStockAdjustment(d)));
+    ipcMain.handle('stock:movement-report',   _gated((e, d)  => db.getProductMovementReport(d.startDate, d.endDate)));
     ipcMain.handle('db:getPurchaseOrders',    ()      => db.getPurchaseOrders());
     ipcMain.handle('db:createPurchaseOrder',  _gated((e, d)  => db.createPurchaseOrder(d)));
     ipcMain.handle('db:updatePurchaseOrder',  _gated((e, id, d) => db.updatePurchaseOrder(id, d)));
@@ -654,6 +957,38 @@ function registerIpcHandlers() {
             properties: ['openFile']
         });
         return canceled || !filePaths.length ? null : filePaths[0];
+    });
+
+    ipcMain.handle('ai:processInvoice', async (e, filePath) => {
+        const local_ai = require('./local_ai.cjs');
+        return await local_ai.processInvoiceFile(filePath);
+    });
+
+    // ── Assistant NLP Handlers ─────────────────────────────────────
+    ipcMain.handle('assistant:chat', async (e, message) => {
+        const { nlpEngine } = require('./local_ai_nlp.cjs');
+        const executor = require('./assistant-executor.cjs');
+        
+        const nlpResult = await nlpEngine.processMessage(message);
+        if (nlpResult.intent === 'None') {
+            return { status: 'unknown', message: nlpResult.answer || 'عذراً، لم أفهم طلبك بدقة.' };
+        }
+        
+        const result = await executor.executeIntent(nlpResult.intent, nlpResult.entities, message);
+        if (result.status === 'success' && !result.message && nlpResult.answer) {
+            result.message = nlpResult.answer;
+        }
+        return result;
+    });
+
+    ipcMain.handle('assistant:confirmAction', async (e, actionId) => {
+        const executor = require('./assistant-executor.cjs');
+        return await executor.confirmAction(actionId);
+    });
+
+    ipcMain.handle('assistant:cancelAction', async (e, actionId) => {
+        const executor = require('./assistant-executor.cjs');
+        return executor.cancelAction(actionId);
     });
 
     ipcMain.handle('dialog:saveFile', async (e, { filename, content, mime }) => {
@@ -724,6 +1059,17 @@ function registerIpcHandlers() {
             `);
             win.webContents.print({ silent: false, printBackground: true }, () => win.close());
         } catch (err) { console.error('Print Error:', err); }
+    });
+
+    ipcMain.handle('printHTMLSilent', async (e, { html, printerName }) => {
+        try {
+            const win = new BrowserWindow({ show: false, webPreferences: { contextIsolation: true, webSecurity: false }});
+            await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+            await win.webContents.executeJavaScript(`new Promise(r => setTimeout(r, 500))`);
+            const opts = { silent: true, printBackground: true };
+            if (printerName) opts.deviceName = printerName;
+            win.webContents.print(opts, () => win.close());
+        } catch (err) { console.error('Silent Print Error:', err); }
     });
 
     ipcMain.handle('zatca:generateQR', async (e, base64TLV) => {
@@ -815,6 +1161,71 @@ function registerIpcHandlers() {
 
     // ── ZATCA Phase 2 ──────────────────────────────────
     ipcMain.handle('zatca:getDevice', () => db.getZatcaDevice());
+
+    // ── [DEV-ONLY] Safe Re-onboard Reset ───────────────────────────────────────
+    // Exposed ONLY through the 5-click developer gate in Settings.jsx.
+    // Safety contract:
+    //   ✅ Archives current private_key_pem + production_cert_pem into _backup columns
+    //   ✅ Clears compliance_csid, production_csid, production_cert_pem,
+    //      onboarding_complete so a fresh onboarding cycle can start
+    //   ✅ Adds backup columns with ALTER IF NOT EXISTS (idempotent)
+    //   ❌ NEVER touches: current_icv, zatca_queue table, sales table, business_settings
+    //   This means in-flight/pending invoices in the queue will fail with the old cert
+    //   until re-onboarding completes and the new cert replaces it — which is expected
+    //   and safe; they will be retried automatically once the new production cert is live.
+    ipcMain.handle('zatca:devResetForReonboard', () => {
+        try {
+            const database = db.getDbInstance();
+            const device = database.prepare('SELECT * FROM zatca_device LIMIT 1').get();
+            if (!device) {
+                return { success: false, error: 'No device record found — nothing to reset.' };
+            }
+
+            // Ensure backup columns exist (idempotent ALTER TABLE)
+            const safeAlter = (sql) => { try { database.prepare(sql).run(); } catch (_) {} };
+            safeAlter('ALTER TABLE zatca_device ADD COLUMN _backup_private_key_pem   TEXT');
+            safeAlter('ALTER TABLE zatca_device ADD COLUMN _backup_production_cert_pem TEXT');
+            safeAlter('ALTER TABLE zatca_device ADD COLUMN _backup_compliance_csid   TEXT');
+            safeAlter('ALTER TABLE zatca_device ADD COLUMN _backup_production_csid   TEXT');
+            safeAlter('ALTER TABLE zatca_device ADD COLUMN _backup_reset_at          TEXT');
+
+            // Snapshot current credentials before clearing
+            database.prepare(`
+                UPDATE zatca_device SET
+                    _backup_private_key_pem    = private_key_pem,
+                    _backup_production_cert_pem= production_cert_pem,
+                    _backup_compliance_csid    = compliance_csid,
+                    _backup_production_csid    = production_csid,
+                    _backup_reset_at           = ?
+                WHERE id = ?
+            `).run(new Date().toISOString(), device.id);
+
+            // Clear onboarding state — leave keys for reference but wipe CSID/cert
+            database.prepare(`
+                UPDATE zatca_device SET
+                    compliance_csid      = NULL,
+                    compliance_secret    = NULL,
+                    production_csid      = NULL,
+                    production_cert_pem  = NULL,
+                    cert_expires_at      = NULL,
+                    onboarding_complete  = 0,
+                    status               = 'RESET_FOR_REONBOARD'
+                WHERE id = ?
+            `).run(device.id);
+
+            console.log('[ZATCA][DEV] Safe re-onboard reset completed. Backup saved. Onboarding state cleared.');
+            return {
+                success: true,
+                message: 'تم إعادة تعيين حالة التهيئة بأمان. يمكنك الآن إعادة التأهيل بشهادة جديدة.',
+                backedUpAt: new Date().toISOString(),
+                clearedFields: ['compliance_csid', 'production_csid', 'production_cert_pem', 'cert_expires_at', 'onboarding_complete'],
+                preserved: ['current_icv', 'zatca_queue', 'sales'],
+            };
+        } catch (err) {
+            console.error('[ZATCA][DEV] devResetForReonboard error:', err);
+            return { success: false, error: err.message };
+        }
+    });
     ipcMain.handle('zatca:getQueueStatus', () => zatcaReporter.getQueueStatus());
     ipcMain.handle('zatca:retryQueue', () => zatcaReporter.retryFailed());
     ipcMain.handle('zatca:resumeQueue', () => zatcaReporter.resumeQueue());
@@ -1006,12 +1417,18 @@ function registerIpcHandlers() {
             // [FIX-ENV-STRING] Pass the actual environment string — not a boolean.
             // Boolean `true` mapped correctly to 'sandbox', but `false` always mapped
             // to 'production', breaking 'simulation' entirely.
-            const zatcaEnv = settings.zatca_env || 'sandbox';
-            const crypto = require('crypto');
-            const pubKey = crypto.createPublicKey(device.private_key_pem);
-            const pubKeyPem = pubKey.export({ type: 'spki', format: 'pem' });
-            const { csrBase64, csrPem } = zatcaPhase2.generateCSR(
-                device.private_key_pem, pubKeyPem,
+            // [FIX-CORE-ALIAS] The UI stores production as 'core' (Settings.jsx ZATCA_ENVS).
+            // Normalize it to 'production' here so all downstream functions get a valid key.
+            const rawZatcaEnv = settings.zatca_env || 'production';
+            const zatcaEnv = (rawZatcaEnv === 'core') ? 'production' : rawZatcaEnv;
+            // [FIX-CSR-KEY-CAPTURE] generateCSR() generates its OWN secp256k1 keypair
+            // internally via the OpenSSL CLI (Electron's BoringSSL can't handle secp256k1),
+            // and its returned CSR is built from that key — NOT from the keys
+            // passed in as arguments. Previously, we passed the old keys parsed via 
+            // crypto.createPublicKey which threw OPENSSL_internal:DECODE_ERROR on 
+            // secp256k1 keys. Since generateCSR ignores them anyway, we pass null.
+            const { csrBase64, csrPem, privateKeyPem: csrPrivateKeyPem, publicKeyPem: csrPublicKeyPem } = zatcaPhase2.generateCSR(
+                null, null,
                 { EGS_SN: device.device_id || 'POS-01', UID: settings.vat_number,
                   ORG: settings.business_name_ar, 
                   OU: settings.zatca_ou || 'Head Office', 
@@ -1021,7 +1438,11 @@ function registerIpcHandlers() {
                   title: settings.zatca_invoice_type || '1100',
                   address: settings.address_city || settings.city || 'Riyadh' }
             );
-            db.updateZatcaDevice({ id: device.id, csr_pem: csrPem });
+            db.updateZatcaDevice({ id: device.id, csr_pem: csrPem, private_key_pem: csrPrivateKeyPem });
+            // Refresh the local device object so runComplianceInvoiceChecklist() below
+            // (and any other code in this handler) signs with the key that actually
+            // matches the CSR/certificate, not the stale prime256v1 key.
+            device = db.getZatcaDevice();
             const compCsid = await zatcaPhase2.issueComplianceCSID(csrBase64, otp, zatcaEnv);
             if (compCsid.error) return { success: false, error: 'Compliance CSID Failed', details: compCsid.data };
             db.updateZatcaDevice({ id: device.id, compliance_csid: JSON.stringify(compCsid) });
@@ -1033,7 +1454,7 @@ function registerIpcHandlers() {
             // Skipping this step causes production CSID issuance to be rejected
             // (or — worse — silently issued against an EGS ZATCA considers untested).
             const complianceCheck = await runComplianceInvoiceChecklist({
-                device, settings, compCsid, isSandbox: zatcaEnv !== 'production',
+                device, settings, compCsid, zatcaEnv
             });
             console.log('[ZATCA] FULL_COMPLIANCE_RESPONSE:\\n' + JSON.stringify(complianceCheck, null, 2));
             if (!complianceCheck.allPassed) {
@@ -1051,9 +1472,9 @@ function registerIpcHandlers() {
             try {
                 const innerBase64 = Buffer.from(prodCsid.binarySecurityToken, 'base64').toString('utf8').replace(/\s+/g, '');
                 const certPem = `-----BEGIN CERTIFICATE-----\n${(innerBase64.match(/.{1,64}/g) || []).join('\n')}\n-----END CERTIFICATE-----`;
-                const forge = require('node-forge');
-                const certObj = forge.pki.certificateFromPem(certPem);
-                certExpiresAt = certObj.validity.notAfter.toISOString();
+                const crypto = require('crypto');
+                const certObj = new crypto.X509Certificate(certPem);
+                certExpiresAt = new Date(certObj.validTo).toISOString();
             } catch (certParseErr) {
                 console.warn('[ZATCA] Could not parse cert notAfter:', certParseErr.message);
             }
@@ -1064,14 +1485,35 @@ function registerIpcHandlers() {
                 cert_expires_at: certExpiresAt,
             });
             return { success: true, certExpiresAt };
-        } catch (err) { return { success: false, error: err.message }; }
+        } catch (err) { 
+            return { success: false, error: 'حدث خطأ أثناء التأهيل: ' + err.message }; 
+        }
+    });
+
+    ipcMain.handle('zatca-dev-reset-for-reonboard', async (e) => {
+        try {
+            const device = db.getZatcaDevice();
+            if (!device) return { success: false, error: 'No ZATCA device found.' };
+            
+            const database = db.getDbInstance();
+            const stmt = database.prepare(`
+                UPDATE zatca_device 
+                SET compliance_csid = NULL,
+                    production_csid = NULL,
+                    csr_pem = NULL
+                WHERE id = ?
+            `);
+            stmt.run(device.id);
+            return { success: true, message: 'تم إعادة تعيين حالة التهيئة بأمان.' };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
     });
 
     ipcMain.handle('zatca:getClearanceStatus', (e, saleId) => {
         try {
             const database = db.getDbInstance();
-            try { database.prepare('ALTER TABLE sales ADD COLUMN zatca_clearance_status TEXT').run(); } catch (_) {}
-            try { database.prepare('ALTER TABLE sales ADD COLUMN zatca_cleared_at TEXT').run(); } catch (_) {}
+
             const row = database.prepare(
                 'SELECT zatca_clearance_status, zatca_cleared_at, customer_tax_id FROM sales WHERE id = ?'
             ).get(saleId);
@@ -1287,7 +1729,7 @@ async function window_api_saveSettings_stub(dbModule, data) {
 // (the functions actually exported by zatca_phase2.cjs). zatca:runSimulationTests
 // previously referenced the non-existent signXMLHash/buildSignatureEnvelope —
 // that has since been fixed to use the same signInvoiceXML()-based path.
-async function runComplianceInvoiceChecklist({ device, settings, compCsid, isSandbox }) {
+async function runComplianceInvoiceChecklist({ device, settings, compCsid, zatcaEnv }) {
     console.log('[ZATCA] QR-FIX-V2-ACTIVE — runComplianceInvoiceChecklist entered via main.cjs, zatcaPhase2 = ./zatca_phase2_impl.cjs');
     const results = [];
     const cryptoMod = require('crypto');
@@ -1325,7 +1767,7 @@ async function runComplianceInvoiceChecklist({ device, settings, compCsid, isSan
 
             const response = await zatcaPhase2.checkComplianceInvoice(
                 invoiceHashBase64, xmlBase64, uuid,
-                compCsid.binarySecurityToken, compCsid.secret, isSandbox
+                compCsid.binarySecurityToken, compCsid.secret, zatcaEnv
             );
             const passed = !response.error && (response.validationResults?.status === 'PASS' || response.validationResults?.status === 'WARNING' || response.reportingStatus === 'REPORTED' || response.clearanceStatus === 'CLEARED');
             results.push({ label, passed, details: response.error ? (response.data || response) : (response.validationResults || { status: 'PASS' }) });
@@ -1361,20 +1803,40 @@ async function runComplianceInvoiceChecklist({ device, settings, compCsid, isSan
         subtype: '0100000',
         buyer: { vatNo: '300000000000003', name: 'Test Buyer', street: 'شارع', building: '1111', district: 'حي', city: 'الرياض', postal: '12345', country: 'SA' },
     });
-    await runOne('Credit Note 381', {
+    // B2C Simplified Credit Note
+    await runOne('B2C Simplified Credit Note 381', {
         ...baseInvoice,
-        invoice: { id: `COMPLY-CN-${Date.now()}` },
+        invoice: { id: `COMPLY-CNB2C-${Date.now()}` },
         typeCode: '381',
-        subtype: '0100000',
         billingRef: cryptoMod.randomUUID(),
         total: '115.00',
         items: [{ Name: 'Return', Qty: 1, Price: 115, Unit: 'PCE', tax_category: 'S' }],
     });
-    await runOne('Debit Note 383', {
+    // B2C Simplified Debit Note
+    await runOne('B2C Simplified Debit Note 383', {
         ...baseInvoice,
-        invoice: { id: `COMPLY-DN-${Date.now()}` },
+        invoice: { id: `COMPLY-DNB2C-${Date.now()}` },
         typeCode: '383',
-        subtype: '0100000',
+        billingRef: cryptoMod.randomUUID(),
+        total: '115.00',
+        items: [{ Name: 'Adjustment', Qty: 1, Price: 115, Unit: 'PCE', tax_category: 'S' }],
+    });
+    // B2B Standard Credit Note
+    await runOne('B2B Standard Credit Note 381', {
+        ...baseInvoice,
+        invoice: { id: `COMPLY-CNB2B-${Date.now()}` },
+        typeCode: '381',
+        buyer: { vatNo: '300000000000003', name: 'Test Buyer', street: 'شارع', building: '1111', district: 'حي', city: 'الرياض', postal: '12345', country: 'SA' },
+        billingRef: cryptoMod.randomUUID(),
+        total: '115.00',
+        items: [{ Name: 'Return', Qty: 1, Price: 115, Unit: 'PCE', tax_category: 'S' }],
+    });
+    // B2B Standard Debit Note
+    await runOne('B2B Standard Debit Note 383', {
+        ...baseInvoice,
+        invoice: { id: `COMPLY-DNB2B-${Date.now()}` },
+        typeCode: '383',
+        buyer: { vatNo: '300000000000003', name: 'Test Buyer', street: 'شارع', building: '1111', district: 'حي', city: 'الرياض', postal: '12345', country: 'SA' },
         billingRef: cryptoMod.randomUUID(),
         total: '115.00',
         items: [{ Name: 'Adjustment', Qty: 1, Price: 115, Unit: 'PCE', tax_category: 'S' }],
@@ -1397,20 +1859,33 @@ function createMainWindow() {
     if (process.env.NODE_ENV === 'development') {
         mainWindow.loadURL('http://localhost:5173');
     } else {
-        mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+        global.mainWindow = mainWindow;
+    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
     }
     mainWindow.on('ready-to-show', () => mainWindow.show());
     mainWindow.on('closed', () => { mainWindow = null; });
 }
 
 app.whenReady().then(() => {
+    if (zatcaPhase2.checkOpenSSLAvailability && !zatcaPhase2.checkOpenSSLAvailability()) {
+        const { dialog } = require('electron');
+        dialog.showErrorBox(
+            'Missing Dependency: OpenSSL',
+            'OpenSSL is required for ZATCA Phase 2 but was not found.\n\nPlease install Git for Windows or OpenSSL for Windows, or ensure openssl.exe is placed in electron/vendor/openssl.'
+        );
+    }
     db.initDatabase(app.getPath('userData'));
     syncEngine.initSyncEngine(db.getDbInstance());
     compliance.initCompliance(db.getDbInstance());
     registerIpcHandlers();
     hardware.registerLabelIPC(db);   // ← Label Engine IPC (P2, P3, P7, P8, P9)
     createMainWindow();
+    menuServer.startMenuServer(mainWindow, db);
     zatcaReporter.startReporter(60000);
+
+    // Start NLP Engine
+    const { nlpEngine } = require('./local_ai_nlp.cjs');
+    nlpEngine.init().catch(e => console.error('NLP Engine init failed:', e));
 
     // ── ZATCA cert expiry daily check ─────────────────
     const checkZatcaCertExpiry = () => {
@@ -1477,3 +1952,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+
+app.on('will-quit', () => {
+    menuServer.stopMenuServer();
+});

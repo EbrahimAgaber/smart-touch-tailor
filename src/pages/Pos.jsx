@@ -229,6 +229,38 @@ export default function Pos() {
       
       navigate(location.pathname, { replace: true, state: {} });
     }
+
+    if (location.state?.tailorHandoff) {
+      const th = location.state.tailorHandoff;
+      clearCart();
+      for (const item of (th.cartItems || [])) {
+        addItem(item, []);
+      }
+      if (th.customer) setSelectedCustomer(th.customer);
+      setOrderType('tailor');
+      setOrderNote(th.orderNote || '');
+      // Setup payment values
+      setTimeout(() => {
+          if (th.depositSuggested > 0) {
+              setPayments([{ type: 'Cash', amount: th.depositSuggested.toString() }]);
+          }
+          setShowPayment(true);
+      }, 300); // small delay to let cart calc
+      navigate(location.pathname, { replace: true, state: { tailor_order_id: th.orderId } });
+    }
+
+    if (location.state?.alterationHandoff) {
+      const ah = location.state.alterationHandoff;
+      clearCart();
+      for (const item of (ah.cartItems || [])) {
+        addItem(item, []);
+      }
+      if (ah.customer) setSelectedCustomer(ah.customer);
+      setOrderType('alteration');
+      setOrderNote(ah.orderNote || '');
+      setTimeout(() => setShowPayment(true), 300);
+      navigate(location.pathname, { replace: true, state: { alteration_ticket_id: ah.ticketId } });
+    }
     
     fetchHeld();
     const interval = setInterval(fetchHeld, 15000); // 15s poll
@@ -313,7 +345,8 @@ export default function Pos() {
   const remaining   = Math.max(0, finalTotal - paidAmount);
   const change      = Math.max(0, paidAmount - finalTotal);
   const hasCredit = payments.some(p => p.type === 'Credit');
-  const canFinalize = finalTotal >= 0 && remaining <= 0.005 && (order.length > 0) && !(hasCredit && !selectedCustomer);
+  const isPartialAllowed = !!selectedCustomer;
+  const canFinalize = finalTotal >= 0 && (remaining <= 0.005 || isPartialAllowed) && (order.length > 0) && !(hasCredit && !selectedCustomer);
 
   // ── Modifiers ───────────────────────────────────────────────────
   const handleItemClick = (item) => {
@@ -451,7 +484,8 @@ export default function Pos() {
       note: orderNote,
       loyalty_points_redeemed: redeemedPtsInt,
       // Store agreed total flag for receipt rendering
-      is_agreed_total: agreedOverrideVal !== null
+      is_agreed_total: agreedOverrideVal !== null,
+      add_change_to_store_credit: document.getElementById('addChangeToCredit')?.checked || false
     };
 
     try {
@@ -477,6 +511,29 @@ export default function Pos() {
         await api.updateTable({ id: table.id, status: 'available', current_order_id: null, name: table.name, zone: '', capacity: 0 });
         setTable(null);
       }
+
+      // Mulam Pipeline Post-Sale Updates
+      if (location.state?.tailor_order_id) {
+        const tStatus = paidAmount >= finalTotal ? 'paid' : 'pending';
+        await api.tailor?.updateOrderStatus?.({
+          order_id: location.state.tailor_order_id,
+          sale_invoice_id: res.invoice || invoiceNum,
+          status: tStatus
+        }).catch(console.error);
+        
+        // Remove from router state so it doesn't trigger again on refresh
+        window.history.replaceState({}, document.title);
+      }
+      
+      if (location.state?.alteration_ticket_id) {
+        await api.tailor?.updateAlterationStatus?.({
+          ticket_id: location.state.alteration_ticket_id,
+          status: 'delivered'
+        }).catch(console.error);
+        
+        window.history.replaceState({}, document.title);
+      }
+
       setLastInvoice({ 
         ...sale, 
         invoice: res.invoice || invoiceNum, 

@@ -125,6 +125,19 @@ export default function ZatcaQueueBanner() {
           {status.lastRejectedInvoice && (
             <><br /><strong>آخر فاتورة مرفوضة:</strong> #{status.lastRejectedInvoice}</>
           )}
+          {status.lastErrorList && status.lastErrorList.length > 0 && (
+            <div style={{ marginTop: '10px', padding: '10px', background: '#fee2e2', borderRadius: '6px' }}>
+              <strong>تفاصيل الأخطاء:</strong>
+              <ul style={{ margin: '5px 0 0 0', paddingInlineStart: '20px' }}>
+                {status.lastErrorList.map((err, idx) => (
+                  <li key={idx} style={{ marginBottom: '4px' }}>
+                    {err.code && <strong>[{err.code}] </strong>}
+                    {err.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -479,11 +479,33 @@ function generatePhase2QR(seller, vatNo, timestamp, total, vatAmt, hashB64, sigB
     return Buffer.concat(parts).toString('base64');
 }
 
+// generateZatcaTLV9 — thin wrapper around generatePhase2QR (same 9-tag TLV
+// builder, same tlvEncodeFixed encoding). Added because main.cjs's
+// 'zatca:getTLV' and 'zatca:getTLV9' IPC handlers both call a function named
+// generateZatcaTLV9 that was never defined here, causing every receipt QR
+// build (and therefore the whole print flow) to throw
+// "generateZatcaTLV9 is not a function" and abort.
+// Accepts BOTH calling conventions already in use in main.cjs:
+//   - positional: generateZatcaTLV9(seller, vatNo, timestamp, total, vatAmt, hashB64, sigB64, pubKeyB64, certSigB64)
+//   - options object: generateZatcaTLV9({ seller, vatNo, timestamp, total, vatAmt, xmlHash, ecdsaSig, pubKeyPem, certSignature })
+function generateZatcaTLV9(sellerOrOpts, vatNo, timestamp, total, vatAmt, hashB64, sigB64, pubKeyB64, certSigB64) {
+    if (sellerOrOpts && typeof sellerOrOpts === 'object') {
+        const o = sellerOrOpts;
+        return generatePhase2QR(
+            o.seller, o.vatNo, o.timestamp, o.total, o.vatAmt,
+            o.xmlHash ?? o.hashB64, o.ecdsaSig ?? o.sigB64,
+            o.pubKeyPem ?? o.pubKeyB64, o.certSignature ?? o.certSigB64
+        );
+    }
+    return generatePhase2QR(sellerOrOpts, vatNo, timestamp, total, vatAmt, hashB64, sigB64, pubKeyB64, certSigB64);
+}
+
 module.exports = {
     generateUUID,
     generateUBL21XML,
     escapeXml,
     generateZatcaTLV,
     generatePhase2QR,
+    generateZatcaTLV9,
     resolveUnitCode,
 };

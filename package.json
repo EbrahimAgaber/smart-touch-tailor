@@ -1,13 +1,13 @@
 {
   "name": "smart-touch-pos",
   "private": true,
-  "version": "1.0.14",
+  "version": "1.8.5",
   "description": "البصمة الذكية - نظام إدارة نقاط البيع المتطور",
   "productName": "البصمة الذكية",
   "main": "electron/main.cjs",
   "repository": {
     "type": "git",
-    "url": "https://github.com/EbrahimAgaber/smart-touch-pos.git"
+    "url": "git+https://github.com/EbrahimAgaber/smart-touch-pos.git"
   },
   "scripts": {
     "dev": "vite",
@@ -21,7 +21,8 @@
     "reset": "npm run kill && rimraf node_modules/.vite dist dist-electron && npm run dev",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite build && cross-env NODE_ENV=production electron .",
-    "dist": "npm run clean && npm run build && electron-builder"
+    "dist": "npm run clean && npm run build && electron-builder",
+    "postinstall": "electron-builder install-app-deps"
   },
   "build": {
     "appId": "com.albasma.smarttouch",
@@ -34,10 +35,25 @@
       "electron/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "electron/vendor/openssl/${arch}",
+        "to": "openssl",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
     "win": {
       "icon": "public/icon.ico",
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        }
       ],
       "artifactName": "Setup.${version}.${ext}"
     },
@@ -69,8 +85,12 @@
     "i18next": "^26.3.1",
     "i18next-browser-languagedetector": "^8.2.1",
     "jsbarcode": "^3.12.3",
+    "localtunnel": "^2.0.2",
     "lucide-react": "^0.383.0",
     "node-forge": "^1.4.0",
+    "node-nlp": "^5.0.0-alpha.5",
+    "pdf-parse": "^1.1.1",
+    "playwright": "^1.62.1",
     "qrcode": "^1.5.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -90,7 +110,7 @@
     "autoprefixer": "^10.5.0",
     "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
-    "electron": "^29.4.6",
+    "electron": "^22.3.27",
     "electron-builder": "^26.8.1",
     "eslint": "^8.45.0",
     "eslint-plugin-react": "^7.32.2",
@@ -102,5 +122,14 @@
     "tailwindcss": "^4.2.4",
     "vite": "^4.4.5",
     "wait-on": "^7.2.0"
-  }
+  },
+  "directories": {
+    "test": "tests"
+  },
+  "keywords": [],
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/EbrahimAgaber/smart-touch-pos/issues"
+  },
+  "homepage": "https://github.com/EbrahimAgaber/smart-touch-pos#readme"
 }

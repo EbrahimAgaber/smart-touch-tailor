@@ -113,6 +113,7 @@ export default function Stock() {
            <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
              <div style={{ display:'flex', background:'#f1f5f9', padding:'4px', borderRadius:'14px', marginRight:'10px' }}>
                 <button onClick={() => setActiveTab('inventory')} style={{ ...tabBtn, background: activeTab==='inventory' ? 'white' : 'transparent', boxShadow: activeTab==='inventory' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>{t('stock.tabs.inventory')}</button>
+                <button onClick={() => setActiveTab('movement_report')} style={{ ...tabBtn, background: activeTab==='movement_report' ? 'white' : 'transparent', boxShadow: activeTab==='movement_report' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>تقرير حركة المنتجات</button>
                 <button onClick={() => setActiveTab('margin_audit')} style={{ ...tabBtn, background: activeTab==='margin_audit' ? 'white' : 'transparent', boxShadow: activeTab==='margin_audit' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>{t('stock.tabs.margin_audit')}</button>
              </div>
              <button onClick={() => navigate('/settings')} style={{ ...primaryBtnStyle, background:'var(--bg-card)', color:'var(--text-muted)', border:'1px solid #e2e8f0' }}>
@@ -126,6 +127,8 @@ export default function Stock() {
 
         {activeTab === 'inventory' ? (
           <InventoryView loading={loading} filtered={filtered} onEdit={handleEditRedirect} onDelete={handleDelete} onHistory={openHistory} onPrint={setLabelProduct} t={t} />
+        ) : activeTab === 'movement_report' ? (
+          <MovementReportView />
         ) : (
           <MarginAuditView loading={loading} products={products} onEdit={handleEditRedirect} t={t} />
         )}
@@ -407,3 +410,146 @@ const modalStyle = {
   background:'var(--bg-card)', width:'100%', maxWidth:'600px', borderRadius:'32px', padding:'32px',
   boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)', direction:'rtl'
 };
+
+function MovementReportView() {
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [movements, setMovements] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchMovements();
+  }, [startDate, endDate]);
+
+  const fetchMovements = async () => {
+    setLoading(true);
+    try {
+      const data = await window.api.getProductMovementReport({ startDate, endDate });
+      setMovements(data || []);
+    } catch (e) {
+      console.error(e);
+    }
+    setLoading(false);
+  };
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    const html = `
+      <html dir="rtl">
+      <head>
+        <meta charset="utf-8">
+        <title>تقرير حركة المنتجات</title>
+        <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+        <style>
+          body { font-family: 'Tajawal', sans-serif; padding: 20px; font-size: 14px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: right; }
+          th { background: #f8fafc; font-weight: 800; }
+          .header { text-align: center; margin-bottom: 20px; }
+          .header h2 { margin: 0 0 10px 0; font-weight: 900; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h2>تقرير حركة المنتجات</h2>
+          <p style="color:#64748b; font-weight:700;">من: ${startDate} إلى: ${endDate}</p>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>المنتج</th>
+              <th>القسم</th>
+              <th>الكمية المباعة</th>
+              <th>إجمالي الإيرادات</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${movements.map(m => `
+              <tr>
+                <td style="font-weight:700;">${m.product_name}</td>
+                <td style="color:#64748b;">${m.category}</td>
+                <td style="font-weight:800; color:#3b82f6;">${m.total_qty_sold}</td>
+                <td style="font-weight:700;">${Number(m.total_revenue).toFixed(2)} SAR</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 500);
+  };
+
+  const mostSold = movements.length > 0 ? movements[0] : null;
+  const leastSold = movements.length > 0 ? movements[movements.length - 1] : null;
+  const totalQty = movements.reduce((sum, m) => sum + m.total_qty_sold, 0);
+  const totalRev = movements.reduce((sum, m) => sum + m.total_revenue, 0);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, minHeight: 0, overflowY: 'auto', paddingRight:'5px' }}>
+      <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', background: 'var(--bg-card)', padding: '20px', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <label style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: '700' }}>من تاريخ</label>
+          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontFamily:'inherit', outline:'none' }} />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <label style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: '700' }}>إلى تاريخ</label>
+          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontFamily:'inherit', outline:'none' }} />
+        </div>
+        <button onClick={handlePrint} style={{ padding: '12px 24px', borderRadius: '14px', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: '700', fontFamily:'inherit', display:'flex', alignItems:'center', gap:'8px' }}>
+          طباعة التقرير
+        </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+        <div style={{ background: '#ecfdf5', padding: '20px', borderRadius: '20px', border: '1px solid #a7f3d0' }}>
+          <div style={{ fontSize: '13px', color: '#047857', fontWeight: '700' }}>الأكثر مبيعاً</div>
+          <div style={{ fontSize: '16px', fontWeight: '800', color: '#064e3b', marginTop: '8px' }}>{mostSold ? `${mostSold.product_name} (${mostSold.total_qty_sold})` : '-'}</div>
+        </div>
+        <div style={{ background: '#fef2f2', padding: '20px', borderRadius: '20px', border: '1px solid #fecaca' }}>
+          <div style={{ fontSize: '13px', color: '#b91c1c', fontWeight: '700' }}>الأقل مبيعاً</div>
+          <div style={{ fontSize: '16px', fontWeight: '800', color: '#7f1d1d', marginTop: '8px' }}>{leastSold ? `${leastSold.product_name} (${leastSold.total_qty_sold})` : '-'}</div>
+        </div>
+        <div style={{ background: '#eff6ff', padding: '20px', borderRadius: '20px', border: '1px solid #bfdbfe' }}>
+          <div style={{ fontSize: '13px', color: '#1d4ed8', fontWeight: '700' }}>إجمالي الكميات المباعة</div>
+          <div style={{ fontSize: '20px', fontWeight: '900', color: '#1e3a8a', marginTop: '8px' }}>{totalQty}</div>
+        </div>
+        <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '13px', color: '#475569', fontWeight: '700' }}>إجمالي الإيرادات</div>
+          <div style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', marginTop: '8px' }}>{totalRev.toFixed(2)} SAR</div>
+        </div>
+      </div>
+
+      <div style={{ background: 'var(--bg-card)', borderRadius: '24px', border: '1px solid #f1f5f9', overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+          <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+            <tr>
+              <th style={{ padding: '16px 20px', fontSize: '13px', color: '#64748b' }}>المنتج</th>
+              <th style={{ padding: '16px 20px', fontSize: '13px', color: '#64748b' }}>القسم</th>
+              <th style={{ padding: '16px 20px', fontSize: '13px', color: '#64748b' }}>الكمية المباعة</th>
+              <th style={{ padding: '16px 20px', fontSize: '13px', color: '#64748b' }}>إجمالي الإيرادات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan="4" style={{ textAlign: 'center', padding: '40px', color:'var(--text-muted)' }}>جاري التحميل...</td></tr>
+            ) : movements.length === 0 ? (
+              <tr><td colSpan="4" style={{ textAlign: 'center', padding: '40px', color:'var(--text-muted)' }}>لا توجد بيانات لهذه الفترة</td></tr>
+            ) : (
+              movements.map((m, i) => (
+                <tr key={m.product_id} style={{ borderBottom: i === movements.length - 1 ? 'none' : '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '16px 20px', fontWeight: '700' }}>{m.product_name}</td>
+                  <td style={{ padding: '16px 20px', color: '#64748b', fontSize: '13px' }}>{m.category}</td>
+                  <td style={{ padding: '16px 20px', fontWeight: '800', color: '#3b82f6' }}>{m.total_qty_sold}</td>
+                  <td style={{ padding: '16px 20px', fontWeight: '700' }}>{Number(m.total_revenue).toFixed(2)} SAR</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

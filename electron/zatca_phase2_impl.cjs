@@ -30,8 +30,12 @@ const ZATCA_URLS = {
 
 function _resolveEnv(env) {
     if (typeof env === 'boolean') return env ? 'sandbox' : 'production';
-    if (env === 'sandbox' || env === 'simulation' || env === 'production') return env;
-    return 'production';
+    if (env === 'sandbox') return 'sandbox';
+    if (env === 'simulation') return 'simulation';
+    // 'core' is the UI-side alias for production (matches ZATCA_URLS key 'production').
+    // Must be explicit — the old else-fallthrough was technically correct but fragile.
+    if (env === 'production' || env === 'core') return 'production';
+    return 'production'; // safe default for any unknown value
 }
 
 function getZatcaUrl(environment, endpoint) {
@@ -347,6 +351,65 @@ function generateDeviceKeyPair() {
     });
     return { privateKeyPem: privateKey, publicKeyPem: publicKey };
 }
+
+function _resolveOpenSSL() {
+    const fs = require('fs');
+    const path = require('path');
+    const { app } = require('electron');
+
+    const appPath = app ? app.getAppPath() : process.cwd();
+    let bundledDir = '';
+    let bundledPath = '';
+    if (app && app.isPackaged) {
+        bundledDir = path.join(process.resourcesPath, 'openssl');
+    } else {
+        bundledDir = path.join(appPath, 'electron', 'vendor', 'openssl', process.arch);
+    }
+    bundledPath = path.join(bundledDir, 'openssl.exe');
+
+    // [FIX-DLL-CHECK] Checking only openssl.exe's existence is not sufficient:
+    // the Git-for-Windows build is dynamically linked against msys-2.0.dll,
+    // msys-crypto-1.1.dll, and msys-ssl-1.1.dll sitting in the same folder. If
+    // the .exe is present but a DLL was left out of the vendor folder at build
+    // time, fs.existsSync(bundledPath) alone would still return true, and the
+    // real failure would only surface later as a cryptic Windows DLL-load error
+    // during actual signing/CSR generation. Verify all required DLLs are present
+    // before trusting the bundled binary.
+    // [FIX-MISSING-MSYS-Z] msys-z.dll (MSYS zlib) was missing from this list.
+    // openssl.exe from this MSYS build dynamically links against msys-z.dll in
+    // addition to the three DLLs below. Because it was omitted here, a vendor
+    // folder missing ONLY msys-z.dll was still reported 'complete', so the
+    // bundled (broken) binary was returned and used — producing a native
+    // Windows 'code execution cannot proceed because msys-z.dll was not found'
+    // dialog the first time openssl.exe actually ran (e.g. during CSR
+    // generation), instead of failing fast here with a clear diagnostic.
+    const REQUIRED_DLLS = ['msys-2.0.dll', 'msys-crypto-1.1.dll', 'msys-ssl-1.1.dll', 'msys-z.dll'];
+    const missingDlls = REQUIRED_DLLS.filter(dll => !fs.existsSync(path.join(bundledDir, dll)));
+    const bundledComplete = fs.existsSync(bundledPath) && missingDlls.length === 0;
+
+    if (bundledComplete) {
+        return `"${bundledPath}"`;
+    }
+
+    if (fs.existsSync(bundledPath) && missingDlls.length > 0) {
+        console.error(`[ZATCA] Bundled openssl.exe is present but missing required DLL(s): ${missingDlls.join(', ')} in ${bundledDir}. Falling back to system 'openssl' on PATH.`);
+    }
+
+    // Fallback to system openssl
+    return 'openssl';
+}
+
+function checkOpenSSLAvailability() {
+    try {
+        const { execSync } = require('child_process');
+        const opensslCmd = _resolveOpenSSL();
+        execSync(`${opensslCmd} version`, { stdio: 'pipe' });
+        return true;
+    } catch (err) {
+        return false;
+    }
+}
+
 function generateCSR(privateKeyPem, publicKeyPem, finalInfo) {
     // ZATCA mandates secp256k1 EC curves for Phase 2. Since BoringSSL in Electron doesn't support secp256k1 natively,
     // we use the local OpenSSL CLI to generate the keys and CSR exactly as required by ZATCA specs.
@@ -358,10 +421,12 @@ function generateCSR(privateKeyPem, publicKeyPem, finalInfo) {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zatca-csr-'));
 
     try {
-        const resolvedEnv = finalInfo.env || 'sandbox';
+        const resolvedEnv = finalInfo.env || finalInfo.environment || 'sandbox';
         let certTypeExt = 'ZATCA-Code-Signing';
-        if (resolvedEnv === 'sandbox' || resolvedEnv === 'simulation') {
+        if (resolvedEnv === 'sandbox') {
             certTypeExt = 'TSTZATCA-Code-Signing';
+        } else if (resolvedEnv === 'simulation') {
+            certTypeExt = 'PREZATCA-Code-Signing';
         }
 
         let deviceSerial = finalInfo.EGS_SN || '1-SmartTouch|2-POS|3-001';
@@ -374,14 +439,32 @@ function generateCSR(privateKeyPem, publicKeyPem, finalInfo) {
         const branchIndus = finalInfo.IND || 'Retail';
         const cn = finalInfo.CN || 'ZATCA-EGS';
 
-        let ou = finalInfo.OU || 'Head Office';
-        if (vatNumber.startsWith('31') && (!ou || !/^\d{10}$/.test(ou))) {
+        // [FIX-OU-FIELD] ZATCA compliance endpoint validates that the CSR OU matches the
+        // organization identifier (first 10 digits of the 15-digit TIN/VAT). Sending a plain
+        // string like 'Head Office' causes the production portal to reject the request as
+        // "Invalid-OTP" even when the OTP is valid. The old guard only corrected OU for VAT
+        // numbers starting with '31', silently leaving '30...' customers broken.
+        let ou;
+        // If an explicit 10-digit TIN prefix was supplied, trust it.
+        if (finalInfo.OU && /^\d{10}$/.test(finalInfo.OU)) {
+            ou = finalInfo.OU;
+        } else if (vatNumber && vatNumber.length >= 10) {
+            // Always derive from the VAT number — covers all TIN prefixes (30, 31, etc.)
             ou = vatNumber.substring(0, 10);
+        } else {
+            // Absolute last resort: use whatever was provided (may cause rejection on prod)
+            ou = finalInfo.OU || 'Head Office';
+            console.warn('[ZATCA][CSR] WARNING: Could not derive a 10-digit OU from VAT number. CSR OU set to "' + ou + '". This may cause Invalid-OTP on production.');
         }
         const org = finalInfo.ORG || 'Smart Touch POS';
 
         // Generate config file for OpenSSL.
-        // Explicitly define custom OIDs to avoid parse/OBJ conflicts, and enforce correct ASN1 types to handle pipe characters.
+        // [FIX-CSR-ASN1-TYPE] Ground truth comparison with wes4m/zatca-xml-js and ZATCA's
+        // official Java SDK confirms: certificateTemplateName OID must use ASN1:UTF8String,
+        // NOT ASN1:PRINTABLESTRING. Using PRINTABLESTRING causes ZATCA's policy validator
+        // to reject the CSR, which is surfaced as "Invalid-OTP" at the compliance endpoint.
+        // [FIX-UTF8-NO] wes4m reference also sets utf8=no in [req] — without this, OpenSSL
+        // may encode DN fields in UTF8 which some ZATCA validators reject.
         const conf = [
             'oid_section = OIDs',
             '[OIDs]',
@@ -393,6 +476,7 @@ function generateCSR(privateKeyPem, publicKeyPem, finalInfo) {
             'req_extensions = v3_req',
             'distinguished_name = dn',
             'prompt = no',
+            'utf8 = no',
             '',
             '[dn]',
             'C = SA',
@@ -401,7 +485,7 @@ function generateCSR(privateKeyPem, publicKeyPem, finalInfo) {
             'CN = ' + cn,
             '',
             '[v3_req]',
-            'certificateTemplateName = ASN1:PRINTABLESTRING:' + certTypeExt,
+            'certificateTemplateName = ASN1:UTF8String:' + certTypeExt,
             'subjectAltName = dirName:alt_names',
             '',
             '[alt_names]',
@@ -418,17 +502,19 @@ function generateCSR(privateKeyPem, publicKeyPem, finalInfo) {
 
         fs.writeFileSync(confPath, conf, 'utf8');
 
+        const opensslCmd = _resolveOpenSSL();
+
         // Generate secp256k1 key pair
-        execSync(`openssl ecparam -name secp256k1 -genkey -noout -out "${keyPath}"`, { stdio: 'pipe' });
+        execSync(`${opensslCmd} ecparam -name secp256k1 -genkey -noout -out "${keyPath}"`, { stdio: 'pipe' });
 
         // Generate CSR
-        execSync(`openssl req -new -sha256 -key "${keyPath}" -extensions v3_req -config "${confPath}" -out "${csrPath}"`, { stdio: 'pipe' });
+        execSync(`${opensslCmd} req -new -sha256 -key "${keyPath}" -extensions v3_req -config "${confPath}" -out "${csrPath}"`, { stdio: 'pipe' });
 
         const privateKeyPem = fs.readFileSync(keyPath, 'utf8');
         const csrPem = fs.readFileSync(csrPath, 'utf8');
 
         // Extract public key
-        const pubKeyPem = execSync(`openssl ec -in "${keyPath}" -pubout`, { encoding: 'utf8', stdio: 'pipe' });
+        const pubKeyPem = execSync(`${opensslCmd} ec -in "${keyPath}" -pubout`, { encoding: 'utf8', stdio: 'pipe' });
 
         // ZATCA expects the entire PEM text (including headers and newlines) to be base64 encoded.
         const csrBase64 = Buffer.from(csrPem.trim()).toString('base64');
@@ -480,7 +566,8 @@ async function getProductionCSID(complianceRequestId, complianceToken, complianc
         console.log('RAW_ZATCA_PRODUCTION_RESPONSE:', JSON.stringify(response.data));
         return response.data;
     } catch (err) {
-        throw new Error(`ZATCA Production API Error: ${err.response?.data?.errors?.[0]?.message || err.message}`);
+        let errDetails = err.response?.data ? (typeof err.response.data === 'object' ? JSON.stringify(err.response.data) : err.response.data) : err.message;
+        throw new Error(`ZATCA Production API Error: ${errDetails}`);
     }
 }
 
@@ -923,7 +1010,8 @@ function signSecp256k1Sha256(privateKeyPem, dataBuffer) {
         fs.writeFileSync(keyPath, privateKeyPem, 'utf8');
         fs.writeFileSync(dataPath, dataBuffer);
 
-        execSync(`openssl dgst -sha256 -sign "${keyPath}" -out "${sigPath}" "${dataPath}"`, { stdio: 'pipe' });
+        const opensslCmd = _resolveOpenSSL();
+        execSync(`${opensslCmd} dgst -sha256 -sign "${keyPath}" -out "${sigPath}" "${dataPath}"`, { stdio: 'pipe' });
 
         return fs.readFileSync(sigPath);
     } finally {
@@ -1128,5 +1216,5 @@ module.exports = {
     getZatcaUrl, ZATCA_URLS, canonicalizeInvoiceXML, c14nWithInheritedNS, c14n11Element, hashXML,
     signInvoiceXML, signAndPackageInvoice, injectUBLExtensions, injectQRPayload, generateZatcaTLV9, extractCertInfo,
     reportInvoice, clearInvoice, extractCertDetails, extractQRFromXML, checkCertExpiry,
-    isValidECPrivateKeyPem, signSecp256k1Sha256, _pkcs8ToECScalar
+    isValidECPrivateKeyPem, signSecp256k1Sha256, _pkcs8ToECScalar, checkOpenSSLAvailability
 };

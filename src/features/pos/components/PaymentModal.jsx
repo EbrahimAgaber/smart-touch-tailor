@@ -9,8 +9,9 @@ const PAY_TYPES = [
   { value: 'Card',         label: '\u0628\u0637\u0627\u0642\u0629',          icon: CreditCard, color: 'text-indigo-500', bg: 'bg-indigo-50' },
   { value: 'STC',          label: 'STC Pay',        icon: Smartphone, color: 'text-purple-500', bg: 'bg-purple-50' },
   { value: 'Mada',         label: '\u0645\u062f\u0649',            icon: CreditCard, color: 'text-teal-500',   bg: 'bg-teal-50' },
-  { value: 'Credit',       label: '\u0622\u062c\u0644',            icon: ReceiptText, color: 'text-slate-500', bg: 'bg-slate-50' },
-  { value: 'BankTransfer', label: '\u062a\u062d\u0648\u064a\u0644 \u0628\u0646\u0643\u064a',     icon: Landmark,  color: 'text-blue-500',   bg: 'bg-blue-50' },
+  { value: 'Credit',       label: 'آجل',            icon: ReceiptText, color: 'text-slate-500', bg: 'bg-slate-50' },
+  { value: 'StoreCredit',  label: 'رصيد متجر',      icon: Zap,         color: 'text-orange-500', bg: 'bg-orange-50' },
+  { value: 'BankTransfer', label: 'تحويل بنكي',     icon: Landmark,  color: 'text-blue-500',   bg: 'bg-blue-50' },
   { value: 'QR',           label: 'QR',             icon: QrCode,    color: 'text-rose-500',   bg: 'bg-rose-50' },
 ];
 
@@ -210,6 +211,12 @@ const PaymentModal = memo(function PaymentModal({
                 </span>
                 <span className="text-sm font-black">\u0631.\u0633</span>
               </div>
+              {changeAmt > 0 && selectedCustomer && (
+                <label className="flex items-center gap-2 mt-2 cursor-pointer text-xs font-bold text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
+                  <input type="checkbox" id="addChangeToCredit" className="accent-primary w-4 h-4" />
+                  حفظ الباقي كرصيد متجر للعميل
+                </label>
+              )}
             </div>
           </div>
           <button onClick={onClose} className="h-12 w-12 rounded-2xl bg-hover text-muted flex items-center justify-center hover:bg-rose-50 hover:text-rose-500 transition-all hover:scale-105 active:scale-95">
@@ -274,14 +281,14 @@ const PaymentModal = memo(function PaymentModal({
 
                   {/* Scrollable type row */}
                   <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1 scrollbar-hide">
-                    {PAY_TYPES.map(t => {
+                    {PAY_TYPES.filter(t => t.value !== 'StoreCredit' || (selectedCustomer?.store_credit > 0)).map(t => {
                       const Icon = t.icon;
                       const sel  = p.type === t.value;
                       return (
                         <button key={t.value} onClick={e => { e.stopPropagation(); updatePayment(i, 'type', t.value); }}
                           className={`flex-shrink-0 h-10 px-3 rounded-xl flex items-center gap-1.5 text-xs font-black transition-all duration-300 ${sel ? `bg-white shadow-md ${t.color} scale-105 z-10 ring-1` : 'bg-hover text-muted hover:text-main hover:bg-white/50'}`}>
                           <Icon size={14} className={sel ? 'animate-bounce' : ''} style={{animationDuration:'2s'}}/>
-                          <span>{t.label}</span>
+                          <span>{t.value === 'StoreCredit' ? `رصيد (${selectedCustomer?.store_credit})` : t.label}</span>
                         </button>
                       );
                     })}

@@ -1,0 +1,837 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/useAuthStore';
+import { useToast } from '../components/ToastManager';
+import { 
+  User, Phone, Scissors, Ruler, FileText, CreditCard, 
+  Banknote, Clock, Package, History, AlertCircle, ChevronDown, UserCheck, Plus, Trash2
+} from 'lucide-react';
+
+const VAT_RATE = window.__vatRate__ || 0.15;
+
+/* ─── SILHOUETTES ─── */
+const ThobeSilhouette = () => (
+    <svg viewBox="0 0 120 180" className="w-20 h-28" style={{ display: 'block' }}
+        stroke="#1e293b" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M38 22 L28 38 L10 44 L10 130 L110 130 L110 44 L92 38 L82 22 Z" fill="#f1f5f9" />
+        <path d="M10 130 L4 175 L116 175 L110 130 Z" fill="#f1f5f9" />
+        <path d="M28 38 L4 52 L4 92 L18 88 L28 38" fill="#e2e8f0" />
+        <path d="M92 38 L116 52 L116 92 L102 88 L92 38" fill="#e2e8f0" />
+        <path d="M50 22 C55 28 65 28 70 22" />
+        <line x1="60" y1="25" x2="60" y2="70" strokeDasharray="2 2" strokeWidth="1" />
+        <circle cx="60" cy="33" r="1.5" fill="#1e293b" />
+        <circle cx="60" cy="44" r="1.5" fill="#1e293b" />
+        <circle cx="60" cy="55" r="1.5" fill="#1e293b" />
+    </svg>
+);
+
+const SirwalSilhouette = () => (
+    <svg viewBox="0 0 120 180" className="w-20 h-28" style={{ display: 'block' }}
+        stroke="#1e293b" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M25 18 L95 18" strokeWidth="3" />
+        <path d="M25 18 L15 35 L15 170 L55 170 L60 80 L65 170 L105 170 L105 35 L95 18 Z" fill="#f1f5f9" />
+        <path d="M15 80 Q60 60 105 80" strokeDasharray="3 2" strokeWidth="1" stroke="#94a3b8" />
+        <path d="M18 45 L35 48" />
+        <path d="M102 45 L85 48" />
+    </svg>
+);
+
+const BishtSilhouette = () => (
+    <svg viewBox="0 0 120 180" className="w-20 h-28" style={{ display: 'block' }}
+        stroke="#1e293b" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M30 22 L20 38 L20 170 L100 170 L100 38 L90 22 Z" fill="#f1f5f9" />
+        <path d="M20 38 C28 55 28 70 20 82" />
+        <path d="M100 38 C92 55 92 70 100 82" />
+        <path d="M42 22 L60 52 L78 22" />
+        <line x1="60" y1="52" x2="60" y2="170" strokeDasharray="3 2" strokeWidth="1" />
+    </svg>
+);
+
+const ShirtSilhouette = () => (
+    <svg viewBox="0 0 120 180" className="w-20 h-28" style={{ display: 'block' }}
+        stroke="#1e293b" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M35 22 L22 34 L8 38 L8 84 L20 80 L26 34 L26 165 L94 165 L94 34 L100 80 L112 84 L112 38 L98 34 L85 22 Z" fill="#f1f5f9" />
+        <path d="M46 22 L54 32 L60 24 L66 32 L74 22" />
+        <line x1="60" y1="30" x2="60" y2="165" strokeDasharray="2 2" strokeWidth="1" />
+        <rect x="33" y="45" width="12" height="14" rx="1" />
+    </svg>
+);
+
+/* ─── PRINT COMPONENTS ─── */
+const thStyle = {
+    border: '1px solid #334155',
+    padding: '4px 6px',
+    textAlign: 'center',
+    fontSize: '10px',
+    fontWeight: '700',
+    background: '#cbd5e1',
+    color: '#0f172a',
+    whiteSpace: 'nowrap',
+};
+
+const tdStyle = {
+    border: '1px solid #334155',
+    padding: '5px 6px',
+    textAlign: 'center',
+    fontSize: '12px',
+    minWidth: '45px',
+    background: 'white',
+};
+
+const CheckCell = ({ label, checked }) => (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginLeft: '10px', fontSize: '11px' }}>
+        <span style={{
+            display: 'inline-block',
+            width: '13px', height: '13px',
+            border: '1.5px solid #334155',
+            borderRadius: '2px',
+            backgroundColor: checked ? '#1e3a5f' : 'white',
+            position: 'relative',
+            flexShrink: 0,
+        }}>
+            {checked && (
+                <svg viewBox="0 0 10 10" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+                    <polyline points="1.5,5 4,7.5 8.5,2" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            )}
+        </span>
+        <span>{label}</span>
+    </span>
+);
+
+const MCell = ({ value }) => (
+    <td style={tdStyle}>
+        <span style={{ fontWeight: '700', fontSize: '12px', color: value ? '#0f172a' : '#94a3b8' }}>
+            {value ? `${value}` : '—'}
+        </span>
+        {value && <span style={{ fontSize: '9px', color: '#64748b', marginRight: '1px' }}>سم</span>}
+    </td>
+);
+
+const MLabel = ({ children }) => (
+    <td style={{ ...thStyle, background: '#e2e8f0' }}>{children}</td>
+);
+
+const TailorWorkOrder = React.forwardRef(({ orderDetails }, ref) => {
+    if (!orderDetails) return null;
+    const { customer, items = [], invoiceNumber, date, deliveryDate, notes, subtotal, paid, balance } = orderDetails;
+
+    return (
+        <div ref={ref}>
+            {items.map((item, itemIndex) => {
+                const m = item.measurements || {};
+                const cfg = item.config || {};
+                return (
+                    <div
+                        key={item.id || itemIndex}
+                        dir="rtl"
+                        className="tailor-work-order print:break-after-page"
+                        style={{
+                            width: '100%',
+                            maxWidth: '210mm',
+                            margin: '0 auto',
+                            background: 'white',
+                            fontFamily: 'sans-serif',
+                            fontSize: '11px',
+                            color: '#0f172a',
+                            padding: '10px 12px',
+                            boxSizing: 'border-box',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '8px',
+                            marginBottom: '20px'
+                        }}
+                    >
+                        {/* Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2.5px solid #1e3a5f', paddingBottom: '8px', marginBottom: '10px' }}>
+                            <div>
+                                <div style={{ fontSize: '18px', fontWeight: '900', color: '#1e3a5f' }}>
+                                    ورقة عمل الخياط {items.length > 1 ? `(قطعة ${itemIndex + 1} من ${items.length})` : ''}
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#64748b' }}>Tailor Work Order — يُسلَّم للمعلم مع القماش</div>
+                            </div>
+                            <div style={{ textAlign: 'left' }}>
+                                <div style={{ fontSize: '14px', fontWeight: '900', color: '#1e3a5f', background: '#e0f2fe', border: '1.5px solid #0ea5e9', borderRadius: '4px', padding: '2px 8px' }}>
+                                    #{invoiceNumber}
+                                </div>
+                                <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>التسليم: {deliveryDate || '—'}</div>
+                            </div>
+                        </div>
+
+                        {/* Customer Table */}
+                        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '10px' }}>
+                            <tbody>
+                                <tr>
+                                    <td style={{ ...thStyle, background: '#1e3a5f', color: 'white', width: '70px' }}>العميل</td>
+                                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700' }}>{customer?.name || '—'}</td>
+                                    <td style={{ ...thStyle, background: '#1e3a5f', color: 'white', width: '60px' }}>الهاتف</td>
+                                    <td style={{ ...tdStyle, textAlign: 'left' }} dir="ltr">{customer?.phone || '—'}</td>
+                                    <td style={{ ...thStyle, background: '#1e3a5f', color: 'white', width: '60px' }}>القماش</td>
+                                    <td style={{ ...tdStyle, textAlign: 'right' }}>{item.fabric_code || 'من العميل'}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        {/* Item Section */}
+                        <div style={{ border: '1.5px solid #334155', borderRadius: '4px', overflow: 'hidden', marginBottom: '10px' }}>
+                            <div style={{ background: '#1e3a5f', color: 'white', fontSize: '11px', fontWeight: '700', padding: '4px 8px' }}>
+                                تفاصيل القطعة ومقاسات التفصيل
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', padding: '8px', background: '#f8fafc' }}>
+                                <div style={{ background: 'white', border: '1px solid #cbd5e1', padding: '4px', borderRadius: '4px' }}>
+                                    {item.garment_type === 'thobe' && <ThobeSilhouette />}
+                                    {item.garment_type === 'sirwal' && <SirwalSilhouette />}
+                                    {item.garment_type === 'shirt' && <ShirtSilhouette />}
+                                    {item.garment_type === 'bisht' && <BishtSilhouette />}
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                        <tbody>
+                                            <tr>
+                                                <MLabel>الطول</MLabel><MCell value={m.length} />
+                                                <MLabel>الكتف</MLabel><MCell value={m.shoulder} />
+                                                <MLabel>الرقبة</MLabel><MCell value={m.neck} />
+                                                <MLabel>الصدر</MLabel><MCell value={m.chest} />
+                                            </tr>
+                                            <tr>
+                                                <MLabel>الوسط</MLabel><MCell value={m.waist} />
+                                                <MLabel>الكم</MLabel><MCell value={m.sleeve} />
+                                                <MLabel>الزند</MLabel><MCell value={m.wrist} />
+                                                <MLabel>الوسع</MLabel><MCell value={m.hand_opening} />
+                                            </tr>
+                                        </tbody>
+                                    </table>
+
+                                    <div style={{ background: 'white', border: '1px solid #cbd5e1', borderTop: 'none', padding: '6px' }}>
+                                        <div style={{ fontSize: '10px', color: '#334155', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                            <span><strong>الياقة:</strong> <CheckCell label="كلاسيك" checked={cfg.collar === 'classic'} /><CheckCell label="ماندرين" checked={cfg.collar === 'mandarin'} /></span>
+                                            <span><strong>الكبك:</strong> <CheckCell label="مفرد" checked={cfg.cuff === 'single'} /><CheckCell label="مزدوج" checked={cfg.cuff === 'double'} /></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Notes */}
+                        <div style={{ border: '1.5px solid #334155', borderRadius: '4px', padding: '6px 8px', marginBottom: '10px', background: 'white' }}>
+                            <span style={{ fontSize: '10px', fontWeight: '700', color: '#475569' }}>ملاحظات المعلم: </span>
+                            <span style={{ fontSize: '11px' }}>{item.notes || notes || 'لا توجد ملاحظات إضافية'}</span>
+                        </div>
+
+                        {/* Receipt Stub */}
+                        <div style={{ borderTop: '1.5px dashed #94a3b8', paddingTop: '8px', marginTop: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold' }}>
+                                <span>إيصال استلام العميل #{invoiceNumber}</span>
+                                <span>الإجمالي: {subtotal} ر.س | المدفوع: {paid || 0} ر.س | المتبقي: {balance} ر.س</span>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+});
+
+export default function TailorPos() {
+    const navigate = useNavigate();
+    const { currentUser } = useAuthStore();
+    const { showToast } = useToast?.() ?? { showToast: (m) => console.log(m) };
+
+    const [currentTime, setCurrentTime] = useState(new Date());
+    const [fabrics, setFabrics] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [businessName, setBusinessName] = useState('نقطة بيع المشغل والخياطة');
+    const [defaultDeliveryDays, setDefaultDeliveryDays] = useState(7);
+    
+    // Customer State
+    const [phone, setPhone] = useState('');
+    const [name, setName] = useState('');
+    const [customer, setCustomer] = useState(null);
+    const [latestProfile, setLatestProfile] = useState(null);
+    const [profileLoaded, setProfileLoaded] = useState(false);
+    
+    const [invoiceNumber] = useState('INV-' + Math.floor(Math.random() * 100000));
+    const [deliveryDate, setDeliveryDate] = useState('');
+    
+    const [items, setItems] = useState([
+        {
+            id: 1,
+            garment_type: 'thobe',
+            fabric_code: 'BYOF',
+            price: 150,
+            notes: '',
+            config: { collar: 'classic', cuff: 'single' },
+            measurements: { length: '', shoulder: '', neck: '', chest: '', waist: '', sleeve: '', wrist: '', hand_opening: '' }
+        }
+    ]);
+
+    const [activeItemIndex, setActiveItemIndex] = useState(0);
+    const [paid, setPaid] = useState('');
+    const [discount, setDiscount] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState('Cash');
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        async function load() {
+            setLoading(true);
+            try {
+                const s = await window.api?.getSettings?.();
+                let days = 7;
+                if (s?.tailor_default_delivery_days) {
+                    days = parseInt(s.tailor_default_delivery_days) || 7;
+                }
+                setDefaultDeliveryDays(days);
+                if(s?.business_name_ar) setBusinessName(s.business_name_ar);
+
+                const dDate = new Date();
+                dDate.setDate(dDate.getDate() + days);
+                setDeliveryDate(dDate.toISOString().split('T')[0]);
+
+                const menuItems = await window.api?.getMenu?.() ?? [];
+                const fabricItems = (menuItems || []).filter(p => p.IsFabric && p.IsActive);
+                setFabrics(fabricItems);
+
+                if (fabricItems.length > 0) {
+                    const copy = [...items];
+                    copy[0].fabric_code = fabricItems[0].ID;
+                    copy[0].price = parseFloat(fabricItems[0].Price || 150);
+                    setItems(copy);
+                }
+            } catch (err) {
+                console.error('Failed to load configs:', err);
+            }
+            setLoading(false);
+        }
+        load();
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    const handlePhoneBlur = async () => {
+        if (phone.length >= 10) {
+            try {
+                const res = await window.api?.getCustomers?.({ search: phone });
+                if (res && res.length > 0) {
+                    const c = res[0];
+                    setCustomer(c);
+                    setName(c.name);
+                    const profiles = await window.api?.tailor?.getMeasurements?.({ customer_id: c.id });
+                    if (profiles && profiles.length > 0) {
+                        const sorted = profiles.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+                        setLatestProfile(sorted[0]);
+                        setProfileLoaded(false);
+                    } else {
+                        setLatestProfile(null);
+                    }
+                } else {
+                    setCustomer(null);
+                    setLatestProfile(null);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        } else {
+            setCustomer(null);
+            setLatestProfile(null);
+        }
+    };
+
+    const handleLoadProfile = useCallback(() => {
+        if (latestProfile?.measurements) {
+            const m = latestProfile.measurements;
+            const copy = [...items];
+            copy[activeItemIndex].measurements = {
+                length: m.length || '',
+                shoulder: m.shoulder || '',
+                chest: m.chest || '',
+                waist: m.waist || '',
+                neck: m.neck || '',
+                sleeve: m.sleeve || '',
+                wrist: m.wrist || m.cuff || m.cuffs || '',
+                hand_opening: m.hand_opening || m.bottom || ''
+            };
+            copy[activeItemIndex].notes = m.notes || '';
+            setItems(copy);
+            setProfileLoaded(true);
+            showToast?.({ type: 'success', message: 'تم تحميل المقاسات السابقة بنجاح' });
+        }
+    }, [latestProfile, activeItemIndex, items, showToast]);
+
+    const activeItem = items[activeItemIndex] || items[0];
+
+    const updateMeasurement = (key, val) => {
+        const copy = [...items];
+        copy[activeItemIndex].measurements[key] = val;
+        setItems(copy);
+    };
+
+    const updateConfig = (key, val) => {
+        const copy = [...items];
+        copy[activeItemIndex].config[key] = val;
+        setItems(copy);
+    }
+
+    const setGarmentType = (type) => {
+        const copy = [...items];
+        copy[activeItemIndex].garment_type = type;
+        setItems(copy);
+    };
+
+    const addItem = () => {
+        const newItem = {
+            id: items.length + 1,
+            garment_type: 'thobe',
+            fabric_code: fabrics.length > 0 ? fabrics[0].ID : 'BYOF',
+            price: fabrics.length > 0 ? parseFloat(fabrics[0].Price || 150) : 150,
+            notes: '',
+            config: { collar: 'classic', cuff: 'single' },
+            measurements: { length: '', shoulder: '', neck: '', chest: '', waist: '', sleeve: '', wrist: '', hand_opening: '' }
+        };
+        setItems([...items, newItem]);
+        setActiveItemIndex(items.length);
+    };
+
+    const removeItem = (idx) => {
+        if (items.length <= 1) return;
+        const newItems = items.filter((_, i) => i !== idx);
+        setItems(newItems);
+        setActiveItemIndex(Math.min(activeItemIndex, newItems.length - 1));
+    };
+
+    const subtotalBeforeDiscount = items.reduce((acc, item) => acc + (Number(item.price) || 0), 0);
+    const finalSubtotal = Math.max(0, subtotalBeforeDiscount - parseFloat(discount || 0));
+    const vat = finalSubtotal * VAT_RATE;
+    const total = finalSubtotal + vat;
+    const balance = Math.max(0, total - (Number(paid) || 0));
+
+    const orderPayload = { 
+        invoiceNumber, 
+        customer: { name, phone }, 
+        deliveryDate, 
+        notes: '', 
+        paid: paid || 0, 
+        subtotal: total.toFixed(2), 
+        balance: balance.toFixed(2), 
+        items 
+    };
+
+    const handleProcess = async () => {
+        if (saving) return;
+        if (!phone || !name) {
+            showToast?.({ type: 'error', message: 'يرجى إدخال بيانات العميل (الجوال والاسم)' });
+            return;
+        }
+
+        // Validate basic measurements
+        const invalidItem = items.find(i => !i.measurements.length || parseFloat(i.measurements.length) <= 0);
+        if (invalidItem) {
+            showToast?.({ type: 'error', message: 'يرجى إدخال الطول لكل القطع' });
+            return;
+        }
+
+        setSaving(true);
+        try {
+            let customerId = customer?.id;
+            if (!customerId) {
+                const cRes = await window.api?.addCustomer?.({ name, phone });
+                if (cRes?.id) customerId = cRes.id;
+            }
+
+            let finalPaymentMethod = paymentMethod === 'Split' ? 'Cash+Card' : paymentMethod;
+            const garmentsList = items.map(i => {
+                // Find fabric name/id
+                const fab = fabrics.find(f => f.ID == i.fabric_code);
+                return {
+                    garment_type: i.garment_type === 'thobe' ? 'ثوب' : i.garment_type === 'sirwal' ? 'سروال' : i.garment_type === 'shirt' ? 'قميص' : 'بشت',
+                    fabric_id: i.fabric_code === 'BYOF' ? null : (fab?.ID || null),
+                    measurements: { ...i.measurements, ...i.config },
+                    special_instructions: i.notes,
+                    fabric_length_used: i.fabric_code === 'BYOF' ? 0 : 3.5 // Could use settings formulas here
+                }
+            });
+
+            const res = await window.api?.tailor?.createOrder?.({
+                customer_id: customerId,
+                total_amount: total,
+                deposit_paid: parseFloat(paid || 0),
+                balance_due: balance,
+                target_delivery_date: deliveryDate,
+                payment_method: finalPaymentMethod,
+                garments: garmentsList
+            });
+
+            if (!res?.success) throw new Error(res?.error || 'فشل الحفظ');
+            showToast?.({ type: 'success', message: 'تم إنشاء الطلب بنجاح!' });
+
+            // Generate Thermal HTML for Customer
+            let receiptHTML = `
+                <html dir="rtl">
+                <head>
+                    <style>
+                        body { font-family: 'Tahoma', sans-serif; font-size: 12px; margin: 0; padding: 10px; width: 80mm; color: #000; }
+                        .text-center { text-align: center; }
+                        .text-right { text-align: right; }
+                        .text-left { text-align: left; }
+                        .font-bold { font-weight: bold; }
+                        .mt-2 { margin-top: 10px; }
+                        .mb-2 { margin-bottom: 10px; }
+                        .border-b { border-bottom: 1px dashed #000; padding-bottom: 5px; margin-bottom: 5px; }
+                        .flex { display: flex; justify-content: space-between; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                        th, td { padding: 4px 0; border-bottom: 1px dotted #ccc; font-size: 11px; }
+                        th { text-align: right; }
+                    </style>
+                </head>
+                <body>
+                    <div class="text-center font-bold mb-2" style="font-size: 16px;">${businessName}</div>
+                    <div class="text-center border-b">فاتورة خياطة تفصيل</div>
+                    <div class="flex mt-2"><span>رقم الفاتورة:</span> <span dir="ltr">#${res.order_id || invoiceNumber}</span></div>
+                    <div class="flex"><span>التاريخ:</span> <span dir="ltr">${new Date().toLocaleDateString('en-CA')}</span></div>
+                    <div class="flex"><span>العميل:</span> <span>${name}</span></div>
+                    <div class="flex border-b"><span>الجوال:</span> <span dir="ltr">${phone}</span></div>
+                    
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>الصنف</th>
+                                <th class="text-center">السعر</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${items.map(i => `
+                                <tr>
+                                    <td>${i.garment_type === 'thobe' ? 'ثوب' : i.garment_type === 'sirwal' ? 'سروال' : i.garment_type === 'shirt' ? 'قميص' : 'بشت'} - ${i.fabric_code === 'BYOF' ? 'قماش خارجي' : 'قماش من المحل'}</td>
+                                    <td class="text-center" dir="ltr">${i.price} SAR</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    
+                    <div class="border-b mt-2"></div>
+                    <div class="flex font-bold"><span>المجموع:</span> <span dir="ltr">${subtotalBeforeDiscount.toFixed(2)} SAR</span></div>
+                    ${discount ? `<div class="flex"><span>الخصم:</span> <span dir="ltr">${parseFloat(discount).toFixed(2)} SAR</span></div>` : ''}
+                    <div class="flex"><span>الضريبة (15%):</span> <span dir="ltr">${vat.toFixed(2)} SAR</span></div>
+                    <div class="flex font-bold mt-2 border-b"><span>الإجمالي:</span> <span dir="ltr">${total.toFixed(2)} SAR</span></div>
+                    
+                    <div class="flex"><span>المدفوع:</span> <span dir="ltr">${parseFloat(paid || 0).toFixed(2)} SAR</span></div>
+                    <div class="flex font-bold mb-2"><span>المتبقي:</span> <span dir="ltr">${balance.toFixed(2)} SAR</span></div>
+                    
+                    <div class="text-center font-bold border-b" style="padding: 5px 0;">تاريخ التسليم: ${deliveryDate}</div>
+                    <div class="text-center mt-2" style="font-size: 10px;">شكراً لتعاملكم معنا</div>
+                </body>
+                </html>
+            `;
+
+            if (window.api?.printHTML) {
+                await window.api.printHTML(receiptHTML);
+            }
+
+            // Print the tailor work order automatically as well
+            handlePrintWorkOrder();
+
+            // Reset
+            setPhone(''); setName(''); setCustomer(null);
+            setItems([{
+                id: 1,
+                garment_type: 'thobe',
+                fabric_code: 'BYOF',
+                price: 150,
+                notes: '',
+                config: { collar: 'classic', cuff: 'single' },
+                measurements: { length: '', shoulder: '', neck: '', chest: '', waist: '', sleeve: '', wrist: '', hand_opening: '' }
+            }]);
+            setPaid(''); setDiscount('');
+            setDeliveryDate(new Date(Date.now() + defaultDeliveryDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+        } catch (err) {
+            showToast?.({ type: 'error', message: err.message });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handlePrintWorkOrder = () => {
+        window.print();
+    };
+
+    const printRef = useRef();
+
+    return (
+        <div dir="rtl" className="min-h-screen p-4 bg-slate-100 font-sans text-slate-800 overflow-y-auto">
+            <style>{`
+                @media print {
+                    @page { size: A4 portrait; margin: 8mm 10mm; }
+                    body * { visibility: hidden; }
+                    .tailor-work-order, .tailor-work-order * { visibility: visible; }
+                    .tailor-work-order {
+                        position: relative;
+                        margin: 0;
+                        padding: 0;
+                        width: 210mm;
+                        font-size: 11px;
+                        background: white !important;
+                        color: black !important;
+                    }
+                    .print-area {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                    }
+                }
+            `}</style>
+
+            <div className="max-w-7xl mx-auto flex flex-col gap-4 print:hidden">
+                <header className="bg-white px-6 py-4 rounded-xl border border-slate-200 flex justify-between items-center shadow-sm">
+                    <div>
+                        <h1 className="text-lg font-black text-slate-900">{businessName}</h1>
+                        <span className="text-xs text-slate-500 font-mono">رقم الطلب: #{invoiceNumber}</span>
+                    </div>
+                    <div className="flex gap-2">
+                        <button onClick={() => navigate('/shift?action=close')} className="bg-rose-50 text-rose-600 px-4 py-2 rounded-lg text-xs font-bold transition hover:bg-rose-100">
+                            إغلاق الوردية
+                        </button>
+                        <button
+                            onClick={handlePrintWorkOrder}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-xs font-bold transition shadow-sm"
+                        >
+                            🖶 طباعة بطاقة العمل (A4)
+                        </button>
+                    </div>
+                </header>
+
+                <div className="grid grid-cols-12 gap-4">
+                    {/* Right Column (Measurements) */}
+                    <div className="col-span-12 lg:col-span-5 flex flex-col gap-4">
+                        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                            <div className="flex justify-between items-center border-b pb-3">
+                                <h2 className="text-sm font-bold text-slate-900">المقاسات والنوع - تفاصيل الطلب</h2>
+                                {latestProfile && !profileLoaded && (
+                                    <button onClick={handleLoadProfile} className="bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold px-3 py-1 rounded text-xs flex items-center gap-1">
+                                        <History size={12} /> استرجاع مقاس سابق
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Items Tabs */}
+                            <div className="flex gap-2 overflow-x-auto pb-2">
+                                {items.map((item, idx) => (
+                                    <button 
+                                        key={idx}
+                                        onClick={() => setActiveItemIndex(idx)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 whitespace-nowrap ${activeItemIndex === idx ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                    >
+                                        قطعة {idx + 1}
+                                        {items.length > 1 && activeItemIndex === idx && (
+                                            <Trash2 size={12} className="text-red-400 hover:text-red-500" onClick={(e) => { e.stopPropagation(); removeItem(idx); }} />
+                                        )}
+                                    </button>
+                                ))}
+                                <button onClick={addItem} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center gap-1">
+                                    <Plus size={14} /> إضافة قطعة
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 mb-1">النوع</label>
+                                    <div className="flex gap-1 bg-slate-50 p-1 rounded border">
+                                        {['thobe', 'sirwal', 'shirt', 'bisht'].map(t => (
+                                            <button
+                                                key={t}
+                                                onClick={() => setGarmentType(t)}
+                                                className={`flex-1 py-1.5 rounded text-xs font-bold transition ${activeItem.garment_type === t ? 'bg-indigo-600 text-white shadow' : 'text-slate-600 hover:bg-slate-200'}`}
+                                            >
+                                                {t === 'thobe' ? 'ثوب' : t === 'sirwal' ? 'سروال' : t === 'shirt' ? 'قميص' : 'بشت'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 mb-1">القماش</label>
+                                    <select 
+                                        className="w-full border rounded p-2 text-xs font-bold bg-slate-50"
+                                        value={activeItem.fabric_code}
+                                        onChange={(e) => {
+                                            const copy = [...items];
+                                            copy[activeItemIndex].fabric_code = e.target.value;
+                                            if (e.target.value === 'BYOF') {
+                                                copy[activeItemIndex].price = 150;
+                                            } else {
+                                                const sel = fabrics.find(f => f.ID == e.target.value);
+                                                if (sel) copy[activeItemIndex].price = parseFloat(sel.Price || 150);
+                                            }
+                                            setItems(copy);
+                                        }}
+                                    >
+                                        <option value="BYOF">✂️ قماش خارجي (تفصيل فقط)</option>
+                                        {fabrics.map(f => <option key={f.ID} value={f.ID}>{f.Name}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-4 gap-2.5 bg-slate-50 p-3 rounded-lg border">
+                                {Object.keys(activeItem.measurements).map(k => (
+                                    <div key={k} className="bg-white p-2 rounded border border-slate-200">
+                                        <label className="text-[10px] font-bold text-slate-500 block mb-1 text-center">
+                                            {k === 'length' ? 'الطول' : k === 'shoulder' ? 'الكتف' : k === 'neck' ? 'الرقبة' : k === 'chest' ? 'الصدر' : k === 'waist' ? 'الوسط' : k === 'sleeve' ? 'الكم' : k === 'wrist' ? 'الزند' : 'وسع الكم'}
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={activeItem.measurements[k]}
+                                            onChange={(e) => updateMeasurement(k, e.target.value)}
+                                            onFocus={(e) => e.target.select()}
+                                            dir="ltr"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm font-black text-[#5861b4] text-center focus:bg-white focus:border-indigo-400 outline-none"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-700 block mb-1">الياقة</label>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => updateConfig('collar', 'classic')} className={`flex-1 py-1.5 border rounded text-xs font-bold ${activeItem.config.collar === 'classic' ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white'}`}>كلاسيك</button>
+                                        <button onClick={() => updateConfig('collar', 'mandarin')} className={`flex-1 py-1.5 border rounded text-xs font-bold ${activeItem.config.collar === 'mandarin' ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white'}`}>ماندرين (سادة)</button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-700 block mb-1">الكبك</label>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => updateConfig('cuff', 'single')} className={`flex-1 py-1.5 border rounded text-xs font-bold ${activeItem.config.cuff === 'single' ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white'}`}>مفرد (سادة)</button>
+                                        <button onClick={() => updateConfig('cuff', 'double')} className={`flex-1 py-1.5 border rounded text-xs font-bold ${activeItem.config.cuff === 'double' ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white'}`}>مزدوج (دبل)</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-2 border-t">
+                                <label className="text-xs font-bold text-slate-700 block mb-1">ملاحظة المعلم</label>
+                                <input
+                                    type="text"
+                                    value={activeItem.notes}
+                                    onChange={(e) => {
+                                        const copy = [...items];
+                                        copy[activeItemIndex].notes = e.target.value;
+                                        setItems(copy);
+                                    }}
+                                    className="w-full border rounded-lg px-3 py-2 text-xs"
+                                    placeholder="إضافة ملاحظات خاصة لهذه القطعة..."
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Middle Column (Live Preview) */}
+                    <div className="col-span-12 lg:col-span-4 flex flex-col gap-4">
+                        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm overflow-hidden h-full">
+                            <h3 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">معاينة ورقة العمل</h3>
+                            <div className="scale-[0.8] sm:scale-[0.9] origin-top h-full" style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                                <TailorWorkOrder orderDetails={orderPayload} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Left Column (Customer & Pay) */}
+                    <div className="col-span-12 lg:col-span-3 flex flex-col gap-4">
+                        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                            <h3 className="text-sm font-bold border-b pb-2 flex items-center gap-2"><User size={16}/> بيانات العميل</h3>
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-500 block mb-1">رقم الجوال</label>
+                                <input
+                                    type="tel"
+                                    value={phone}
+                                    onChange={(e) => { setPhone(e.target.value); if(customer){ setCustomer(null); setLatestProfile(null); } }}
+                                    onBlur={handlePhoneBlur}
+                                    dir="ltr"
+                                    className="w-full border-2 border-slate-100 focus:border-indigo-300 rounded-lg p-2 text-sm font-bold bg-slate-50 outline-none"
+                                    placeholder="05XXXXXXXX"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-500 block mb-1">الاسم</label>
+                                <input
+                                    type="text"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    className="w-full border-2 border-slate-100 focus:border-indigo-300 rounded-lg p-2 text-sm font-bold bg-slate-50 outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-500 block mb-1">تاريخ التسليم المتوقع</label>
+                                <input
+                                    type="date"
+                                    value={deliveryDate}
+                                    onChange={(e) => setDeliveryDate(e.target.value)}
+                                    className="w-full border-2 border-slate-100 focus:border-indigo-300 rounded-lg p-2 text-sm font-bold bg-slate-50 outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                            <h3 className="text-sm font-bold border-b pb-2 flex items-center gap-2"><Banknote size={16}/> الحساب والدفع</h3>
+                            
+                            {items.map((item, idx) => (
+                                <div key={idx} className="flex justify-between text-xs items-center">
+                                    <span>قطعة {idx + 1} ({item.garment_type === 'thobe' ? 'ثوب' : 'أخرى'})</span>
+                                    <div className="flex items-center gap-2">
+                                        <input type="number" value={item.price} onChange={e => { const copy=[...items]; copy[idx].price=e.target.value; setItems(copy); }} className="w-16 border rounded p-1 text-center text-xs font-bold bg-slate-50 outline-none" dir="ltr" />
+                                        <span>ر.س</span>
+                                    </div>
+                                </div>
+                            ))}
+
+                            <div className="flex justify-between items-center text-xs pt-2 border-t">
+                                <span className="text-slate-500 font-bold">الخصم الإضافي:</span>
+                                <input type="number" value={discount} onChange={e => setDiscount(e.target.value)} className="w-20 border rounded p-1 text-center font-bold bg-slate-50 outline-none" dir="ltr" />
+                            </div>
+                            
+                            <div className="flex justify-between text-xs text-slate-500 font-bold">
+                                <span>الضريبة (15%):</span>
+                                <span dir="ltr">{vat.toFixed(2)} SAR</span>
+                            </div>
+
+                            <div className="flex justify-between items-end pt-2 border-t">
+                                <span className="text-sm font-black text-indigo-700">الإجمالي:</span>
+                                <span className="text-lg font-black text-indigo-700" dir="ltr">{total.toFixed(2)} <span className="text-[10px]">SAR</span></span>
+                            </div>
+
+                            <div className="flex gap-2 py-2">
+                                {[{ id: 'Cash', label: 'نقداً', icon: Banknote }, { id: 'Card', label: 'شبكة', icon: CreditCard }, { id: 'Split', label: 'مقسم', icon: AlertCircle }].map(m => (
+                                    <button
+                                        key={m.id}
+                                        onClick={() => setPaymentMethod(m.id)}
+                                        className={`flex-1 py-2 flex flex-col items-center gap-1 text-[10px] font-bold rounded-lg border-2 ${paymentMethod === m.id ? 'bg-indigo-50 border-indigo-400 text-indigo-700' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}
+                                    >
+                                        <m.icon size={14} /> {m.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="flex justify-between items-center text-xs font-bold bg-slate-50 p-2 rounded">
+                                <span>المدفوع (عربون):</span>
+                                <input type="number" value={paid} onChange={e => setPaid(e.target.value)} className="w-24 border rounded p-1.5 text-center font-bold text-sm outline-none focus:border-indigo-300" dir="ltr" placeholder={total.toFixed(2)} />
+                            </div>
+
+                            <div className="flex justify-between text-xs font-bold pt-2">
+                                <span>المتبقي:</span>
+                                <span className={balance > 0 ? 'text-amber-600' : 'text-emerald-600'} dir="ltr">{balance.toFixed(2)} SAR</span>
+                            </div>
+
+                            <button
+                                onClick={handleProcess}
+                                disabled={saving}
+                                className={`w-full text-white text-sm font-black py-3 rounded-lg mt-2 transition shadow ${saving ? 'bg-slate-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                            >
+                                {saving ? 'جاري التنفيذ...' : 'حفظ وإنشاء الطلب'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Dedicated Print View */}
+            <div className="hidden print:block print-area">
+                <TailorWorkOrder ref={printRef} orderDetails={orderPayload} />
+            </div>
+        </div>
+    );
+}

@@ -89,7 +89,7 @@ async function processQueue() {
         const csidSecret = csidData.secret;
         
         const settings = db.getSettings();
-        const isSandbox = settings.zatca_env === 'sandbox' || settings.zatca_env === 'simulation';
+        const zatcaEnv = settings.zatca_env || 'sandbox';
 
         // Fetch pending items ordered by ICV. 'retry_exhausted' is a terminal
         // state and is intentionally excluded here (it falls out naturally
@@ -145,8 +145,8 @@ async function processQueue() {
             let response;
             try {
                 response = isB2B
-                    ? await clearInvoice(item.xml_hash, xmlBase64, item.uuid, csidToken, csidSecret, isSandbox)
-                    : await reportInvoice(item.xml_hash, xmlBase64, item.uuid, csidToken, csidSecret, isSandbox);
+                    ? await clearInvoice(item.xml_hash, xmlBase64, item.uuid, csidToken, csidSecret, zatcaEnv)
+                    : await reportInvoice(item.xml_hash, xmlBase64, item.uuid, csidToken, csidSecret, zatcaEnv);
             } catch (networkErr) {
                 console.error(`[ZATCA] Network/transport failure submitting invoice ${item.invoice_number} (ICV: ${item.icv}):`, networkErr.message);
                 database.prepare(`
@@ -350,16 +350,36 @@ function getQueueStatus() {
         // Fetch last rejected invoice for the banner (FIX 4)
         let lastRejectedInvoice = null;
         let lastError = null;
+        let lastErrorList = [];
         if (halted) {
             try {
-                const rej = database.prepare("SELECT invoice_number, zatca_response_json FROM zatca_queue WHERE status='rejected' ORDER BY id DESC LIMIT 1").get();
+                // Including 'failed' as well since body-level rejections are marked 'failed'
+                const rej = database.prepare("SELECT invoice_number, zatca_response_json FROM zatca_queue WHERE status IN ('rejected', 'failed') AND zatca_response_json IS NOT NULL ORDER BY id DESC LIMIT 1").get();
                 if (rej) {
                     lastRejectedInvoice = rej.invoice_number;
                     if (rej.zatca_response_json) {
                         try {
                             const resp = JSON.parse(rej.zatca_response_json);
-                            lastError = resp.errors?.[0]?.message || resp.message || JSON.stringify(resp).slice(0, 120);
-                        } catch (_) { lastError = rej.zatca_response_json.slice(0, 120); }
+                            
+                            if (resp._parsed_errors) {
+                                // _parsed_errors is "CODE: msg | CODE2: msg2" — split back into structured items
+                                lastErrorList = String(resp._parsed_errors).split(' | ').map(seg => {
+                                    const m = seg.match(/^([^:]+):\s*(.+)$/);
+                                    return m ? { code: m[1].trim(), message: m[2].trim() } : { message: seg };
+                                });
+                            } else if (resp.validationResults && Array.isArray(resp.validationResults.errorMessages) && resp.validationResults.errorMessages.length > 0) {
+                                lastErrorList = resp.validationResults.errorMessages.map(e => ({ code: e.code, message: e.message }));
+                            } else if (resp.validationResults && Array.isArray(resp.validationResults.warningMessages) && resp.validationResults.warningMessages.length > 0) {
+                                lastErrorList = resp.validationResults.warningMessages.map(w => ({ code: w.code, message: w.message }));
+                            } else {
+                                lastErrorList.push({ message: `Full JSON Dump: ${JSON.stringify(resp)}` });
+                            }
+
+                            lastError = lastErrorList.map(e => e.code ? `${e.code}: ${e.message}` : e.message).join(' | ');
+                        } catch (_) { 
+                            lastErrorList.push({ message: `Raw Dump: ${rej.zatca_response_json}` });
+                            lastError = `Raw Dump: ${rej.zatca_response_json}`; 
+                        }
                     }
                 }
             } catch (_) {}
@@ -410,6 +430,7 @@ function getQueueStatus() {
             lastWarningMessages,
             lastRejectedInvoice,
             lastError,
+            lastErrorList,
             lastExhaustedInvoice
         };
     } catch (e) {

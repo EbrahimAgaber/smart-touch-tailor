@@ -151,40 +151,74 @@ export default function Staff() {
   };
 
   const handlePrintSettlement = (tailor) => {
+    const shopName = 'مشغل البصمة الذكية للخياطة والتفصيل';
     const printContent = `
-      <html dir="rtl">
+      <!DOCTYPE html>
+      <html dir="rtl" lang="ar">
         <head>
+          <meta charset="utf-8" />
           <title>مسير رواتب - ${tailor.tailor_name || tailor.name}</title>
           <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #333; }
-            h2 { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; }
-            .info { margin-top: 20px; font-size: 18px; line-height: 1.8; }
-            .total { margin-top: 30px; font-size: 22px; font-weight: bold; border-top: 2px dashed #ccc; padding-top: 20px; text-align: center; }
-            @media print { body { padding: 0; } }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; color: #0f172a; margin: 0; }
+            .sheet { max-width: 480px; margin: 0 auto; border: 1.5px solid #0f172a; border-radius: 8px; padding: 20px; }
+            .hdr { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; }
+            .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #cbd5e1; font-size: 14px; }
+            .total-row { display: flex; justify-content: space-between; padding: 14px 0 6px; font-size: 18px; font-weight: 900; color: #16a34a; border-top: 2px solid #0f172a; margin-top: 10px; }
+            .sig-box { display: flex; justify-content: space-between; margin-top: 30px; font-size: 13px; font-weight: bold; }
           </style>
         </head>
         <body>
-          <h2>مسير رواتب الخياط</h2>
-          <div class="info">
-            <p><strong>اسم الخياط:</strong> ${tailor.tailor_name || tailor.name}</p>
-            <p><strong>الفترة:</strong> من ${startDate} إلى ${endDate}</p>
-            <p><strong>عدد القطع المنجزة:</strong> ${tailor.pieces_completed || 0}</p>
-            <p><strong>العمولة الأساسية:</strong> ${(tailor.base_commission || 0).toFixed(2)} ر.س</p>
-            <p><strong>المكافآت:</strong> ${(tailor.bonuses || 0).toFixed(2)} ر.س</p>
+          <div class="sheet">
+            <div class="hdr">
+              <h2 style="margin:0 0 4px; font-size: 18px;">${shopName}</h2>
+              <div style="font-size: 13px; color: #475569;">سند صرف أجور بالقطعة والعمولات</div>
+            </div>
+            <div class="row"><span>الموظف / المعلم:</span><strong>${tailor.tailor_name || tailor.name} (${tailor.role_label || 'خياط'})</strong></div>
+            <div class="row"><span>فترة الاحتساب:</span><strong>من ${startDate} إلى ${endDate}</strong></div>
+            <div class="row"><span>عدد القطع المنجزة:</span><strong>${tailor.pieces_completed || 0} قطعة</strong></div>
+            <div class="row"><span>إجمالي العمولات الأساسية:</span><strong>${(tailor.base_commission || 0).toFixed(2)} ر.س</strong></div>
+            <div class="row"><span>المكافآت والحوافز:</span><strong>${(tailor.bonuses || 0).toFixed(2)} ر.س</strong></div>
+            <div class="total-row"><span>صافي المبلغ المصروف:</span><span>${(tailor.total_payout || 0).toFixed(2)} ر.س</span></div>
+            <div class="sig-box">
+              <div>توقيع المحاسب / الإدارة: ________</div>
+              <div>توقيع المستلم: ________</div>
+            </div>
           </div>
-          <div class="total">
-            إجمالي المستحق: ${(tailor.total_payout || 0).toFixed(2)} ر.س
-          </div>
-          <script>
-            window.onload = () => { window.print(); window.close(); }
-          </script>
         </body>
       </html>
     `;
-    const win = window.open('', '_blank');
-    if (win) {
-      win.document.write(printContent);
-      win.document.close();
+
+    if (window.api?.printHTML) {
+      window.api.printHTML(printContent);
+      return;
+    }
+
+    try {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.top = '-9999px';
+      iframe.style.left = '-9999px';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(printContent);
+      doc.close();
+      setTimeout(() => {
+        try {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        } catch (e) {
+          console.warn('Payroll print error:', e);
+        }
+        setTimeout(() => {
+          try { document.body.removeChild(iframe); } catch (_) {}
+        }, 2000);
+      }, 400);
+    } catch (e) {
+      console.error('Print failed:', e);
     }
   };
 

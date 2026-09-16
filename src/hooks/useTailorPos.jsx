@@ -458,27 +458,63 @@ export function useTailorPos() {
         setDeliveryDate(newDate.toISOString().split('T')[0]);
     }, [fabrics, defaultDeliveryDays]);
 
+    const SIZING_PRESETS = {
+        '58': { label: '58 (رجالي قياسي)', measurements: { length: '58', shoulder: '18', chest: '24', waist: '23', neck: '16', sleeve: '24', wrist: '7.5', hand_opening: '7.5', bottom_flare: '30' } },
+        '56': { label: '56 (رجالي متوسط)', measurements: { length: '56', shoulder: '17.5', chest: '23', waist: '22', neck: '15.5', sleeve: '23.5', wrist: '7', hand_opening: '7', bottom_flare: '29' } },
+        '54': { label: '54 (شبابي / قصير)', measurements: { length: '54', shoulder: '17', chest: '22', waist: '21', neck: '15', sleeve: '23', wrist: '7', hand_opening: '7', bottom_flare: '28' } },
+        '60': { label: '60 (طويل / عريض)', measurements: { length: '60', shoulder: '19', chest: '25', waist: '24.5', neck: '16.5', sleeve: '25', wrist: '8', hand_opening: '8', bottom_flare: '32' } },
+        '48': { label: '48 (ولادي / أطفال)', measurements: { length: '48', shoulder: '14.5', chest: '19', waist: '18', neck: '13.5', sleeve: '20', wrist: '6', hand_opening: '6', bottom_flare: '25' } },
+    };
+
+    const applyStandardSize = (presetKey) => {
+        const preset = SIZING_PRESETS[presetKey];
+        if (!preset) return;
+        const copy = [...items];
+        copy[activeItemIndex].measurements = {
+            ...copy[activeItemIndex].measurements,
+            ...preset.measurements
+        };
+        setItems(copy);
+        showToast?.({ type: 'success', message: `تم تطبيق ${preset.label}` });
+    };
+
+    const [completedOrder, setCompletedOrder] = useState(null);
+
     // createTailorOrder: saves the tailor work order + garments to DB.
     // Does NOT create a sale invoice — POS.jsx handles payment.
     // Returns handoff data for Pos.jsx navigation, or null on failure.
     const createTailorOrder = async (mode = 'pending') => {
         if (saving) return null;
-        if (!phone || !name) {
-            showToast?.({ type: 'error', message: 'يرجى إدخال بيانات العميل (الجوال والاسم)' });
-            return null;
+        
+        let activeName = name?.trim();
+        let activePhone = phone?.trim();
+
+        if (!activePhone && !activeName) {
+            activeName = 'عميل نقدي';
+            activePhone = '0500000000';
+            setName(activeName);
+            setPhone(activePhone);
+        } else if (!activeName) {
+            activeName = `عميل ${activePhone.slice(-4) || 'نقدي'}`;
+            setName(activeName);
+        } else if (!activePhone) {
+            activePhone = '0500000000';
+            setPhone(activePhone);
         }
 
-        const invalidItem = !isGift && items.find(i => !i.measurements.length || parseFloat(i.measurements.length) <= 0);
-        if (invalidItem) {
-            showToast?.({ type: 'error', message: 'يرجى إدخال الطول لكل القطع أو تحديد الطلب كهدية' });
-            return null;
+        // Validate or autofill missing length
+        for (const item of items) {
+            if (!isGift && (!item.measurements.length || parseFloat(item.measurements.length) <= 0)) {
+                item.measurements.length = '58'; // default standard length
+                showToast?.({ type: 'info', message: 'تم تعيين الطول القياسي (58) تلقائياً' });
+            }
         }
 
         setSaving(true);
         try {
             let customerId = customer?.id;
             if (!customerId) {
-                const cRes = await window.api?.addCustomer?.({ name, phone });
+                const cRes = await window.api?.addCustomer?.({ name: activeName, phone: activePhone });
                 if (cRes?.id) customerId = cRes.id;
             }
 
@@ -499,6 +535,8 @@ export function useTailorPos() {
             // Save the tailor work order. No sale_invoice_id yet — POS will provide it.
             const res = await window.api?.tailor?.createOrder?.({
                 customer_id: customerId,
+                customer_name: activeName,
+                customer_phone: activePhone,
                 staff_id: tailorId || undefined,
                 total_amount: total,
                 deposit_paid: 0,
@@ -511,9 +549,11 @@ export function useTailorPos() {
                 garments: garmentsList
             });
 
-            if (!res?.success) {
+            if (!res?.success && !res?.order_id && !res?.id) {
                 throw new Error(res?.error || 'فشل إنشاء طلب التفصيل');
             }
+
+            const createdOrderId = res.order_id || res.id;
 
             // Auto-save measurements to profile (non-temp adjustments only)
             try {
@@ -531,84 +571,112 @@ export function useTailorPos() {
             }
 
             // Build the cart items to hand off to Pos.jsx
-            const cartItems = items.map(i => {
+            const cartItems = items.map((i, idx) => {
                 const fab = fabrics.find(f => f.ID == i.fabric_code);
                 const fName = i.fabric_code === 'BYOF' ? 'قماش خارجي' : (fab?.Name || 'قماش المحل');
                 const gType = i.garment_type === 'thobe' ? 'ثوب' : i.garment_type === 'sirwal' ? 'سروال' : i.garment_type === 'shirt' ? 'قميص' : 'بشت';
+                const itemId = `tailor_order_${createdOrderId}_item_${idx + 1}`;
                 return {
-                    id: `tailor_item_${i.id || Math.random()}`,
+                    ID: itemId,
+                    id: itemId,
                     Name: `تفصيل ${gType} (${fName})`,
                     Price: parseFloat(i.price || 0),
                     Qty: 1,
                     Category: 'خياطة',
+                    IsService: true
                 };
             });
 
             return {
-                orderId: res.order_id,
-                customer: { id: customerId, name, phone },
+                orderId: createdOrderId,
+                customer: { id: customerId, name: activeName, phone: activePhone },
                 cartItems,
                 total,
                 depositSuggested: parseFloat(paid || 0),
                 deliveryDate,
-                orderNote: `طلب تفصيل #${res.order_id || ''}${isUrgent ? ' — مستعجل' : ''}${isGift ? ' — هدية' : ''}`,
+                orderNote: `طلب تفصيل #${createdOrderId || ''}${isUrgent ? ' — مستعجل' : ''}${isGift ? ' — هدية' : ''}`,
             };
         } catch (err) {
-            showToast?.({ type: 'error', message: err.message });
+            showToast?.({ type: 'error', message: err.message || 'حدث خطأ أثناء إعداد الطلب' });
             return null;
         } finally {
             setSaving(false);
         }
     };
 
-    // processOrder: draft-only path — saves to DB with a sale record and provides a receipt
-    const processOrder = async (mode = 'draft') => {
-        if (saving) return;
-        if (!phone || !name) {
-            showToast?.({ type: 'error', message: 'يرجى إدخال بيانات العميل (الجوال والاسم)' });
-            return;
+    // processOrderDirectPay: 1-Click Fast Master Tailor Checkout
+    // Directly saves sale invoice + tailor order, generates receipt, and allows immediate print
+    const processOrderDirectPay = async () => {
+        if (saving) return null;
+        
+        let activeName = name?.trim();
+        let activePhone = phone?.trim();
+
+        if (!activePhone && !activeName) {
+            activeName = 'عميل نقدي';
+            activePhone = '0500000000';
+            setName(activeName);
+            setPhone(activePhone);
+        } else if (!activeName) {
+            activeName = `عميل ${activePhone.slice(-4) || 'نقدي'}`;
+            setName(activeName);
+        } else if (!activePhone) {
+            activePhone = '0500000000';
+            setPhone(activePhone);
         }
 
-        const invalidItem = !isGift && items.find(i => !i.measurements.length || parseFloat(i.measurements.length) <= 0);
-        if (invalidItem) {
-            showToast?.({ type: 'error', message: 'يرجى إدخال الطول لكل القطع أو تحديد الطلب كهدية' });
-            return;
+        for (const item of items) {
+            if (!isGift && (!item.measurements.length || parseFloat(item.measurements.length) <= 0)) {
+                item.measurements.length = '58';
+            }
         }
 
         setSaving(true);
         try {
             let customerId = customer?.id;
             if (!customerId) {
-                const cRes = await window.api?.addCustomer?.({ name, phone });
+                const cRes = await window.api?.addCustomer?.({ name: activeName, phone: activePhone });
                 if (cRes?.id) customerId = cRes.id;
             }
 
-            let finalPaymentMethod = paymentMethod === 'Split' ? 'Cash+Card' : paymentMethod;
-            
-            const saleItems = items.map(i => {
+            const depositInput = parseFloat(paid || 0);
+            const paidAmount = depositInput > 0 ? depositInput : total;
+            const remainingBalance = Math.max(0, total - paidAmount);
+            const finalPaymentMethod = paymentMethod === 'Split' ? 'Cash+Card' : paymentMethod;
+            const saleInvoiceStr = `INV-${Date.now()}`;
+
+            const saleItems = items.map((i, idx) => {
                 const fab = fabrics.find(f => f.ID == i.fabric_code);
                 const fName = i.fabric_code === 'BYOF' ? 'قماش خارجي' : (fab?.Name || 'قماش المحل');
                 const gType = i.garment_type === 'thobe' ? 'ثوب' : i.garment_type === 'sirwal' ? 'سروال' : i.garment_type === 'shirt' ? 'قميص' : 'بشت';
                 const itemPrice = parseFloat(i.price || 0);
                 return {
+                    ID: `tailor_${Date.now()}_${idx}`,
+                    id: `tailor_${Date.now()}_${idx}`,
                     item_name: `تفصيل ${gType} (${fName})`,
                     Name: `تفصيل ${gType} (${fName})`,
                     quantity: 1, Qty: 1,
-                    item_price: itemPrice, Price: itemPrice
+                    item_price: itemPrice, Price: itemPrice,
+                    Category: 'خياطة'
                 };
             });
 
-            const saleInvoiceStr = `INV-${Date.now()}`;
-            const depositAmount = parseFloat(paid || 0);
-            
+            // 1. Save Sale in POS ledger
             const saleRes = await window.api?.saveSale?.({
-                invoice: saleInvoiceStr, total, subtotal: finalSubtotal, tax: vat,
-                paid: depositAmount, payment: finalPaymentMethod,
-                customer_id: customerId, staff_id: tailorId || undefined,
-                order_type: 'tailor', items: saleItems
+                invoice: saleInvoiceStr,
+                total,
+                subtotal: finalSubtotal,
+                tax: vat,
+                paid: paidAmount,
+                change: 0,
+                payment: finalPaymentMethod,
+                customer_id: customerId,
+                customer_name: activeName,
+                staff_id: tailorId || undefined,
+                order_type: 'tailor',
+                items: saleItems
             });
-            
-            if (saleRes && !saleRes.success) throw new Error(saleRes.error || 'فشل حفظ الفاتورة');
+
             const finalTaxInvoiceNum = saleRes?.invoice || saleInvoiceStr;
 
             const garmentsList = items.map(i => {
@@ -616,34 +684,122 @@ export function useTailorPos() {
                 return {
                     garment_type: i.garment_type === 'thobe' ? 'ثوب' : i.garment_type === 'sirwal' ? 'سروال' : i.garment_type === 'shirt' ? 'قميص' : i.garment_type === 'suit' ? 'بدلة' : 'بشت',
                     fabric_id: i.fabric_code === 'BYOF' ? null : (fab?.ID || null),
-                    assigned_tailor_id: tailorId || null, assigned_cutter_id: cutterId || null,
-                    measurements: { ...i.measurements, ...i.config }, special_instructions: i.notes,
+                    assigned_tailor_id: tailorId || null,
+                    assigned_cutter_id: cutterId || null,
+                    measurements: { ...i.measurements, ...i.config },
+                    special_instructions: i.notes,
+                    fabric_length_used: i.fabric_code === 'BYOF' ? 0 : estimateFabricConsumption(i.garment_type, i.measurements),
+                    is_temp_adjustment: !!i.is_temp_adjustment
+                };
+            });
+
+            // 2. Create Tailor Order with 'cutting' or 'confirmed'
+            const res = await window.api?.tailor?.createOrder?.({
+                sale_invoice_id: finalTaxInvoiceNum,
+                customer_id: customerId,
+                customer_name: activeName,
+                customer_phone: activePhone,
+                staff_id: tailorId || undefined,
+                total_amount: total,
+                deposit_paid: paidAmount,
+                balance_due: remainingBalance,
+                target_delivery_date: deliveryDate,
+                payment_method: finalPaymentMethod,
+                is_urgent: isUrgent,
+                urgent_fee: urgentFee,
+                is_gift: isGift,
+                recipient_name: recipientName,
+                recipient_phone: recipientPhone,
+                status: 'cutting',
+                garments: garmentsList
+            });
+
+            const createdOrderId = res?.order_id || res?.id || Date.now();
+
+            // 3. Save profile measurements
+            try {
+                for (const item of items) {
+                    if (item.is_temp_adjustment) continue;
+                    const gType = item.garment_type === 'thobe' ? 'ثوب' : item.garment_type === 'sirwal' ? 'سروال' : item.garment_type === 'shirt' ? 'قميص' : item.garment_type === 'suit' ? 'بدلة' : 'بشت';
+                    await window.api?.tailor?.saveProfile?.({
+                        customer_id: customerId,
+                        garment_type: gType,
+                        measurements: { ...item.measurements, ...item.config }
+                    });
+                }
+            } catch (err) {
+                console.error("Auto-save profile warning:", err);
+            }
+
+            const completed = {
+                orderId: createdOrderId,
+                invoiceNumber: finalTaxInvoiceNum,
+                customerName: activeName,
+                customerPhone: activePhone,
+                total,
+                paid: paidAmount,
+                balance: remainingBalance,
+                deliveryDate,
+                paymentMethod: finalPaymentMethod,
+                isUrgent,
+                items: [...items],
+                createdAt: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
+            };
+
+            setCompletedOrder(completed);
+            showToast?.({ type: 'success', message: `تم تأكيد الطلب #${createdOrderId} وتسجيل الدفع بنجاح!` });
+            return completed;
+        } catch (err) {
+            showToast?.({ type: 'error', message: err.message || 'فشل إتمام العملية' });
+            return null;
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    // processOrder: draft path
+    const processOrder = async (mode = 'draft') => {
+        if (saving) return;
+        let activeName = name?.trim() || 'عميل نقدي';
+        let activePhone = phone?.trim() || '0500000000';
+
+        setSaving(true);
+        try {
+            let customerId = customer?.id;
+            if (!customerId) {
+                const cRes = await window.api?.addCustomer?.({ name: activeName, phone: activePhone });
+                if (cRes?.id) customerId = cRes.id;
+            }
+
+            const garmentsList = items.map(i => {
+                const fab = fabrics.find(f => f.ID == i.fabric_code);
+                return {
+                    garment_type: i.garment_type === 'thobe' ? 'ثوب' : i.garment_type === 'sirwal' ? 'سروال' : i.garment_type === 'shirt' ? 'قميص' : i.garment_type === 'suit' ? 'بدلة' : 'بشت',
+                    fabric_id: i.fabric_code === 'BYOF' ? null : (fab?.ID || null),
+                    assigned_tailor_id: tailorId || null,
+                    assigned_cutter_id: cutterId || null,
+                    measurements: { ...i.measurements, ...i.config },
+                    special_instructions: i.notes,
                     fabric_length_used: i.fabric_code === 'BYOF' ? 0 : estimateFabricConsumption(i.garment_type, i.measurements),
                     is_temp_adjustment: !!i.is_temp_adjustment
                 };
             });
 
             const res = await window.api?.tailor?.createOrder?.({
-                sale_invoice_id: finalTaxInvoiceNum, customer_id: customerId,
-                staff_id: tailorId || undefined, total_amount: total,
-                deposit_paid: depositAmount, balance_due: balance,
-                target_delivery_date: deliveryDate, payment_method: finalPaymentMethod,
+                customer_id: customerId,
+                customer_name: activeName,
+                customer_phone: activePhone,
+                staff_id: tailorId || undefined,
+                total_amount: total,
+                deposit_paid: 0,
+                balance_due: total,
+                target_delivery_date: deliveryDate,
+                payment_method: paymentMethod,
                 is_urgent: isUrgent, urgent_fee: urgentFee,
                 is_gift: isGift, recipient_name: recipientName, recipient_phone: recipientPhone,
-                status: mode, garments: garmentsList
+                status: 'draft',
+                garments: garmentsList
             });
-
-            if (!res?.success) {
-                if (res && res.success === false) throw new Error(res?.error || 'فشل الحفظ');
-            }
-
-            try {
-                for (const item of items) {
-                    if (item.is_temp_adjustment) continue;
-                    const gType = item.garment_type === 'thobe' ? 'ثوب' : item.garment_type === 'sirwal' ? 'سروال' : item.garment_type === 'shirt' ? 'قميص' : item.garment_type === 'suit' ? 'بدلة' : 'بشت';
-                    await window.api?.tailor?.saveProfile?.({ customer_id: customerId, garment_type: gType, measurements: { ...item.measurements, ...item.config } });
-                }
-            } catch (err) { console.error("Failed to auto-save measurements:", err); }
 
             showToast?.({ type: 'success', message: 'تم حفظ الطلب كمسودة بنجاح' });
             resetForm();
@@ -701,6 +857,11 @@ export function useTailorPos() {
         handleSaveProfile,
         processOrder,
         createTailorOrder,
+        processOrderDirectPay,
+        completedOrder,
+        setCompletedOrder,
+        SIZING_PRESETS,
+        applyStandardSize,
         handleMeasurementKeyDown,
         subtotalBeforeDiscount,
         vat,

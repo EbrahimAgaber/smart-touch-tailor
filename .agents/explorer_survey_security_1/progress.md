@@ -1,4 +1,4 @@
-# Progress — Security & ZATCA Explorer
+# Progress ï¿½ Security & ZATCA Explorer
 
 **Last visited**: 2026-09-11T00:25:00Z
 **Current status**: Exploration complete, handoff.md written. Ready to report to parent.

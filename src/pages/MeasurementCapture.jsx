@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import MulamSubNav from '../components/mulam/MulamSubNav';
+import { GarmentIcon } from '../components/GarmentIcons';
+import { Ruler, Scissors, Printer, Paperclip, Edit3, Save, BarChart2, X, Plus, Send } from 'lucide-react';
+import TailorWhatsAppModal from '../components/mulam/TailorWhatsAppModal';
+import { printMeasurementProfileDirect, generateMeasurementWhatsAppText } from '../utils/tailorPrintAndShare';
 
 const GARMENT_TYPES = [
-  { id: 'thobe',   label: 'ثوب رجالي', icon: '✂️' },
-  { id: 'sirwal',  label: 'سروال',     icon: '👖' },
-  { id: 'shirt',   label: 'قميص',      icon: '👔' },
-  { id: 'bisht',   label: 'بشت',       icon: '🧥' },
-  { id: 'suit',    label: 'بدلة',      icon: '🤵' },
+  { id: 'thobe',   label: 'ثوب رجالي' },
+  { id: 'sirwal',  label: 'سروال' },
+  { id: 'shirt',   label: 'قميص' },
+  { id: 'bisht',   label: 'بشت' },
+  { id: 'suit',    label: 'بدلة' },
 ];
 
 const NORMALIZED_FIELDS = [
@@ -47,6 +51,14 @@ export default function MeasurementCapture() {
   const [error,       setError]       = useState(null);
   const [unit,        setUnit]        = useState(() => localStorage.getItem('mulam_preferred_unit') || 'in');
   const [showHistory, setShowHistory] = useState(false);
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [settings, setSettings] = useState({});
+
+  useEffect(() => {
+    window.api?.getSettings?.().then(s => {
+      if (s) setSettings(s);
+    }).catch(err => console.warn('Failed to load settings:', err));
+  }, []);
 
   // Search View State
   const [allCustomers, setAllCustomers] = useState([]);
@@ -240,8 +252,9 @@ export default function MeasurementCapture() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '30px 20px', overflowY: 'auto' }}>
           <div style={{ maxWidth: '680px', margin: '0 auto', width: '100%' }}>
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-              <h2 style={{ fontSize: '22px', fontWeight: 800, margin: '0 0 6px 0', color: 'var(--text-main, #0f172a)' }}>
-                📐 دفتر وسجل المقاسات (Measurement Ledger)
+              <h2 style={{ fontSize: '22px', fontWeight: 800, margin: '0 0 6px 0', color: 'var(--text-main, #0f172a)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                <Ruler size={22} color="var(--color-primary, #6366f1)" />
+                <span>دفتر وسجل المقاسات (Measurement Ledger)</span>
               </h2>
               <p style={{ color: 'var(--text-muted, #64748b)', fontSize: '14px', margin: 0 }}>
                 ابحث عن عميل للوصول المباشر إلى ملف قياساته، مقارنة السجلات، أو إطلاق تفصيل جديد
@@ -359,7 +372,7 @@ export default function MeasurementCapture() {
               </div>
             </div>
 
-            {/* 🚀 PRIMARY CTA BUTTON: Start Order With This Profile */}
+            {/* PRIMARY CTA BUTTON: Start Order With This Profile */}
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
                 onClick={handleStartOrderWithProfile}
@@ -379,7 +392,7 @@ export default function MeasurementCapture() {
                   boxShadow: '0 4px 15px rgba(99,102,241,0.3)'
                 }}
               >
-                <span>✂️</span>
+                <Scissors size={18} />
                 <span>بدء طلب تفصيل جديد بهذا المقاس</span>
               </button>
             </div>
@@ -411,26 +424,59 @@ export default function MeasurementCapture() {
                     color: 'var(--color-accent, #0ea5e9)',
                     fontWeight: 800,
                     fontSize: '12px',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '5px'
                   }}
                 >
-                  📊 مقارنة السجل
+                  <BarChart2 size={14} />
+                  <span>مقارنة السجل</span>
                 </button>
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => printMeasurementProfileDirect(customer, form, unit, settings)}
                   style={{
                     flex: 1,
                     padding: '8px',
                     borderRadius: '8px',
                     background: 'var(--bg-hover, #f8fafc)',
                     border: '1px solid var(--border-subtle, #e2e8f0)',
+                    color: '#3b82f6',
+                    fontWeight: 800,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '5px'
+                  }}
+                  title="طباعة نموذج المقاسات A4"
+                >
+                  <Printer size={14} />
+                  <span>طباعة</span>
+                </button>
+                <button
+                  onClick={() => setShowWhatsAppModal(true)}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    borderRadius: '8px',
+                    background: 'rgba(16, 185, 129, 0.08)',
+                    border: '1px solid rgba(16, 185, 129, 0.25)',
                     color: '#10b981',
                     fontWeight: 800,
                     fontSize: '12px',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '5px'
                   }}
+                  title="مشاركة المقاس مع الخياط عبر واتساب"
                 >
-                  🖨️ طباعة المقاس
+                  <Send size={14} />
+                  <span>واتساب</span>
                 </button>
               </div>
 
@@ -502,8 +548,9 @@ export default function MeasurementCapture() {
                 />
                 <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   {attachments.map(a => (
-                    <div key={a.id} style={{ fontSize: '11px', padding: '4px 8px', background: 'var(--bg-hover, #f8fafc)', borderRadius: '4px', color: 'var(--text-muted, #64748b)' }}>
-                      📎 {a.file_path.split(/[\\/]/).pop()}
+                    <div key={a.id} style={{ fontSize: '11px', padding: '4px 8px', background: 'var(--bg-hover, #f8fafc)', borderRadius: '4px', color: 'var(--text-muted, #64748b)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Paperclip size={12} />
+                      <span>{a.file_path.split(/[\\/]/).pop()}</span>
                     </div>
                   ))}
                 </div>
@@ -539,10 +586,14 @@ export default function MeasurementCapture() {
                         borderRadius: '8px',
                         fontSize: '12px',
                         fontWeight: 800,
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
                       }}
                     >
-                      ✏️ تعديل المقاس
+                      <Edit3 size={13} />
+                      <span>تعديل المقاس</span>
                     </button>
                   )}
                 </div>
@@ -571,10 +622,14 @@ export default function MeasurementCapture() {
                           color: form.garment_type === g.id ? 'var(--color-accent, #0ea5e9)' : 'var(--text-muted, #64748b)',
                           fontWeight: 800,
                           fontSize: '13px',
-                          cursor: editMode ? 'pointer' : 'default'
+                          cursor: editMode ? 'pointer' : 'default',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
                         }}
                       >
-                        <span>{g.icon}</span> {g.label}
+                        <GarmentIcon type={g.id} size={16} color={form.garment_type === g.id ? 'var(--color-accent, #0ea5e9)' : '#64748b'} />
+                        <span>{g.label}</span>
                       </button>
                     ))}
                   </div>
@@ -697,7 +752,12 @@ export default function MeasurementCapture() {
                         cursor: 'pointer'
                       }}
                     >
-                      {saving ? 'جاري الحفظ...' : '💾 حفظ واعتماد المقاس'}
+                      {saving ? 'جاري الحفظ...' : (
+                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                          <Save size={16} />
+                          <span>حفظ واعتماد المقاس</span>
+                        </span>
+                      )}
                     </button>
                     <button
                       onClick={() => handleSave(true)}
@@ -746,15 +806,16 @@ export default function MeasurementCapture() {
             maxHeight: '85vh',
             overflowY: 'auto'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #334155', paddingBottom: '10px' }}>
-              <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 800 }}>
-                📊 مقارنة سجل المقاسات التاريخي (History & Delta Diffs)
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-subtle, #e2e8f0)', paddingBottom: '10px' }}>
+              <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <BarChart2 size={18} color="var(--color-accent, #0ea5e9)" />
+                <span>مقارنة سجل المقاسات التاريخي (History & Delta Diffs)</span>
               </h3>
               <button
                 onClick={() => setShowHistory(false)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted, #64748b)', fontSize: '20px', cursor: 'pointer' }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted, #64748b)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
               >
-                ✕
+                <X size={18} />
               </button>
             </div>
 
@@ -796,6 +857,16 @@ export default function MeasurementCapture() {
           </div>
         </div>
       )}
+
+      {/* WhatsApp Share Modal */}
+      <TailorWhatsAppModal
+        isOpen={showWhatsAppModal}
+        onClose={() => setShowWhatsAppModal(false)}
+        title={`مشاركة مقاسات العميل ${customer?.name || ''}`}
+        defaultCustomerPhone={customer?.phone || ''}
+        customerName={customer?.name || ''}
+        messageText={generateMeasurementWhatsAppText(customer, form, unit)}
+      />
     </div>
   );
 }

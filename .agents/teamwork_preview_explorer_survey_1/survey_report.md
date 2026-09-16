@@ -1,4 +1,4 @@
-# Mulam (??????) Experience Pipeline — Comprehensive Codebase & Route Map
+# Mulam (??????) Experience Pipeline ï¿½ Comprehensive Codebase & Route Map
 **Project:** Mulam Pipeline Redesign  
 **Explorer:** Explorer 1 (Codebase & Route Mapper)  
 **Date:** 2026-09-10  
@@ -103,45 +103,45 @@ Currently, this pipeline suffers from severe architectural fragmentation:
 
 ```
                         +-------------------------------+
-                        ¦      Login & Onboarding       ¦
+                        ï¿½      Login & Onboarding       ï¿½
                         +-------------------------------+
-                                        ¦
+                                        ï¿½
                                         ?
 +-------------------------------------------------------------------------------+
-¦                          Home Screen (`/home`)                                ¦
-¦  - KPI Cards: Today Orders, Today Revenue, Ready for Pickup, Overdue Orders   ¦
-¦  - Mulam Control Center: Low Fabrics, Scheduled Fittings, Recent Deliveries   ¦
-¦  - Modules Grid: Tailor POS, Orders Board, Customers, Stock, Dashboard, Sett. ¦
+ï¿½                          Home Screen (`/home`)                                ï¿½
+ï¿½  - KPI Cards: Today Orders, Today Revenue, Ready for Pickup, Overdue Orders   ï¿½
+ï¿½  - Mulam Control Center: Low Fabrics, Scheduled Fittings, Recent Deliveries   ï¿½
+ï¿½  - Modules Grid: Tailor POS, Orders Board, Customers, Stock, Dashboard, Sett. ï¿½
 +-------------------------------------------------------------------------------+
-                ¦                               ¦
+                ï¿½                               ï¿½
        (Click: New Order)            (Click: Ready / Orders Board)
-                ¦                               ¦
+                ï¿½                               ï¿½
                 ?                               ?
 +-------------------------------+               +-------------------------------+
-¦   Tailor POS (`/tailor-pos`)  ¦               ¦ Orders Board (`/orders-board`)¦
-¦  - 3-Col Layout: Form/Meas/Prv¦?--------------¦  - 5-Stage Kanban             ¦
-¦  - Custom Header              ¦               ¦  - Delayed Deposit Modal      ¦
-¦  - Red Button to Alterations  ¦               ¦  - Customer Delivery Modal    ¦
+ï¿½   Tailor POS (`/tailor-pos`)  ï¿½               ï¿½ Orders Board (`/orders-board`)ï¿½
+ï¿½  - 3-Col Layout: Form/Meas/Prvï¿½?--------------ï¿½  - 5-Stage Kanban             ï¿½
+ï¿½  - Custom Header              ï¿½               ï¿½  - Delayed Deposit Modal      ï¿½
+ï¿½  - Red Button to Alterations  ï¿½               ï¿½  - Customer Delivery Modal    ï¿½
 +-------------------------------+               +-------------------------------+
-        ¦               ¦                               ¦
- (Click: Alterations)   ¦ (Print / Submit)              ¦ (Navigates to Dashboard)
-        ¦               ¦                               ¦
+        ï¿½               ï¿½                               ï¿½
+ (Click: Alterations)   ï¿½ (Print / Submit)              ï¿½ (Navigates to Dashboard)
+        ï¿½               ï¿½                               ï¿½
         ?               ?                               ?
 +----------------+  +---------------+           +-------------------------------+
-¦  Alterations   ¦  ¦ Thermal & A4  ¦           ¦     Admin Dashboard           ¦
-¦ (`/alterations`)¦  ¦ Print Sheets  ¦           ¦       (`/dashboard`)          ¦
-¦                ¦  +---------------+           +-------------------------------+
-¦ *DEAD END*     ¦
-¦ No Header      ¦
-¦ No Sidebar     ¦
-¦ No Back Button ¦
+ï¿½  Alterations   ï¿½  ï¿½ Thermal & A4  ï¿½           ï¿½     Admin Dashboard           ï¿½
+ï¿½ (`/alterations`)ï¿½  ï¿½ Print Sheets  ï¿½           ï¿½       (`/dashboard`)          ï¿½
+ï¿½                ï¿½  +---------------+           +-------------------------------+
+ï¿½ *DEAD END*     ï¿½
+ï¿½ No Header      ï¿½
+ï¿½ No Sidebar     ï¿½
+ï¿½ No Back Button ï¿½
 +----------------+
 
                   +-----------------------------------------------+
-                  ¦    Measurement Capture (`/measurements`)      ¦
-                  ¦  - Customer Search Mode (when no ID)          ¦
-                  ¦  - Profile Edit / Comparison / Attachments    ¦
-                  ¦  *DISCONNECTED* from TailorPos order intake!  ¦
+                  ï¿½    Measurement Capture (`/measurements`)      ï¿½
+                  ï¿½  - Customer Search Mode (when no ID)          ï¿½
+                  ï¿½  - Profile Edit / Comparison / Attachments    ï¿½
+                  ï¿½  *DISCONNECTED* from TailorPos order intake!  ï¿½
                   +-----------------------------------------------+
 ```
 
@@ -164,7 +164,7 @@ Currently, this pipeline suffers from severe architectural fragmentation:
    - Each page implements its own mismatched top header with inconsistent buttons, colors, and font styles.
 4. **Header Target Inconsistency:**
    - On `/tailor-pos`, `/orders-board`, and `/measurements`, the back/home button is labeled "????????" or "? ????????", but points to `/dashboard` instead of `/home`.
-   - In contrast, the app’s actual home page is `/home`. Non-admin users who click this button trigger an `AdminRoute` redirect loop back to `/tailor-pos`!
+   - In contrast, the appï¿½s actual home page is `/home`. Non-admin users who click this button trigger an `AdminRoute` redirect loop back to `/tailor-pos`!
 
 ### 5.2 Information Architecture & Screen Flow Friction
 1. **Disconnected Measurement Profiles:**
@@ -218,19 +218,19 @@ Following `ui_ux_pro_max` and `AGENTS.md` ("Workflow-First" ergonomic philosophy
 src/
 +-- App.jsx [Lines 336-341: Mulam Route Definitions]
 +-- components/
-¦   +-- AppLayout.jsx [Lines 26-61, 185-199: Sidebar & Category Rail]
-¦   +-- TailorWorkOrder.jsx [A4 Print Sheet & Measurement Matrix]
-¦   +-- GarmentIcons.jsx [SVG Garment Silhouettes]
+ï¿½   +-- AppLayout.jsx [Lines 26-61, 185-199: Sidebar & Category Rail]
+ï¿½   +-- TailorWorkOrder.jsx [A4 Print Sheet & Measurement Matrix]
+ï¿½   +-- GarmentIcons.jsx [SVG Garment Silhouettes]
 +-- hooks/
-¦   +-- useTailorPos.jsx [Tailoring Business Logic, State, Calculations]
+ï¿½   +-- useTailorPos.jsx [Tailoring Business Logic, State, Calculations]
 +-- pages/
-¦   +-- Home.jsx [Lines 53-58, 69-129, 278-316: Mulam KPI Widgets & Launch Tiles]
-¦   +-- TailorPos.jsx [Intake POS, Measurements Entry, Garment Config]
-¦   +-- TailorPos.css [Styling for Tailor POS Workspace]
-¦   +-- Alterations.jsx [Alterations Intake & Status Kanban]
-¦   +-- OrdersBoard.jsx [Production Workshop Stage Board]
-¦   +-- MeasurementCapture.jsx [Customer Measurement Profile Book]
-¦   +-- Settings.jsx [Lines 1096-1145: Tailor Shop Configuration Tab]
+ï¿½   +-- Home.jsx [Lines 53-58, 69-129, 278-316: Mulam KPI Widgets & Launch Tiles]
+ï¿½   +-- TailorPos.jsx [Intake POS, Measurements Entry, Garment Config]
+ï¿½   +-- TailorPos.css [Styling for Tailor POS Workspace]
+ï¿½   +-- Alterations.jsx [Alterations Intake & Status Kanban]
+ï¿½   +-- OrdersBoard.jsx [Production Workshop Stage Board]
+ï¿½   +-- MeasurementCapture.jsx [Customer Measurement Profile Book]
+ï¿½   +-- Settings.jsx [Lines 1096-1145: Tailor Shop Configuration Tab]
 electron/
 +-- database.cjs [Schema lines 606-695; Methods lines 3551-3910]
 +-- main.cjs [IPC Handlers lines 743-785]

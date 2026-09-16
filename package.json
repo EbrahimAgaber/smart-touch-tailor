@@ -10,19 +10,11 @@
     "url": "git+https://github.com/EbrahimAgaber/smart-touch-pos.git"
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0 --port 3000",
     "build": "vite build",
     "clean": "rimraf dist dist-electron node_modules/.vite",
-    "kill": "taskkill /F /IM electron.exe /T 2>nul & npx kill-port 5173 & exit 0",
-    "electron:start": "cross-env NODE_ENV=development electron .",
-    "electron:wait": "node wait-vite.cjs && npm run electron:start",
-    "start": "npm run kill && concurrently -k --raw \"npm run dev\" \"npm run electron:wait\"",
-    "clean:start": "npm run kill && npm run clean && concurrently -k --raw \"npm run dev\" \"npm run electron:wait\"",
-    "reset": "npm run kill && rimraf node_modules/.vite dist dist-electron && npm run dev",
-    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite build && cross-env NODE_ENV=production electron .",
-    "dist": "npm run clean && npm run build && electron-builder",
-    "postinstall": "electron-builder install-app-deps"
+    "lint": "eslint src --ext js,jsx",
+    "preview": "vite preview --host 0.0.0.0 --port 3000"
   },
   "build": {
     "appId": "com.albasma.smarttouch",

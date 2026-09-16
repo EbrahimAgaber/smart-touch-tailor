@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import MulamSubNav from '../components/mulam/MulamSubNav';
 import { useToast } from '../components/ToastManager';
 import { generateBarcodeSVG } from '../utils/barcodeSvg';
+import { Scissors, ScanBarcode, X, Plus, CheckCircle2, Undo2, PackageCheck, Banknote, Tag, User, Save, Clock, Play, Printer, Share2, MessageCircle, AlertCircle, ShieldAlert } from 'lucide-react';
 
 export default function Alterations() {
     const navigate = useNavigate();
@@ -19,6 +20,7 @@ export default function Alterations() {
     const [customerList, setCustomerList] = useState([]);
     const [customerSuggestions, setCustomerSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const [staffList, setStaffList] = useState([]);
 
     // Modal Form State
     const [phone, setPhone] = useState('');
@@ -29,11 +31,16 @@ export default function Alterations() {
     const [dueDate, setDueDate] = useState('');
     const [deposit, setDeposit] = useState(0);
 
-
+    // Alteration Lifecycle & Accountability
+    const [reason, setReason] = useState('customer_request'); // 'customer_request' | 'fitting_adjustment' | 'tailor_error' | 'cutter_error' | 'fabric_shrinkage'
+    const [assignedTailor, setAssignedTailor] = useState('');
+    const [faultStaff, setFaultStaff] = useState('');
+    const [fittingNotes, setFittingNotes] = useState('');
 
     useEffect(() => {
         loadTickets();
         loadCustomers();
+        loadStaff();
     }, []);
 
     const loadTickets = async () => {
@@ -58,6 +65,140 @@ export default function Alterations() {
         } catch (e) {
             console.error('Failed to load customers for autocomplete:', e);
         }
+    };
+
+    const loadStaff = async () => {
+        try {
+            const data = await window.api?.getStaff?.();
+            if (Array.isArray(data)) {
+                setStaffList(data);
+            }
+        } catch (e) {
+            console.error('Failed to load staff list:', e);
+        }
+    };
+
+    // Print Hanger Barcode Label (Thermal 60x40mm)
+    const handlePrintAlterationHangerTag = (ticket) => {
+        const ticketNum = `ALT-${String(ticket.id).padStart(4, '0')}`;
+        const barcodeSvg = generateBarcodeSVG(ticketNum, { width: 1.5, height: 34, fontSize: 11 });
+        const reasonLabels = {
+            customer_request: 'رغبة العميل (مدفوع)',
+            fitting_adjustment: 'تعديل بروفة قياس',
+            tailor_error: 'خطأ خياط (مجاني)',
+            cutter_error: 'خطأ تفصيل (مجاني)',
+            fabric_shrinkage: 'انكماش قماش'
+        };
+        const reasonText = reasonLabels[ticket.reason] || ticket.reason || 'تعديل ثوب';
+        
+        const html = `
+            <!DOCTYPE html>
+            <html dir="rtl" lang="ar">
+            <head>
+                <meta charset="utf-8" />
+                <title>ملصق تعليق تعديل - ${ticketNum}</title>
+                <style>
+                    @page { size: 60mm 40mm; margin: 0; }
+                    body {
+                        margin: 0;
+                        padding: 3mm;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                        font-size: 11px;
+                        width: 60mm;
+                        box-sizing: border-box;
+                        color: #000;
+                    }
+                    .tag-border {
+                        border: 1.5px dashed #000;
+                        border-radius: 4px;
+                        padding: 2.5mm;
+                        text-align: center;
+                    }
+                    .title { font-size: 12px; font-weight: 900; margin-bottom: 2px; }
+                    .ticket-num { font-size: 13px; font-weight: 900; background: #000; color: #fff; padding: 1px 6px; border-radius: 3px; display: inline-block; margin: 1px 0; }
+                    .info-row { display: flex; justify-content: space-between; font-size: 9.5px; margin-top: 2px; }
+                    .instructions { text-align: right; font-weight: 800; font-size: 9.5px; margin-top: 3px; padding-top: 2px; border-top: 1px solid #000; }
+                    .barcode-wrap { margin-top: 3px; }
+                </style>
+            </head>
+            <body>
+                <div class="tag-border">
+                    <div class="title">ملصق ثوب تعديل</div>
+                    <div class="ticket-num">${ticketNum}</div>
+                    <div class="info-row">
+                        <span>العميل: <strong>${ticket.customer_name || 'عميل'}</strong></span>
+                        <span>${ticket.customer_phone || ''}</span>
+                    </div>
+                    <div class="info-row">
+                        <span>السبب: <strong>${reasonText}</strong></span>
+                        ${ticket.assigned_tailor ? `<span>المكلف: <strong>${ticket.assigned_tailor}</strong></span>` : ''}
+                    </div>
+                    <div class="instructions">
+                        ${(ticket.items || []).map(i => `• ${i.instructions || i.garment_type || 'تعديل'}`).join('<br>')}
+                    </div>
+                    <div class="barcode-wrap">${barcodeSvg}</div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        if (window.api?.printHTML) {
+            window.api.printHTML(html);
+            return;
+        }
+
+        try {
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.top = '-9999px';
+            iframe.style.left = '-9999px';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            document.body.appendChild(iframe);
+            const doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(html);
+            doc.close();
+            setTimeout(() => {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+                setTimeout(() => { try { document.body.removeChild(iframe); } catch(_) {} }, 2000);
+            }, 400);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    // Share Status via WhatsApp
+    const handleShareAlterationWhatsApp = (ticket) => {
+        if (!ticket.customer_phone) {
+            showToast?.({ type: 'warning', message: 'لا يوجد رقم جوال مسجل لهذا العميل' });
+            return;
+        }
+        const cleanPhone = ticket.customer_phone.replace(/[^0-9]/g, '');
+        let saudiPhone = cleanPhone;
+        if (saudiPhone.startsWith('05')) saudiPhone = '966' + saudiPhone.substring(1);
+        else if (saudiPhone.startsWith('5')) saudiPhone = '966' + saudiPhone;
+
+        const statusText = ticket.status === 'ready' 
+            ? '✅ ثوبكم / قطعتكم جاهزة للاستلام في المشغل.' 
+            : ticket.status === 'in_progress' 
+            ? '✂️ يجري العمل حالياً على تعديل طلبكم بعناية.' 
+            : '📋 تم تسجيل تذكرة التعديل في جدول المشغل.';
+
+        const total = parseFloat(ticket.total_fee || 0);
+        const dep = parseFloat(ticket.deposit || 0);
+        const bal = Math.max(0, total - dep);
+
+        const message = `مرحباً بك ${ticket.customer_name || 'عزيزنا العميل'}،
+نود إبلاغكم بشأن تذكرة التعديل رقم #ALT-${String(ticket.id).padStart(4, '0')} في مشغل البصمة الذكية:
+${statusText}
+${bal > 0 ? `المبلغ المتبقي للاستلام: ${bal.toFixed(2)} ر.س` : 'الحساب: مسدد بالكامل'}
+${ticket.target_delivery_date ? `موعد التسليم المتوقع: ${ticket.target_delivery_date}` : ''}
+نسعد دائماً بخدمتكم!`;
+
+        const url = `https://wa.me/${saudiPhone}?text=${encodeURIComponent(message)}`;
+        window.open(url, '_blank');
     };
 
     // Filter customers as user types phone or name
@@ -177,7 +318,11 @@ export default function Alterations() {
                 items,
                 total_fee: totalFee,
                 deposit: parseFloat(deposit || 0),
-                target_delivery_date: dueDate
+                target_delivery_date: dueDate,
+                reason,
+                assigned_tailor: assignedTailor,
+                fault_staff: faultStaff,
+                fitting_notes: fittingNotes
             };
 
             const res = await window.api?.tailor?.createAlteration?.(payload);
@@ -189,6 +334,10 @@ export default function Alterations() {
             setPhone(''); setName(''); setSelectedCustomerId(null); setLinkedOrderId('');
             setItems([{ garment_type: 'thobe', instructions: '', fee: 0 }]);
             setDeposit(0);
+            setReason('customer_request');
+            setAssignedTailor('');
+            setFaultStaff('');
+            setFittingNotes('');
             loadTickets();
 
             // Offline-first Thermal Print with Pure SVG Barcode
@@ -198,11 +347,22 @@ export default function Alterations() {
                 fontSize: 13
             });
 
+            const reasonLabels = {
+                customer_request: 'رغبة العميل (مدفوع)',
+                fitting_adjustment: 'تعديل بروفة قياس',
+                tailor_error: 'خطأ خياط (مجاني)',
+                cutter_error: 'خطأ تفصيل (مجاني)',
+                fabric_shrinkage: 'انكماش قماش'
+            };
+
             const html = `
-                <html dir="rtl">
+                <!DOCTYPE html>
+                <html dir="rtl" lang="ar">
                 <head>
+                    <meta charset="utf-8" />
+                    <title>تذكرة تعديل - ALT-${String(ticketId).padStart(4, '0')}</title>
                     <style>
-                        body { font-family: 'Tahoma', sans-serif; font-size: 12px; width: 80mm; padding: 10px; margin: 0; color: #000; }
+                        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; width: 80mm; padding: 10px; margin: 0; color: #000; }
                         .text-center { text-align: center; }
                         .flex { display: flex; justify-content: space-between; }
                         .border-b { border-bottom: 1px dashed #000; padding-bottom: 5px; margin-bottom: 5px; }
@@ -210,11 +370,14 @@ export default function Alterations() {
                     </style>
                 </head>
                 <body>
-                    <h2 class="text-center" style="margin: 0 0 5px 0;">تذكرة تعديل خياطة</h2>
-                    <div class="text-center border-b">أمر تشغيل معمل وتعديل</div>
+                    <h2 class="text-center" style="margin: 0 0 5px 0;">مشغل البصمة الذكية</h2>
+                    <div class="text-center border-b">أمر تشغيل معمل وتعديل قطعة</div>
                     <div class="flex" style="margin-top: 8px;"><span>رقم التذكرة:</span> <span class="font-bold">#ALT-${String(ticketId).padStart(4, '0')}</span></div>
                     <div class="flex"><span>العميل:</span> <span>${name}</span></div>
                     <div class="flex"><span>الجوال:</span> <span dir="ltr">${phone}</span></div>
+                    <div class="flex"><span>نوع التعديل / السبب:</span> <span>${reasonLabels[reason] || reason}</span></div>
+                    ${assignedTailor ? `<div class="flex"><span>المعلم المكلف:</span> <span>${assignedTailor}</span></div>` : ''}
+                    ${fittingNotes ? `<div class="flex"><span>ملاحظات البروفة:</span> <span>${fittingNotes}</span></div>` : ''}
                     <div class="border-b" style="margin-top: 5px;"></div>
                     <div style="margin: 6px 0;">
                         ${items.map(i => `<div class="flex"><span>${i.garment_type === 'thobe' ? 'ثوب' : i.garment_type === 'shirt' ? 'قميص' : i.garment_type === 'pants' ? 'سروال' : 'أخرى'}: ${i.instructions}</span> <span>${i.fee} ر.س</span></div>`).join('')}
@@ -234,12 +397,22 @@ export default function Alterations() {
             if (window.api?.printHTML) {
                 window.api.printHTML(html);
             } else {
-                const win = window.open('', '_blank', 'width=350,height=500');
-                if (win) {
-                    win.document.write(html);
-                    win.document.close();
-                    setTimeout(() => win.print(), 300);
-                }
+                const iframe = document.createElement('iframe');
+                iframe.style.position = 'fixed';
+                iframe.style.top = '-9999px';
+                iframe.style.left = '-9999px';
+                iframe.style.width = '0';
+                iframe.style.height = '0';
+                document.body.appendChild(iframe);
+                const doc = iframe.contentWindow.document;
+                doc.open();
+                doc.write(html);
+                doc.close();
+                setTimeout(() => {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                    setTimeout(() => { try { document.body.removeChild(iframe); } catch(_) {} }, 2000);
+                }, 400);
             }
 
         } catch (e) {
@@ -293,10 +466,11 @@ export default function Alterations() {
                             position: 'absolute',
                             right: '12px',
                             color: 'var(--color-accent, #0EA5E9)',
-                            fontSize: '18px',
+                            display: 'flex',
+                            alignItems: 'center',
                             pointerEvents: 'none'
                         }}>
-                            📷
+                            <ScanBarcode size={18} />
                         </div>
                         <input
                             ref={searchInputRef}
@@ -329,11 +503,12 @@ export default function Alterations() {
                                     border: 'none',
                                     color: 'var(--text-muted, #64748b)',
                                     cursor: 'pointer',
-                                    fontSize: '14px',
+                                    display: 'flex',
+                                    alignItems: 'center',
                                     padding: '4px'
                                 }}
                             >
-                                ✕
+                                <X size={14} />
                             </button>
                         )}
                     </div>
@@ -386,7 +561,7 @@ export default function Alterations() {
                             onMouseOver={(e) => e.currentTarget.style.background = 'var(--color-primary-hover, #4f46e5)'}
                             onMouseOut={(e) => e.currentTarget.style.background = 'var(--color-primary, #6366f1)'}
                         >
-                            <span style={{ fontSize: '16px' }}>➕</span>
+                            <Plus size={16} />
                             <span>إصدار تذكرة تعديل جديدة</span>
                         </button>
                     </div>
@@ -426,7 +601,7 @@ export default function Alterations() {
                                 background: 'rgba(245,158,11,0.08)'
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ color: '#f59e0b', fontSize: '16px' }}>⏳</span>
+                                    <Clock size={16} color="#f59e0b" />
                                     <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
                                         قيد الانتظار
                                     </h3>
@@ -482,6 +657,86 @@ export default function Alterations() {
                                                 {t.customer_phone || '—'}
                                             </div>
 
+                                            {/* Reason & Accountability Badges */}
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
+                                                {t.reason && (
+                                                    <span style={{
+                                                        fontSize: '11px',
+                                                        fontWeight: 800,
+                                                        padding: '2px 7px',
+                                                        borderRadius: '6px',
+                                                        background: t.reason.includes('error') ? 'rgba(239, 68, 68, 0.15)' : t.reason === 'fitting_adjustment' ? 'rgba(168, 85, 247, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                                                        color: t.reason.includes('error') ? '#ef4444' : t.reason === 'fitting_adjustment' ? '#a855f7' : '#3b82f6'
+                                                    }}>
+                                                        {t.reason === 'customer_request' ? 'رغبة العميل' : t.reason === 'fitting_adjustment' ? 'بروفة قياس' : t.reason === 'tailor_error' ? 'خطأ خياط (مجاني)' : t.reason === 'cutter_error' ? 'خطأ فصال (مجاني)' : 'انكماش قماش'}
+                                                    </span>
+                                                )}
+                                                {t.assigned_tailor && (
+                                                    <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '6px', background: 'rgba(99, 102, 241, 0.12)', color: 'var(--color-primary, #6366f1)' }}>
+                                                        المعلم: {t.assigned_tailor}
+                                                    </span>
+                                                )}
+                                                {t.fault_staff && (
+                                                    <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}>
+                                                        المسؤول: {t.fault_staff}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {t.fitting_notes && (
+                                                <div style={{ fontSize: '11px', color: '#a855f7', background: 'rgba(168, 85, 247, 0.08)', padding: '4px 8px', borderRadius: '6px', marginBottom: '8px', border: '1px dashed rgba(168, 85, 247, 0.3)' }}>
+                                                    🔍 <strong>البروفة:</strong> {t.fitting_notes}
+                                                </div>
+                                            )}
+
+                                            {/* Quick Print & Share Buttons */}
+                                            <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                                                <button
+                                                    onClick={() => handlePrintAlterationHangerTag(t)}
+                                                    title="طباعة ملصق المعلقة للثوب"
+                                                    style={{
+                                                        flex: 1,
+                                                        padding: '5px 8px',
+                                                        background: 'var(--bg-card, #ffffff)',
+                                                        border: '1px solid var(--border-subtle, #e2e8f0)',
+                                                        borderRadius: '6px',
+                                                        fontSize: '11px',
+                                                        fontWeight: 700,
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: '4px',
+                                                        color: 'var(--text-main, #0f172a)'
+                                                    }}
+                                                >
+                                                    <Printer size={12} />
+                                                    <span>ملصق تعليق</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => handleShareAlterationWhatsApp(t)}
+                                                    title="مراسلة العميل بالواتساب"
+                                                    style={{
+                                                        flex: 1,
+                                                        padding: '5px 8px',
+                                                        background: '#128C7E',
+                                                        color: '#ffffff',
+                                                        border: 'none',
+                                                        borderRadius: '6px',
+                                                        fontSize: '11px',
+                                                        fontWeight: 800,
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: '4px'
+                                                    }}
+                                                >
+                                                    <MessageCircle size={12} />
+                                                    <span>واتساب</span>
+                                                </button>
+                                            </div>
+
                                             {/* Items Instructions */}
                                             <div style={{ background: 'rgba(0,0,0,0.2)', padding: '8px 10px', borderRadius: '8px', fontSize: '12px', marginBottom: '10px' }}>
                                                 {t.items?.map((item, idx) => (
@@ -519,7 +774,7 @@ export default function Alterations() {
                                                     transition: 'all 0.15s'
                                                 }}
                                             >
-                                                <span>▶️</span>
+                                                <Play size={14} />
                                                 <span>بدء العمل في التعديل</span>
                                             </button>
                                         </div>
@@ -546,7 +801,7 @@ export default function Alterations() {
                                 background: 'rgba(59,130,246,0.08)'
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ color: '#3b82f6', fontSize: '16px' }}>🧵</span>
+                                    <Scissors size={16} color="#3b82f6" />
                                     <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
                                         جاري العمل
                                     </h3>
@@ -602,6 +857,86 @@ export default function Alterations() {
                                                 {t.customer_phone || '—'}
                                             </div>
 
+                                            {/* Reason & Accountability Badges */}
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
+                                                {t.reason && (
+                                                    <span style={{
+                                                        fontSize: '11px',
+                                                        fontWeight: 800,
+                                                        padding: '2px 7px',
+                                                        borderRadius: '6px',
+                                                        background: t.reason.includes('error') ? 'rgba(239, 68, 68, 0.15)' : t.reason === 'fitting_adjustment' ? 'rgba(168, 85, 247, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                                                        color: t.reason.includes('error') ? '#ef4444' : t.reason === 'fitting_adjustment' ? '#a855f7' : '#3b82f6'
+                                                    }}>
+                                                        {t.reason === 'customer_request' ? 'رغبة العميل' : t.reason === 'fitting_adjustment' ? 'بروفة قياس' : t.reason === 'tailor_error' ? 'خطأ خياط (مجاني)' : t.reason === 'cutter_error' ? 'خطأ فصال (مجاني)' : 'انكماش قماش'}
+                                                    </span>
+                                                )}
+                                                {t.assigned_tailor && (
+                                                    <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '6px', background: 'rgba(99, 102, 241, 0.12)', color: 'var(--color-primary, #6366f1)' }}>
+                                                        المعلم: {t.assigned_tailor}
+                                                    </span>
+                                                )}
+                                                {t.fault_staff && (
+                                                    <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}>
+                                                        المسؤول: {t.fault_staff}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {t.fitting_notes && (
+                                                <div style={{ fontSize: '11px', color: '#a855f7', background: 'rgba(168, 85, 247, 0.08)', padding: '4px 8px', borderRadius: '6px', marginBottom: '8px', border: '1px dashed rgba(168, 85, 247, 0.3)' }}>
+                                                    🔍 <strong>البروفة:</strong> {t.fitting_notes}
+                                                </div>
+                                            )}
+
+                                            {/* Quick Print & Share Buttons */}
+                                            <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                                                <button
+                                                    onClick={() => handlePrintAlterationHangerTag(t)}
+                                                    title="طباعة ملصق المعلقة للثوب"
+                                                    style={{
+                                                        flex: 1,
+                                                        padding: '5px 8px',
+                                                        background: 'var(--bg-card, #ffffff)',
+                                                        border: '1px solid var(--border-subtle, #e2e8f0)',
+                                                        borderRadius: '6px',
+                                                        fontSize: '11px',
+                                                        fontWeight: 700,
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: '4px',
+                                                        color: 'var(--text-main, #0f172a)'
+                                                    }}
+                                                >
+                                                    <Printer size={12} />
+                                                    <span>ملصق تعليق</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => handleShareAlterationWhatsApp(t)}
+                                                    title="مراسلة العميل بالواتساب"
+                                                    style={{
+                                                        flex: 1,
+                                                        padding: '5px 8px',
+                                                        background: '#128C7E',
+                                                        color: '#ffffff',
+                                                        border: 'none',
+                                                        borderRadius: '6px',
+                                                        fontSize: '11px',
+                                                        fontWeight: 800,
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: '4px'
+                                                    }}
+                                                >
+                                                    <MessageCircle size={12} />
+                                                    <span>واتساب</span>
+                                                </button>
+                                            </div>
+
                                             <div style={{ background: 'rgba(0,0,0,0.2)', padding: '8px 10px', borderRadius: '8px', fontSize: '12px', marginBottom: '10px' }}>
                                                 {t.items?.map((item, idx) => (
                                                     <div key={idx} style={{ color: 'var(--text-muted, #64748b)' }}>
@@ -637,7 +972,7 @@ export default function Alterations() {
                                                         gap: '6px'
                                                     }}
                                                 >
-                                                    <span>✅</span>
+                                                    <CheckCircle2 size={14} />
                                                     <span>جاهز للتسليم</span>
                                                 </button>
                                                 <button
@@ -652,10 +987,15 @@ export default function Alterations() {
                                                         borderRadius: '8px',
                                                         fontWeight: 700,
                                                         fontSize: '12px',
-                                                        cursor: 'pointer'
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: '4px'
                                                     }}
                                                 >
-                                                    ↩️ تراجع
+                                                    <Undo2 size={13} />
+                                                    <span>تراجع</span>
                                                 </button>
                                             </div>
                                         </div>
@@ -682,7 +1022,7 @@ export default function Alterations() {
                                 background: 'rgba(16,185,129,0.08)'
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ color: '#10b981', fontSize: '16px' }}>📦</span>
+                                    <PackageCheck size={16} color="#10b981" />
                                     <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
                                         جاهز للتسليم
                                     </h3>
@@ -738,6 +1078,86 @@ export default function Alterations() {
                                                 {t.customer_phone || '—'}
                                             </div>
 
+                                            {/* Reason & Accountability Badges */}
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
+                                                {t.reason && (
+                                                    <span style={{
+                                                        fontSize: '11px',
+                                                        fontWeight: 800,
+                                                        padding: '2px 7px',
+                                                        borderRadius: '6px',
+                                                        background: t.reason.includes('error') ? 'rgba(239, 68, 68, 0.15)' : t.reason === 'fitting_adjustment' ? 'rgba(168, 85, 247, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                                                        color: t.reason.includes('error') ? '#ef4444' : t.reason === 'fitting_adjustment' ? '#a855f7' : '#3b82f6'
+                                                    }}>
+                                                        {t.reason === 'customer_request' ? 'رغبة العميل' : t.reason === 'fitting_adjustment' ? 'بروفة قياس' : t.reason === 'tailor_error' ? 'خطأ خياط (مجاني)' : t.reason === 'cutter_error' ? 'خطأ فصال (مجاني)' : 'انكماش قماش'}
+                                                    </span>
+                                                )}
+                                                {t.assigned_tailor && (
+                                                    <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '6px', background: 'rgba(99, 102, 241, 0.12)', color: 'var(--color-primary, #6366f1)' }}>
+                                                        المعلم: {t.assigned_tailor}
+                                                    </span>
+                                                )}
+                                                {t.fault_staff && (
+                                                    <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}>
+                                                        المسؤول: {t.fault_staff}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {t.fitting_notes && (
+                                                <div style={{ fontSize: '11px', color: '#a855f7', background: 'rgba(168, 85, 247, 0.08)', padding: '4px 8px', borderRadius: '6px', marginBottom: '8px', border: '1px dashed rgba(168, 85, 247, 0.3)' }}>
+                                                    🔍 <strong>البروفة:</strong> {t.fitting_notes}
+                                                </div>
+                                            )}
+
+                                            {/* Quick Print & Share Buttons */}
+                                            <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                                                <button
+                                                    onClick={() => handlePrintAlterationHangerTag(t)}
+                                                    title="طباعة ملصق المعلقة للثوب"
+                                                    style={{
+                                                        flex: 1,
+                                                        padding: '5px 8px',
+                                                        background: 'var(--bg-card, #ffffff)',
+                                                        border: '1px solid var(--border-subtle, #e2e8f0)',
+                                                        borderRadius: '6px',
+                                                        fontSize: '11px',
+                                                        fontWeight: 700,
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: '4px',
+                                                        color: 'var(--text-main, #0f172a)'
+                                                    }}
+                                                >
+                                                    <Printer size={12} />
+                                                    <span>ملصق تعليق</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => handleShareAlterationWhatsApp(t)}
+                                                    title="مراسلة العميل بالواتساب"
+                                                    style={{
+                                                        flex: 1,
+                                                        padding: '5px 8px',
+                                                        background: '#128C7E',
+                                                        color: '#ffffff',
+                                                        border: 'none',
+                                                        borderRadius: '6px',
+                                                        fontSize: '11px',
+                                                        fontWeight: 800,
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: '4px'
+                                                    }}
+                                                >
+                                                    <MessageCircle size={12} />
+                                                    <span>واتساب</span>
+                                                </button>
+                                            </div>
+
                                             {/* Financial Status Highlight */}
                                             <div style={{
                                                 background: bal > 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
@@ -780,7 +1200,8 @@ export default function Alterations() {
                                                         gap: '6px'
                                                     }}
                                                 >
-                                                    <span>{bal > 0 ? '💵 تسليم وتحصيل' : '📦 تسليم للعميل'}</span>
+                                                    {bal > 0 ? <Banknote size={15} /> : <PackageCheck size={15} />}
+                                                    <span>{bal > 0 ? 'تسليم وتحصيل' : 'تسليم للعميل'}</span>
                                                 </button>
                                                 <button
                                                     onClick={() => handleUpdateStatus(t.id, 'in_progress')}
@@ -794,10 +1215,15 @@ export default function Alterations() {
                                                         borderRadius: '8px',
                                                         fontWeight: 700,
                                                         fontSize: '12px',
-                                                        cursor: 'pointer'
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: '4px'
                                                     }}
                                                 >
-                                                    ↩️ إعادة
+                                                    <Undo2 size={13} />
+                                                    <span>إعادة للخياط</span>
                                                 </button>
                                             </div>
                                         </div>
@@ -844,14 +1270,15 @@ export default function Alterations() {
                             justifyContent: 'space-between',
                             alignItems: 'center'
                         }}>
-                            <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
-                                🏷️ إصدار تذكرة تعديل جديدة
+                            <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: 'var(--text-main, #0f172a)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Tag size={18} color="var(--color-primary, #6366f1)" />
+                                <span>إصدار تذكرة تعديل جديدة</span>
                             </h2>
                             <button
                                 onClick={() => setShowModal(false)}
-                                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted, #64748b)', fontSize: '20px', cursor: 'pointer' }}
+                                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted, #64748b)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
                             >
-                                ✕
+                                <X size={18} />
                             </button>
                         </div>
 
@@ -921,7 +1348,7 @@ export default function Alterations() {
                                     />
                                 </div>
 
-                                {/* Autocomplete Suggestion Flyout */}
+                                 {/* Autocomplete Suggestion Flyout */}
                                 {showSuggestions && customerSuggestions.length > 0 && (
                                     <div style={{
                                         position: 'absolute',
@@ -954,12 +1381,102 @@ export default function Alterations() {
                                                 onMouseOver={e => e.currentTarget.style.background = '#283548'}
                                                 onMouseOut={e => e.currentTarget.style.background = '#1e293b'}
                                             >
-                                                <span style={{ fontWeight: 700 }}>👤 {c.name}</span>
+                                                <span style={{ fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                    <User size={13} color="var(--color-primary, #6366f1)" />
+                                                    <span>{c.name}</span>
+                                                </span>
                                                 <span style={{ color: 'var(--text-muted, #64748b)', fontFamily: "'IBM Plex Mono', monospace" }}>{c.phone}</span>
                                             </div>
                                         ))}
                                     </div>
                                 )}
+                            </div>
+
+                            {/* Alteration Lifecycle & Accountability Section */}
+                            <div style={{
+                                background: 'rgba(99, 102, 241, 0.05)',
+                                border: '1px solid rgba(99, 102, 241, 0.2)',
+                                borderRadius: '10px',
+                                padding: '14px',
+                                marginBottom: '16px'
+                            }}>
+                                <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-primary, #6366f1)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <ShieldAlert size={16} />
+                                    <span>دورة التعديل والمسؤولية والبروفة</span>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '10px' }}>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted, #64748b)' }}>
+                                            سبب التعديل والمسؤولية المالية
+                                        </label>
+                                        <select
+                                            value={reason}
+                                            onChange={e => {
+                                                const r = e.target.value;
+                                                setReason(r);
+                                                if (r === 'tailor_error' || r === 'cutter_error') {
+                                                    // Set fee to 0 automatically for internal shop errors
+                                                    setItems(prev => prev.map(item => ({ ...item, fee: 0 })));
+                                                    setDeposit(0);
+                                                }
+                                            }}
+                                            style={{ width: '100%', padding: '9px', borderRadius: '7px', background: '#111827', border: '1px solid #334155', color: '#fff', fontSize: '13px' }}
+                                        >
+                                            <option value="customer_request">رغبة العميل (تعديل مدفوع)</option>
+                                            <option value="fitting_adjustment">بروفة قياس (تعديل مقاسات بعد التجربة)</option>
+                                            <option value="tailor_error">خطأ خياط (مجاني - مسؤولية الخياط)</option>
+                                            <option value="cutter_error">خطأ تفصيل / قص (مجاني - مسؤولية الفصال)</option>
+                                            <option value="fabric_shrinkage">انكماش قماش بعد الغسيل</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted, #64748b)' }}>
+                                            المعلم المكلف بالتعديل
+                                        </label>
+                                        <select
+                                            value={assignedTailor}
+                                            onChange={e => setAssignedTailor(e.target.value)}
+                                            style={{ width: '100%', padding: '9px', borderRadius: '7px', background: '#111827', border: '1px solid #334155', color: '#fff', fontSize: '13px' }}
+                                        >
+                                            <option value="">-- اختياري: اختر المعلم المكلف --</option>
+                                            {staffList.map(s => (
+                                                <option key={s.id} value={s.name}>{s.name} ({s.role === 'tailor' ? 'خياط' : s.role === 'cutter' ? 'فصال' : s.role})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {(reason === 'tailor_error' || reason === 'cutter_error') && (
+                                        <div>
+                                            <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 700, color: '#ef4444' }}>
+                                                الموظف المتسبب بالخطأ (للمساءلة)
+                                            </label>
+                                            <select
+                                                value={faultStaff}
+                                                onChange={e => setFaultStaff(e.target.value)}
+                                                style={{ width: '100%', padding: '9px', borderRadius: '7px', background: '#111827', border: '1px solid #ef4444', color: '#fff', fontSize: '13px' }}
+                                            >
+                                                <option value="">-- اختر الموظف المسؤول --</option>
+                                                {staffList.map(s => (
+                                                    <option key={s.id} value={s.name}>{s.name} ({s.role})</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted, #64748b)' }}>
+                                        ملاحظات البروفة والتجربة (Fitting Notes)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="مثال: قياس التجربة: الياقة مضبوطة، يحتاج تقصير الطول 1.5 سم وتضييق بسيط في المعصم"
+                                        value={fittingNotes}
+                                        onChange={e => setFittingNotes(e.target.value)}
+                                        style={{ width: '100%', padding: '9px 12px', borderRadius: '7px', background: '#111827', border: '1px solid #334155', color: '#fff', fontSize: '13px' }}
+                                    />
+                                </div>
                             </div>
 
                             {/* Items Section */}
@@ -1030,9 +1547,9 @@ export default function Alterations() {
                                         {items.length > 1 && (
                                             <button
                                                 onClick={() => handleRemoveItem(index)}
-                                                style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 800 }}
+                                                style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                             >
-                                                ✕
+                                                <X size={14} />
                                             </button>
                                         )}
                                     </div>
@@ -1105,10 +1622,15 @@ export default function Alterations() {
                                     borderRadius: '8px',
                                     fontWeight: 900,
                                     fontSize: '14px',
-                                    cursor: 'pointer'
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px'
                                 }}
                             >
-                                💾 حفظ وطباعة التذكرة الفورية
+                                <Save size={16} />
+                                <span>حفظ وطباعة التذكرة الفورية</span>
                             </button>
                             <button
                                 onClick={() => setShowModal(false)}

@@ -43,8 +43,16 @@ export function ToastProvider({ children }) {
 
   const dismiss = useCallback((id) => dispatch({ type: 'REMOVE', id }), []);
 
+  const showToast = useCallback((msgOrObj, fallbackType = 'info') => {
+    if (typeof msgOrObj === 'object' && msgOrObj !== null) {
+      toast(msgOrObj.message || msgOrObj.msg || '', msgOrObj.type || fallbackType);
+    } else {
+      toast(msgOrObj, fallbackType);
+    }
+  }, [toast]);
+
   return (
-    <ToastContext.Provider value={{ toast, dismiss }}>
+    <ToastContext.Provider value={{ toast, showToast, dismiss }}>
       {children}
       {createPortal(
         <ToastContainer toasts={toasts} onDismiss={dismiss} />,

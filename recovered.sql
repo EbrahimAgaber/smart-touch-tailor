@@ -10944,7 +10944,7 @@ INSERT INTO lost_and_found VALUES(568, 568, 16, 77, NULL, 301, 'INV-178395237550
         <cac:Party>
             <cac:PartyIdentification>
                 <cbc:ID schemeID="CRN">4651104286</cbc:ID>
-            .', 'شاورما والوجباتوحدة / قط', 'عة (PCE)W��', '', 0, '� / قطعة (PCE)h', '��', 'ما ت', NULL, 1, 'ورتيلا صاروخالشاورما والوجباتوحدة / قطعة (PCE)W��');
+            .', 'شاورما والوجباتوحدة / قط', 'عة (PCE)W��', '', 0, '� / قطعة (PCE)h', '��', 'ما ت', NULL, 1, 'ورتيلا صاروخالشاورما والوجباتوحدة / قطعة (PCE)W��');
 CREATE TRIGGER customers_sync_update
             AFTER UPDATE ON customers
             FOR EACH ROW

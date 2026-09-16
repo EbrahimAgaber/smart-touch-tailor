@@ -28,6 +28,8 @@ import Services from './pages/Services';
 import OrdersBoard from './pages/OrdersBoard';
 import MeasurementCapture from './pages/MeasurementCapture';
 import CustomerMenu from './pages/CustomerMenu';
+import CustomerOrderTracker from './pages/CustomerOrderTracker';
+import FabricRemnants from './pages/FabricRemnants';
 import Sponsors from './pages/Sponsors';
 import CustomerDisplay from './pages/CustomerDisplay';
 import Onboarding from './pages/Onboarding';
@@ -333,11 +335,16 @@ export default function App() {
                 <Route path="/sponsors"         element={<P><Sponsors /></P>} />
                 <Route path="/services"         element={<P><Services /></P>} />
                 
+                {/* ── Public Customer Self-Service Tracking ── */}
+                <Route path="/track"            element={<CustomerOrderTracker />} />
+                <Route path="/track/:orderId"   element={<CustomerOrderTracker />} />
+
                 {/* ── Tailor-specific ── */}
                 <Route path="/tailor-pos"       element={<P><TailorPos /></P>} />
                 <Route path="/alterations"       element={<P><Alterations /></P>} />
                 <Route path="/orders-board"     element={<P><OrdersBoard /></P>} />
                 <Route path="/measurements"     element={<P><MeasurementCapture /></P>} />
+                <Route path="/fabric-remnants"  element={<P><FabricRemnants /></P>} />
                 <Route path="/customer-menu"    element={<CustomerMenu />} />
 
                 {/* ── Admin-only ── */}

@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useLicenseStore } from '../store/useLicenseStore';
-import { CreditCard, Pause, ChefHat, Trash2, Edit3, X, Save, MessageSquare, Headphones, LayoutGrid, Table } from 'lucide-react';
+import { CreditCard, Pause, ChefHat, Trash2, Edit3, X, Save, MessageSquare, Headphones, LayoutGrid, Table, Scissors, Ruler, Factory, ArrowRight } from 'lucide-react';
 import QRCode from '../utils/qr-gen';
 import TabularView from '../features/pos/components/TabularView';
 
@@ -153,6 +153,8 @@ export default function Pos() {
   // Hold orders
   const [heldOrders, setHeldOrders] = useState([]);
   const [showHeld, setShowHeld]     = useState(false);
+  const pendingTailorOrderIdRef     = useRef(null);
+  const pendingAlterationTicketIdRef = useRef(null);
 
   // WhatsApp Modal
   const [showWAModal, setShowWAModal] = useState(false);
@@ -196,14 +198,23 @@ export default function Pos() {
       }
     };
 
-    if (location.state?.tableId && api && api.getTables) {
-      api.getTables().then(all => {
+    fetchHeld();
+    const interval = setInterval(fetchHeld, 15000); // 15s poll
+    return () => clearInterval(interval);
+  }, []);
+
+  // ── Router Handoff Listener (Tailor POS, Alterations, Held Orders) ──
+  useEffect(() => {
+    if (!location.state) return;
+
+    if (location.state?.tableId && window.api?.getTables) {
+      window.api.getTables().then(all => {
         const t = (all || []).find(x => x.id === location.state.tableId);
         if (t) setTable(t);
       }).catch(() => {});
     }
 
-    // FIX: Auto-resume a held order sent from the Services page
+    // Auto-resume a held order sent from the Services page
     if (location.state?.resumeHeld) {
       const held = location.state.resumeHeld;
       clearCart();
@@ -216,6 +227,7 @@ export default function Pos() {
       
       if (!held.items || held.items.length === 0) {
         addItem({
+          ID: 'service_' + (held.id || Date.now()),
           id: 'service_' + (held.id || Date.now()),
           Name: `تذكرة: ${held.label || 'صيانة عامة'}`,
           Price: parseFloat(held.final_price) || 0,
@@ -224,36 +236,59 @@ export default function Pos() {
         });
       }
 
-      // Clean up the held order from the queue
-      api?.deleteHeldOrder?.(held.id);
-      
+      window.api?.deleteHeldOrder?.(held.id);
       navigate(location.pathname, { replace: true, state: {} });
     }
 
+    // Mulam Tailor POS Handoff
     if (location.state?.tailorHandoff) {
       const th = location.state.tailorHandoff;
+      if (th.orderId) {
+        pendingTailorOrderIdRef.current = th.orderId;
+      }
       clearCart();
       for (const item of (th.cartItems || [])) {
-        addItem(item, []);
+        addItem({
+          ID: item.ID || item.id || `tailor_${Date.now()}_${Math.random()}`,
+          id: item.ID || item.id || `tailor_${Date.now()}_${Math.random()}`,
+          Name: item.Name || item.name || 'تفصيل ثوب',
+          Price: parseFloat(item.Price || item.price || 0),
+          Qty: item.Qty || item.qty || 1,
+          Category: item.Category || 'خياطة',
+          IsService: true
+        }, []);
       }
       if (th.customer) setSelectedCustomer(th.customer);
       setOrderType('tailor');
       setOrderNote(th.orderNote || '');
-      // Setup payment values
+      
+      // Auto-open payment modal after items settle
       setTimeout(() => {
-          if (th.depositSuggested > 0) {
-              setPayments([{ type: 'Cash', amount: th.depositSuggested.toString() }]);
-          }
-          setShowPayment(true);
-      }, 300); // small delay to let cart calc
+        if (th.depositSuggested > 0) {
+          setPayments([{ type: 'Cash', amount: th.depositSuggested.toString() }]);
+        }
+        setShowPayment(true);
+      }, 300);
       navigate(location.pathname, { replace: true, state: { tailor_order_id: th.orderId } });
     }
 
+    // Alteration Handoff
     if (location.state?.alterationHandoff) {
       const ah = location.state.alterationHandoff;
+      if (ah.ticketId) {
+        pendingAlterationTicketIdRef.current = ah.ticketId;
+      }
       clearCart();
       for (const item of (ah.cartItems || [])) {
-        addItem(item, []);
+        addItem({
+          ID: item.ID || item.id || `alt_${Date.now()}_${Math.random()}`,
+          id: item.ID || item.id || `alt_${Date.now()}_${Math.random()}`,
+          Name: item.Name || item.name || 'تعديل ملابس',
+          Price: parseFloat(item.Price || item.price || 0),
+          Qty: item.Qty || item.qty || 1,
+          Category: item.Category || 'تعديل',
+          IsService: true
+        }, []);
       }
       if (ah.customer) setSelectedCustomer(ah.customer);
       setOrderType('alteration');
@@ -261,11 +296,7 @@ export default function Pos() {
       setTimeout(() => setShowPayment(true), 300);
       navigate(location.pathname, { replace: true, state: { alteration_ticket_id: ah.ticketId } });
     }
-    
-    fetchHeld();
-    const interval = setInterval(fetchHeld, 15000); // 15s poll
-    return () => clearInterval(interval);
-  }, []);
+  }, [location.state]);
 
   // ── Keyboard shortcuts are declared below to prevent initialization issues
 
@@ -513,24 +544,28 @@ export default function Pos() {
       }
 
       // Mulam Pipeline Post-Sale Updates
-      if (location.state?.tailor_order_id) {
-        const tStatus = paidAmount >= finalTotal ? 'paid' : 'pending';
+      const activeTailorId = pendingTailorOrderIdRef.current || location.state?.tailor_order_id;
+      if (activeTailorId) {
+        const tStatus = paidAmount >= finalTotal ? 'confirmed' : 'pending';
         await api.tailor?.updateOrderStatus?.({
-          order_id: location.state.tailor_order_id,
+          order_id: activeTailorId,
           sale_invoice_id: res.invoice || invoiceNum,
-          status: tStatus
+          status: tStatus,
+          paid_amount: paidAmount
         }).catch(console.error);
         
-        // Remove from router state so it doesn't trigger again on refresh
+        pendingTailorOrderIdRef.current = null;
         window.history.replaceState({}, document.title);
       }
       
-      if (location.state?.alteration_ticket_id) {
+      const activeAltId = pendingAlterationTicketIdRef.current || location.state?.alteration_ticket_id;
+      if (activeAltId) {
         await api.tailor?.updateAlterationStatus?.({
-          ticket_id: location.state.alteration_ticket_id,
+          ticket_id: activeAltId,
           status: 'delivered'
         }).catch(console.error);
         
+        pendingAlterationTicketIdRef.current = null;
         window.history.replaceState({}, document.title);
       }
 
@@ -625,6 +660,31 @@ export default function Pos() {
       if (table) {
         await api.updateTable({ id: table.id, status: 'available', current_order_id: null, name: table.name, zone: '', capacity: 0 });
         setTable(null);
+      }
+
+      // Mulam Pipeline Post-Sale Updates
+      const activeTailorId = pendingTailorOrderIdRef.current || location.state?.tailor_order_id;
+      if (activeTailorId) {
+        await api.tailor?.updateOrderStatus?.({
+          order_id: activeTailorId,
+          sale_invoice_id: res.invoice || invoiceNum,
+          status: 'confirmed',
+          paid_amount: saleTotal
+        }).catch(console.error);
+        
+        pendingTailorOrderIdRef.current = null;
+        window.history.replaceState({}, document.title);
+      }
+      
+      const activeAltId = pendingAlterationTicketIdRef.current || location.state?.alteration_ticket_id;
+      if (activeAltId) {
+        await api.tailor?.updateAlterationStatus?.({
+          ticket_id: activeAltId,
+          status: 'delivered'
+        }).catch(console.error);
+        
+        pendingAlterationTicketIdRef.current = null;
+        window.history.replaceState({}, document.title);
       }
 
       const invoiceData = { 
@@ -1780,6 +1840,75 @@ export default function Pos() {
                 <Table size={14} /> {t('pos.header.tabular')}
               </button>
             </div>
+
+            {/* Quick Tailor Switcher - Mulam Ergonomics */}
+            {(orderType === 'tailor' || settings?.business_type === 'tailor' || pendingTailorOrderIdRef.current) && (
+              <div style={{ display:'flex', gap:'6px', background:'#f1f5f9', padding:'3px', borderRadius:'10px', border:'1px solid #cbd5e1' }}>
+                <button
+                  onClick={() => navigate('/tailor-pos')}
+                  style={{
+                    border: 'none',
+                    background: '#10b981',
+                    color: '#ffffff',
+                    padding: '6px 12px',
+                    borderRadius: '7px',
+                    fontSize: '11px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    boxShadow: '0 1px 3px rgba(16,185,129,0.3)'
+                  }}
+                  title="العودة لشاشة تفصيل ثوب جديد"
+                >
+                  <Scissors size={13} />
+                  <span>تفصيل جديد</span>
+                </button>
+
+                <button
+                  onClick={() => navigate('/measurements')}
+                  style={{
+                    border: 'none',
+                    background: '#ffffff',
+                    color: '#334155',
+                    padding: '6px 10px',
+                    borderRadius: '7px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="الانتقال إلى دفتر قياسات العملاء"
+                >
+                  <Ruler size={13} />
+                  <span>المقاسات</span>
+                </button>
+
+                <button
+                  onClick={() => navigate('/orders-board')}
+                  style={{
+                    border: 'none',
+                    background: '#ffffff',
+                    color: '#334155',
+                    padding: '6px 10px',
+                    borderRadius: '7px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="لوحة متابعة مراحل خياطة الثياب"
+                >
+                  <Factory size={13} />
+                  <span>المعمل</span>
+                </button>
+              </div>
+            )}
           </div>
           <div style={{ background:'white', padding:'5px 12px', borderRadius:'99px', fontSize:'12px', fontWeight:'600', color:'#64748b', boxShadow:'0 1px 2px rgba(0,0,0,0.05)' }}>
             {new Date().toLocaleString('ar-SA', { timeZone:'Asia/Riyadh', hour:'2-digit', minute:'2-digit' })}
@@ -2187,6 +2316,57 @@ export default function Pos() {
 
             {/* SECONDARY: WhatsApp */}
             <button onClick={shareViaWhatsApp} style={{ width:'100%', padding:'13px', marginBottom:'10px', background:'#f0fdf4', color:'#059669', border:'2px solid #a7f3d0', borderRadius:'14px', fontWeight:'800', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', fontSize:'14px', fontFamily:'inherit' }}>💬 {t('pos.success.send_whatsapp')}</button>
+
+            {/* TAILOR MULTI-ORDER WORKFLOW SHORTCUT */}
+            {(orderType === 'tailor' || settings?.business_type === 'tailor' || lastInvoice?.order_type === 'tailor' || pendingTailorOrderIdRef.current) && (
+              <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '10px', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <button
+                  onClick={() => { setShowSuccess(false); navigate('/tailor-pos'); }}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: '#059669',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontWeight: '900',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    fontSize: '14px',
+                    fontFamily: 'inherit',
+                    boxShadow: '0 2px 6px rgba(5,150,105,0.3)'
+                  }}
+                >
+                  <Scissors size={16} />
+                  <span>تسجيل طلب تفصيل جديد (العميل التالي)</span>
+                </button>
+                <button
+                  onClick={() => { setShowSuccess(false); navigate('/measurements'); }}
+                  style={{
+                    width: '100%',
+                    padding: '9px',
+                    background: '#ffffff',
+                    color: '#065f46',
+                    border: '1px solid #a7f3d0',
+                    borderRadius: '8px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    fontSize: '12px',
+                    fontFamily: 'inherit'
+                  }}
+                >
+                  <Ruler size={14} />
+                  <span>الانتقال لدفتر المقاسات</span>
+                </button>
+              </div>
+            )}
 
             {/* TERTIARY: Void + Continue */}
             <div style={{ display:'flex', gap:'8px' }}>

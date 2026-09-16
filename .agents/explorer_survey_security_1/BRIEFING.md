@@ -1,4 +1,4 @@
-# BRIEFING — 2026-09-11T00:15:00Z
+# BRIEFING ï¿½ 2026-09-11T00:15:00Z
 
 ## Mission
 Investigate the codebase for Requirement 1: ZATCA Compliance & Critical Security Fixes (auth/PIN reset, IPC path traversal & RBAC, ZATCA Phase 2 thermal receipt).
@@ -11,7 +11,7 @@ Investigate the codebase for Requirement 1: ZATCA Compliance & Critical Security
 - Milestone: Survey & Architectural Design
 
 ## ?? Key Constraints
-- Read-only investigation — do NOT implement
+- Read-only investigation ï¿½ do NOT implement
 - Explore R1: ZATCA Compliance & Critical Security Fixes
 - Exact file paths, line numbers, and proposed code fixes in handoff.md
 
@@ -43,5 +43,5 @@ Investigate the codebase for Requirement 1: ZATCA Compliance & Critical Security
 - Fully documented all file paths, exact line numbers, security flaws, and drop-in code fix designs.
 
 ## Artifact Index
-- handoff.md — Final security & ZATCA analysis report
-- progress.md — Liveness & task execution progress
+- handoff.md ï¿½ Final security & ZATCA analysis report
+- progress.md ï¿½ Liveness & task execution progress

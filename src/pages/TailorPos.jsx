@@ -2,7 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MulamSubNav from '../components/mulam/MulamSubNav';
 import TailorWorkOrder from '../components/TailorWorkOrder';
+import { GarmentIcon } from '../components/GarmentIcons';
+import { Zap, ShoppingBag, FileText, Eye, Plus, Check, Printer, RotateCcw, UserPlus, ArrowRight, ArrowLeft, Lock, X, CreditCard, ShoppingCart, FileSpreadsheet, Copy, Send, Ruler, Factory, Share2 } from 'lucide-react';
 import { useTailorPos } from '../hooks/useTailorPos';
+import TailorPrintModal from '../components/mulam/TailorPrintModal';
+import TailorWhatsAppModal from '../components/mulam/TailorWhatsAppModal';
+import { printTailorWorkOrderDirect, generateTailorWhatsAppText } from '../utils/tailorPrintAndShare';
 import './TailorPos.css';
 
 export default function TailorPos() {
@@ -52,7 +57,10 @@ export default function TailorPos() {
         urgentFee, setUrgentFee,
         isGift, setIsGift,
         recipientName, setRecipientName,
-        recipientPhone, setRecipientPhone
+        recipientPhone, setRecipientPhone,
+        processOrderDirectPay,
+        completedOrder, setCompletedOrder,
+        SIZING_PRESETS, applyStandardSize
     } = useTailorPos();
 
     const printRef = useRef();
@@ -60,6 +68,20 @@ export default function TailorPos() {
     // Work Order Drawer Toggle (eliminates 33% permanent screen hog)
     const [showWorkOrderDrawer, setShowWorkOrderDrawer] = useState(false);
     const [showProfilesModal, setShowProfilesModal] = useState(false);
+    const [showPrintModal, setShowPrintModal] = useState(false);
+    const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+    const [settings, setSettings] = useState({});
+
+    useEffect(() => {
+        window.api?.getSettings?.().then(s => {
+            if (s) setSettings(s);
+        }).catch(err => console.warn('Failed to load settings:', err));
+    }, []);
+
+    const handleDirectPrintA4 = async (targetOrder = null) => {
+        const orderToPrint = targetOrder || completedOrder || orderPayload;
+        await printTailorWorkOrderDirect(orderToPrint, fabrics, settings);
+    };
 
     // Global Unit Sync
     const [unit, setUnit] = useState(() => localStorage.getItem('mulam_preferred_unit') || 'in');
@@ -151,12 +173,12 @@ export default function TailorPos() {
                     )}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {/* Reset / New Order button */}
                     <button
                         type="button"
                         onClick={resetForm}
-                        title="بدء طلب جديد وتوليد رقم فاتورة جديد"
+                        title="بدء طلب جديد وتوليد رقم فاتورة جديد للعميل التالي"
                         style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -171,28 +193,79 @@ export default function TailorPos() {
                             cursor: 'pointer',
                         }}
                     >
-                        <span>➕ طلب جديد</span>
+                        <Plus size={15} />
+                        <span>طلب جديد</span>
+                    </button>
+
+                    {/* Direct Print Work Order A4 */}
+                    <button
+                        type="button"
+                        onClick={() => handleDirectPrintA4()}
+                        title="طباعة أمر التشغيل A4 فورياً للطابعة"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: '#3b82f6',
+                            color: '#ffffff',
+                            border: 'none',
+                            padding: '8px 14px',
+                            borderRadius: '10px',
+                            fontSize: '13px',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 6px rgba(59, 130, 246, 0.3)'
+                        }}
+                    >
+                        <Printer size={15} />
+                        <span>طباعة كرت العمل A4</span>
+                    </button>
+
+                    {/* WhatsApp Work Order Share */}
+                    <button
+                        type="button"
+                        onClick={() => setShowWhatsAppModal(true)}
+                        title="مشاركة تفاصيل المقاسات وأمر التشغيل مع الخياط عبر واتساب"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: '#10b981',
+                            color: '#ffffff',
+                            border: 'none',
+                            padding: '8px 14px',
+                            borderRadius: '10px',
+                            fontSize: '13px',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)'
+                        }}
+                    >
+                        <Send size={15} />
+                        <span>مشاركة واتساب</span>
                     </button>
 
                     {/* On-demand A4 Work Order Preview Button */}
                     <button
                         type="button"
-                        onClick={() => setShowWorkOrderDrawer(true)}
+                        onClick={() => setShowPrintModal(true)}
+                        title="معاينة نموذج ورقة عمل المعلم كاملة"
                         style={{
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
-                            background: showWorkOrderDrawer ? 'var(--primary, #6366f1)' : '#f8fafc',
-                            color: showWorkOrderDrawer ? '#ffffff' : 'var(--text-main, #0f172a)',
+                            background: '#f8fafc',
+                            color: 'var(--text-main, #0f172a)',
                             border: '1px solid var(--border-subtle, #e2e8f0)',
-                            padding: '8px 16px',
+                            padding: '8px 12px',
                             borderRadius: '10px',
-                            fontSize: '13px',
+                            fontSize: '12px',
                             fontWeight: 800,
                             cursor: 'pointer',
                         }}
                     >
-                        <span>معاينة ورقة العمل A4</span>
+                        <Eye size={14} />
+                        <span>معاينة الورقة</span>
                     </button>
 
                     <button
@@ -202,7 +275,7 @@ export default function TailorPos() {
                             background: 'rgba(239, 68, 68, 0.08)',
                             color: '#ef4444',
                             border: '1px solid rgba(239, 68, 68, 0.2)',
-                            padding: '8px 14px',
+                            padding: '8px 12px',
                             borderRadius: '10px',
                             fontSize: '12px',
                             fontWeight: 800,
@@ -664,45 +737,133 @@ export default function TailorPos() {
                         )}
                     </div>
 
-                    {/* Action Buttons */}
-                    <div style={{ display: 'flex', gap: '10px', marginTop: 'auto', paddingTop: '10px', flexShrink: 0 }}>
-                        <button
-                            type="button"
-                            onClick={handleCheckoutToPOS}
-                            disabled={saving}
-                            style={{
-                                flex: 2,
-                                minHeight: '48px',
-                                background: 'var(--primary, #6366f1)',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '10px',
-                                fontWeight: 900,
-                                fontSize: '14px',
-                                cursor: saving ? 'not-allowed' : 'pointer',
-                                boxShadow: '0 4px 15px rgba(99, 102, 241, 0.2)'
-                            }}
-                        >
-                            {saving ? 'جاري الحفظ...' : 'حفظ وإتمام الدفع'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => processOrder('draft')}
-                            disabled={saving}
-                            style={{
-                                flex: 1,
-                                minHeight: '48px',
-                                background: '#f8fafc',
-                                color: '#f59e0b',
-                                border: '1px solid rgba(245, 158, 11, 0.3)',
-                                borderRadius: '10px',
-                                fontWeight: 800,
-                                fontSize: '13px',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            مسودة
-                        </button>
+                    {/* Action Buttons — Fast Mulam Seasonal Pipeline */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 'auto', paddingTop: '10px', flexShrink: 0 }}>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    await processOrderDirectPay();
+                                }}
+                                disabled={saving}
+                                style={{
+                                    flex: 2,
+                                    minHeight: '48px',
+                                    background: '#10b981',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '10px',
+                                    fontWeight: 900,
+                                    fontSize: '14px',
+                                    cursor: saving ? 'not-allowed' : 'pointer',
+                                    boxShadow: '0 4px 15px rgba(16, 185, 129, 0.25)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px'
+                                }}
+                                title="إتمام الفاتورة وتأكيد طلب التفصيل فورياً والطباعة"
+                            >
+                                <CreditCard size={16} />
+                                <span>حفظ ودفع فوري (المعلم)</span>
+                                <span style={{ fontSize: '12px', opacity: 0.9 }}>
+                                    ({(paid && parseFloat(paid) > 0 ? parseFloat(paid) : total).toFixed(2)} ر.س)
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={handleCheckoutToPOS}
+                                disabled={saving}
+                                style={{
+                                    flex: 1.4,
+                                    minHeight: '48px',
+                                    background: 'var(--primary, #6366f1)',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '10px',
+                                    fontWeight: 900,
+                                    fontSize: '13px',
+                                    cursor: saving ? 'not-allowed' : 'pointer',
+                                    boxShadow: '0 4px 15px rgba(99, 102, 241, 0.2)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px'
+                                }}
+                                title="ترحيل الطلب إلى شاشة الكاشير للتحصيل"
+                            >
+                                <ShoppingCart size={16} />
+                                <span>تحويل للكاشير</span>
+                                <ArrowLeft size={14} />
+                            </button>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                                type="button"
+                                onClick={() => processOrder('draft')}
+                                disabled={saving}
+                                style={{
+                                    flex: 1,
+                                    minHeight: '36px',
+                                    background: '#f8fafc',
+                                    color: '#f59e0b',
+                                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                                    borderRadius: '8px',
+                                    fontWeight: 800,
+                                    fontSize: '12px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '5px'
+                                }}
+                            >
+                                <FileText size={14} />
+                                <span>حفظ كمسودة</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setShowWorkOrderDrawer(true)}
+                                style={{
+                                    flex: 1.2,
+                                    minHeight: '36px',
+                                    background: '#f8fafc',
+                                    color: 'var(--text-muted, #64748b)',
+                                    border: '1px solid var(--border-subtle, #e2e8f0)',
+                                    borderRadius: '8px',
+                                    fontWeight: 700,
+                                    fontSize: '12px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '5px'
+                                }}
+                            >
+                                <FileSpreadsheet size={14} />
+                                <span>ورقة العمل A4</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={resetForm}
+                                style={{
+                                    minHeight: '36px',
+                                    padding: '0 12px',
+                                    background: '#fee2e2',
+                                    color: '#ef4444',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    fontWeight: 700,
+                                    fontSize: '12px',
+                                    cursor: 'pointer'
+                                }}
+                                title="تفريغ الحقول وبدء طلب جديد"
+                            >
+                                مسح
+                            </button>
+                        </div>
                     </div>
                 </section>
 
@@ -791,7 +952,8 @@ export default function TailorPos() {
                                     gap: '4px'
                                 }}
                             >
-                                ⧉ تكرار
+                                <Copy size={12} />
+                                <span>تكرار</span>
                             </button>
                         </div>
                     </div>
@@ -827,12 +989,51 @@ export default function TailorPos() {
                                 {items.length > 1 && (
                                     <span
                                         onClick={(e) => { e.stopPropagation(); removeItem(idx); }}
-                                        style={{ color: '#ef4444', fontWeight: 900, marginRight: '4px' }}
+                                        style={{ color: '#ef4444', fontWeight: 900, marginRight: '4px', display: 'inline-flex', alignItems: 'center' }}
                                         title="حذف القطعة"
                                     >
-                                        ✕
+                                        <X size={12} />
                                     </span>
                                 )}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Quick Sizing Presets Bar — 1-Click Fast Sizing */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: '#f8fafc',
+                        padding: '6px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-subtle, #e2e8f0)',
+                        flexShrink: 0,
+                        flexWrap: 'wrap'
+                    }}>
+                        <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-muted, #64748b)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <Zap size={12} color="#f59e0b" />
+                            <span>قوالب مقاسات سريعة:</span>
+                        </span>
+                        {Object.entries(SIZING_PRESETS || {}).map(([k, preset]) => (
+                            <button
+                                key={k}
+                                type="button"
+                                onClick={() => applyStandardSize(k)}
+                                style={{
+                                    padding: '4px 10px',
+                                    borderRadius: '6px',
+                                    background: '#ffffff',
+                                    border: '1px solid var(--border-subtle, #cbd5e1)',
+                                    color: 'var(--text-main, #0f172a)',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                                }}
+                                title={`تطبيق مقاس ${preset.label}`}
+                            >
+                                {preset.label}
                             </button>
                         ))}
                     </div>
@@ -840,10 +1041,10 @@ export default function TailorPos() {
                     {/* Garment Type Pills */}
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', flexShrink: 0 }}>
                         {[
-                            { id: 'thobe', label: 'ثوب رجالي', icon: '👔' },
-                            { id: 'sirwal', label: 'سروال', icon: '👖' },
-                            { id: 'shirt', label: 'قميص', icon: '👕' },
-                            { id: 'bisht', label: 'بشت', icon: '🧥' }
+                            { id: 'thobe', label: 'ثوب رجالي' },
+                            { id: 'sirwal', label: 'سروال' },
+                            { id: 'shirt', label: 'قميص' },
+                            { id: 'bisht', label: 'بشت' }
                         ].map(g => (
                             <button
                                 key={g.id}
@@ -873,7 +1074,7 @@ export default function TailorPos() {
                                     transition: 'all 0.15s ease'
                                 }}
                             >
-                                <span>{g.icon}</span>
+                                <GarmentIcon type={g.id} size={18} color={activeItem.garment_type === g.id ? 'var(--primary, #6366f1)' : '#64748b'} />
                                 <span>{g.label}</span>
                             </button>
                         ))}
@@ -999,8 +1200,9 @@ export default function TailorPos() {
                                 }}
                                 style={{ width: '16px', height: '16px', accentColor: '#6366f1', cursor: 'pointer' }}
                             />
-                            <label htmlFor="temp_adjustment_check" style={{ fontSize: '13px', fontWeight: 600, color: '#334155', cursor: 'pointer' }}>
-                                🔒 تعديل مؤقت لهذا الطلب فقط (لا تحفظه كمقاس أساسي دائم للعميل)
+                            <label htmlFor="temp_adjustment_check" style={{ fontSize: '13px', fontWeight: 600, color: '#334155', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <Lock size={13} color="#6366f1" />
+                                <span>تعديل مؤقت لهذا الطلب فقط (لا تحفظه كمقاس أساسي دائم للعميل)</span>
                             </label>
                         </div>
                     </div>
@@ -1155,19 +1357,43 @@ export default function TailorPos() {
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 <button
                                     type="button"
-                                    onClick={() => window.print()}
+                                    onClick={() => handleDirectPrintA4()}
                                     style={{
-                                        background: 'var(--primary, #6366f1)',
+                                        background: '#3b82f6',
                                         color: '#ffffff',
                                         border: 'none',
                                         padding: '6px 14px',
                                         borderRadius: '8px',
                                         fontWeight: 800,
                                         fontSize: '12px',
-                                        cursor: 'pointer'
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '5px'
                                     }}
                                 >
-                                    طباعة الورقة
+                                    <Printer size={14} />
+                                    <span>طباعة A4</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowWhatsAppModal(true)}
+                                    style={{
+                                        background: '#10b981',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        padding: '6px 14px',
+                                        borderRadius: '8px',
+                                        fontWeight: 800,
+                                        fontSize: '12px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '5px'
+                                    }}
+                                >
+                                    <Send size={14} />
+                                    <span>واتساب</span>
                                 </button>
                                 <button
                                     type="button"
@@ -1183,7 +1409,8 @@ export default function TailorPos() {
                                         cursor: 'pointer'
                                     }}
                                 >
-                                    ✕ إغلاق
+                                    <X size={14} />
+                                    <span>إغلاق</span>
                                 </button>
                             </div>
                         </div>
@@ -1258,9 +1485,9 @@ export default function TailorPos() {
                             <button
                                 type="button"
                                 onClick={() => setShowProfilesModal(false)}
-                                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#64748b' }}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
                             >
-                                ✕
+                                <X size={18} />
                             </button>
                         </div>
 
@@ -1356,6 +1583,252 @@ export default function TailorPos() {
                 </div>
             )}
 
+
+            {/* Order Confirmation & Quick Print Modal */}
+            {completedOrder && (
+                <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    background: 'rgba(15, 23, 42, 0.65)',
+                    zIndex: 2500,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px',
+                    backdropFilter: 'blur(4px)'
+                }}>
+                    <div style={{
+                        background: '#ffffff',
+                        borderRadius: '16px',
+                        width: '100%',
+                        maxWidth: '520px',
+                        overflow: 'hidden',
+                        boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
+                        border: '1px solid var(--border-subtle, #e2e8f0)',
+                        animation: 'fadeIn 0.2s ease-out'
+                    }}>
+                        {/* Header Banner */}
+                        <div style={{
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: '#ffffff',
+                            padding: '20px',
+                            textAlign: 'center',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}>
+                            <div style={{
+                                width: '48px',
+                                height: '48px',
+                                borderRadius: '50%',
+                                background: 'rgba(255, 255, 255, 0.2)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}>
+                                <Check size={28} color="#ffffff" strokeWidth={3} />
+                            </div>
+                            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 900 }}>
+                                تم حفظ الطلب واعتماد الدفع بنجاح
+                            </h2>
+                            <div style={{ fontSize: '13px', opacity: 0.9, fontFamily: "'IBM Plex Mono', monospace" }}>
+                                أمر تشغيل: #{completedOrder.orderId || completedOrder.order_id || '---'} | فاتورة: #{completedOrder.invoiceNumber || completedOrder.sale_invoice_id || invoiceNumber}
+                            </div>
+                        </div>
+
+                        {/* Order Details Body */}
+                        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            <div style={{
+                                background: '#f8fafc',
+                                borderRadius: '10px',
+                                padding: '14px',
+                                border: '1px solid #e2e8f0',
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: '10px',
+                                fontSize: '13px'
+                            }}>
+                                <div>
+                                    <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>العميل</span>
+                                    <span style={{ fontWeight: 800, color: '#0f172a' }}>{name || phone || 'عميل نقدي'}</span>
+                                </div>
+                                <div>
+                                    <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>الهاتف</span>
+                                    <span style={{ fontWeight: 800, color: '#0f172a', fontFamily: "'IBM Plex Mono', monospace" }} dir="ltr">{phone || '---'}</span>
+                                </div>
+                                <div>
+                                    <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>عدد القطع</span>
+                                    <span style={{ fontWeight: 800, color: '#0f172a' }}>{completedOrder.items?.length || items.length} قطع</span>
+                                </div>
+                                <div>
+                                    <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>موعد الاستلام</span>
+                                    <span style={{ fontWeight: 800, color: '#6366f1' }}>{deliveryDate || '---'}</span>
+                                </div>
+                                <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px' }}>
+                                    <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>إجمالي الفاتورة</span>
+                                    <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '15px', fontFamily: "'IBM Plex Mono', monospace" }}>
+                                        {(completedOrder.total || total).toFixed(2)} ر.س
+                                    </span>
+                                </div>
+                                <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px' }}>
+                                    <span style={{ color: '#64748b', fontSize: '11px', display: 'block' }}>المتبقي بذمة العميل</span>
+                                    <span style={{
+                                        fontWeight: 900,
+                                        color: (completedOrder.balance || balance) > 0 ? '#f59e0b' : '#10b981',
+                                        fontSize: '15px',
+                                        fontFamily: "'IBM Plex Mono', monospace"
+                                    }}>
+                                        {((completedOrder.balance !== undefined ? completedOrder.balance : balance) || 0).toFixed(2)} ر.س
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Print & Next Actions */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDirectPrintA4(completedOrder)}
+                                        style={{
+                                            flex: 1,
+                                            padding: '12px',
+                                            borderRadius: '10px',
+                                            background: '#3b82f6',
+                                            color: '#ffffff',
+                                            border: 'none',
+                                            fontWeight: 800,
+                                            fontSize: '13px',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '6px',
+                                            boxShadow: '0 2px 8px rgba(59, 130, 246, 0.25)'
+                                        }}
+                                    >
+                                        <Printer size={16} />
+                                        <span>طباعة أمر التشغيل A4</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPrintModal(true)}
+                                        style={{
+                                            padding: '12px 16px',
+                                            borderRadius: '10px',
+                                            background: '#f1f5f9',
+                                            color: '#334155',
+                                            border: '1px solid #cbd5e1',
+                                            fontWeight: 700,
+                                            fontSize: '13px',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        معاينة
+                                    </button>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setShowWhatsAppModal(true)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px',
+                                        borderRadius: '10px',
+                                        background: '#10b981',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        fontWeight: 800,
+                                        fontSize: '13px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px',
+                                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
+                                    }}
+                                >
+                                    <Send size={16} />
+                                    <span>مشاركة كرت العمل مع الخياط (واتساب)</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setCompletedOrder(null);
+                                        resetForm();
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '13px',
+                                        borderRadius: '10px',
+                                        background: '#0f172a',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        fontWeight: 900,
+                                        fontSize: '14px',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 4px 12px rgba(15, 23, 42, 0.25)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px'
+                                    }}
+                                >
+                                    <UserPlus size={18} />
+                                    <span>تسجيل طلب تفصيل للعميل التالي</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setCompletedOrder(null);
+                                        navigate('/measurements');
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px',
+                                        borderRadius: '10px',
+                                        background: '#ffffff',
+                                        color: '#334155',
+                                        border: '1px solid #cbd5e1',
+                                        fontWeight: 700,
+                                        fontSize: '12px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '6px'
+                                    }}
+                                >
+                                    <Ruler size={15} />
+                                    <span>الانتقال لدفتر المقاسات</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Dedicated Tailor Print Modal */}
+            <TailorPrintModal
+                isOpen={showPrintModal}
+                onClose={() => setShowPrintModal(false)}
+                orderDetails={completedOrder || orderPayload}
+                fabrics={fabrics}
+                settings={settings}
+            />
+
+            {/* Tailor WhatsApp Share Modal */}
+            <TailorWhatsAppModal
+                isOpen={showWhatsAppModal}
+                onClose={() => setShowWhatsAppModal(false)}
+                title={`مشاركة أمر تشغيل تفصيل #${(completedOrder || orderPayload)?.invoiceNumber || invoiceNumber}`}
+                defaultCustomerPhone={(completedOrder || orderPayload)?.customer?.phone || phone}
+                customerName={(completedOrder || orderPayload)?.customer?.name || name}
+                messageText={generateTailorWhatsAppText(completedOrder || orderPayload, fabrics, settings)}
+            />
 
             {/* Hidden Print Container for A4 Printing */}
             <div className="hidden print:block">

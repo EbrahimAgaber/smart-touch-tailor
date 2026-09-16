@@ -488,7 +488,7 @@ export default function AppLayout({ children }) {
 
           {/* Role badge */}
           <div style={{ padding: '8px 4px', textAlign: 'center', flexShrink: 0 }}>
-            <span style={{ display: 'block', width: 28, height: 28, borderRadius: '50%', background: String(role||'').toLowerCase()==='admin' ? 'var(--color-accent-dim)' : 'var(--color-success-dim)', color: String(role||'').toLowerCase()==='admin' ? 'var(--color-accent)' : 'var(--color-success)', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ width: 28, height: 28, borderRadius: '50%', background: String(role||'').toLowerCase()==='admin' ? 'var(--color-accent-dim)' : 'var(--color-success-dim)', color: String(role||'').toLowerCase()==='admin' ? 'var(--color-accent)' : 'var(--color-success)', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <IconAudit size={14}/>
             </span>
           </div>

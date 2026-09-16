@@ -1,4 +1,4 @@
-# Handoff Report — Explorer 1 (Codebase & Route Mapper)
+# Handoff Report ï¿½ Explorer 1 (Codebase & Route Mapper)
 **Milestone:** Mulam Pipeline Survey & Audit  
 **Date:** 2026-09-10  
 **Folder:** `c:\my-pos\V4\.agents\teamwork_preview_explorer_survey_1`  
@@ -9,7 +9,7 @@
 ## 1. Observation
 
 ### Exact File Paths & Code Locations Inspected:
-1. **Route Registrations (`c:\my-pos\V4\src\App.jsx` lines 336–341):**
+1. **Route Registrations (`c:\my-pos\V4\src\App.jsx` lines 336ï¿½341):**
    ```jsx
    {/* -- Tailor-specific -- */}
    <Route path="/tailor-pos"       element={<P><TailorPos /></P>} />
@@ -18,17 +18,17 @@
    <Route path="/measurements"     element={<P><MeasurementCapture /></P>} />
    <Route path="/customer-menu"    element={<CustomerMenu />} />
    ```
-2. **Navigation Sidebar Deficiencies (`c:\my-pos\V4\src\components\AppLayout.jsx` lines 26–51, 185–199):**
-   - Lines 28–32 list `LINKS`: `/orders-board` and `/measurements` are registered.
+2. **Navigation Sidebar Deficiencies (`c:\my-pos\V4\src\components\AppLayout.jsx` lines 26ï¿½51, 185ï¿½199):**
+   - Lines 28ï¿½32 list `LINKS`: `/orders-board` and `/measurements` are registered.
    - `/tailor-pos` and `/alterations` are **completely absent** from the `LINKS` array.
-   - Lines 189–194:
+   - Lines 189ï¿½194:
      ```javascript
      // Tailor specific
      if ((link.path === '/orders-board' || link.path === '/measurements') && businessType !== 'tailor') return false;
      // Hide general POS features if Tailor is selected (tailors use tailor-checkout instead)
      if (businessType === 'tailor' && (link.path === '/pos' || link.path === '/services')) return false;
      ```
-3. **The Alterations Isolation Trap (`c:\my-pos\V4\src\pages\Alterations.jsx` lines 135–143):**
+3. **The Alterations Isolation Trap (`c:\my-pos\V4\src\pages\Alterations.jsx` lines 135ï¿½143):**
    - Line 136 starts with: `<div className="tailor-pos-page" style={{ padding: '20px', height: '100%', overflowY: 'auto' }}>`.
    - There is NO `<AppLayout>` wrapper, NO navigation bar, and NO back button.
    - The only entrance into this page in the entire codebase is in `TailorPos.jsx` line 89:
@@ -40,19 +40,19 @@
      ```
 4. **Header Target Inconsistency (`src/pages/TailorPos.jsx` line 85, `src/pages/OrdersBoard.jsx` line 170, `src/pages/MeasurementCapture.jsx` line 203):**
    - In all three pages, the button labeled "????????" executes `navigate('/dashboard')` rather than `navigate('/home')`.
-   - In `src/App.jsx` lines 81–83:
+   - In `src/App.jsx` lines 81ï¿½83:
      ```javascript
      if (role !== 'admin') return <Navigate to={businessType === 'tailor' ? '/tailor-pos' : '/pos'} replace />;
      ```
      When a cashier or tailor clicks "????????", they are routed to `/dashboard`, intercepted by `AdminRoute`, and redirected back to `/tailor-pos`.
-5. **Tailor Control Center in Home (`c:\my-pos\V4\src\pages\Home.jsx` lines 52–58, 69–129, 278–316):**
+5. **Tailor Control Center in Home (`c:\my-pos\V4\src\pages\Home.jsx` lines 52ï¿½58, 69ï¿½129, 278ï¿½316):**
    - Tailor KPI stats queried via `window.api?.tailor?.getDashboardStats?.()`.
    - Mulam widgets render: New Orders Today, Today Revenue, Ready for Pickup, Overdue Orders, Low Fabrics Alert, Scheduled Fittings Today, Recent Deliveries.
    - Quick launch modules list `tailor-pos`, `orders-board`, `customers`, `stock`, `dashboard`, `settings`.
    - **Missing:** Any tile or metric for Alterations (`/alterations`).
-6. **Backend IPC & Database Schema (`c:\my-pos\V4\electron\database.cjs` lines 606–695, 3551–3910):**
+6. **Backend IPC & Database Schema (`c:\my-pos\V4\electron\database.cjs` lines 606ï¿½695, 3551ï¿½3910):**
    - Tables: `tailor_orders`, `tailor_order_garments`, `alteration_tickets`, `alteration_items`, `measurement_profiles`, `customer_attachments`, `tailor_appointments`.
-   - Preload IPC: `electron/preload.cjs` lines 367–391 exposes `window.api.tailor.*`.
+   - Preload IPC: `electron/preload.cjs` lines 367ï¿½391 exposes `window.api.tailor.*`.
 
 ---
 
@@ -90,9 +90,9 @@ The redesign must integrate all Mulam destinations into a unified navigation rai
 ## 5. Verification Method
 
 To independently verify these findings:
-1. **Route Inspection:** Check `src/App.jsx` lines 336–341.
-2. **Sidebar Links:** Inspect `src/components/AppLayout.jsx` lines 26–51 and observe that `/tailor-pos` and `/alterations` are absent.
-3. **Navigation Dead End Reproduction:** In `src/pages/Alterations.jsx`, check lines 135–145 to confirm the lack of header, back buttons, and `AppLayout`.
+1. **Route Inspection:** Check `src/App.jsx` lines 336ï¿½341.
+2. **Sidebar Links:** Inspect `src/components/AppLayout.jsx` lines 26ï¿½51 and observe that `/tailor-pos` and `/alterations` are absent.
+3. **Navigation Dead End Reproduction:** In `src/pages/Alterations.jsx`, check lines 135ï¿½145 to confirm the lack of header, back buttons, and `AppLayout`.
 4. **Automated End-to-End Test Execution:**
    - Execute Playwright test scripts:
      ```powershell

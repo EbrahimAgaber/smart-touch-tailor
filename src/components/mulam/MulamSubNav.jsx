@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Scissors, Kanban, Tag, Ruler, Home, Clock, Layers } from 'lucide-react';
 
 /**
  * MulamSubNav — Unified Navigation Rail for Master Tailor Experience
@@ -103,14 +104,14 @@ export default function MulamSubNav({
     {
       id: 'pos',
       label: 'تفصيل جديد',
-      icon: '✂️',
+      icon: Scissors,
       path: '/tailor-pos',
       shortcut: 'F1'
     },
     {
       id: 'board',
       label: 'لوحة المعمل',
-      icon: '🏭',
+      icon: Kanban,
       path: '/orders-board',
       count: counts.activeOrders,
       badgeColor: '#3b82f6',
@@ -119,7 +120,7 @@ export default function MulamSubNav({
     {
       id: 'alterations',
       label: 'إدارة التعديلات',
-      icon: '🏷️',
+      icon: Tag,
       path: '/alterations',
       count: counts.pendingAlterations,
       badgeColor: '#f59e0b',
@@ -128,11 +129,18 @@ export default function MulamSubNav({
     {
       id: 'measurements',
       label: 'دفتر المقاسات',
-      icon: '📐',
+      icon: Ruler,
       path: '/measurements',
       count: counts.totalMeasurements,
       badgeColor: '#10b981',
       shortcut: 'F4'
+    },
+    {
+      id: 'remnants',
+      label: 'فواضل الأقمشة',
+      icon: Layers,
+      path: '/fabric-remnants',
+      badgeColor: '#6366f1'
     }
   ];
 
@@ -186,7 +194,7 @@ export default function MulamSubNav({
             e.currentTarget.style.background = '#f8fafc';
           }}
         >
-          <span style={{ fontSize: '15px' }}>←</span>
+          <Home size={15} />
           <span>الرئيسية</span>
         </button>
 
@@ -197,6 +205,7 @@ export default function MulamSubNav({
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           {navTabs.map((tab) => {
             const isActive = activeTab === tab.id;
+            const TabIcon = tab.icon;
             return (
               <button
                 key={tab.id}
@@ -233,6 +242,7 @@ export default function MulamSubNav({
                   }
                 }}
               >
+                <TabIcon size={16} strokeWidth={isActive ? 2.4 : 2} />
                 <span>{tab.label}</span>
 
                 {typeof tab.count === 'number' && tab.count > 0 && (

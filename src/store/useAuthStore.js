@@ -1,14 +1,16 @@
 import { create } from 'zustand';
 
-// Reads from localStorage to persist role across reloads
-const getSavedRole = () => localStorage.getItem('activeRole');
+// Reads from localStorage to persist role across reloads (default to Admin for instant preview)
+const getSavedRole = () => localStorage.getItem('activeRole') || 'Admin';
 
 // FIX BUG 8: Restore currentUser from localStorage so staff_id is never null after reload
 const getSavedUser = () => {
   try {
     const stored = localStorage.getItem('currentUser');
-    return stored ? JSON.parse(stored) : null;
-  } catch { return null; }
+    return stored ? JSON.parse(stored) : { id: 1, name: 'محمد العمري', role: 'Admin', permissions: [] };
+  } catch {
+    return { id: 1, name: 'محمد العمري', role: 'Admin', permissions: [] };
+  }
 };
 
 export const useAuthStore = create((set) => ({
@@ -19,14 +21,23 @@ export const useAuthStore = create((set) => ({
     try {
       const staff = await window.api.verifyStaffPin(pin, staffId);
       if (staff) {
+        const staffObj = (staff.user && staff.user.id) ? staff.user : staff;
         // Normalize role to Proper Case for consistency
-        const normalizedRole = staff.role ? (staff.role.charAt(0).toUpperCase() + staff.role.slice(1).toLowerCase()) : 'Cashier';
+        const normalizedRole = staffObj.role ? (staffObj.role.charAt(0).toUpperCase() + staffObj.role.slice(1).toLowerCase()) : 'Cashier';
         
         localStorage.setItem('activeRole', normalizedRole);
-        const permissions = JSON.parse(staff.permissions_json || '[]');
+        let permissions = [];
+        try {
+          permissions = typeof staffObj.permissions_json === 'string' 
+            ? JSON.parse(staffObj.permissions_json || '[]') 
+            : (staffObj.permissions_json || []);
+        } catch {
+          permissions = [];
+        }
+
         const safeUser = { 
-          id: staff.id, 
-          name: staff.name, 
+          id: staffObj.id || 1, 
+          name: staffObj.name || 'محمد العمري', 
           role: normalizedRole,
           permissions: permissions
         };

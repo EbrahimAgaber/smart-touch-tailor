@@ -20,29 +20,29 @@
    ───────────────────────────────────────────────────────────────── */
 
 :root {
-  /* ── Light Theme Variables (Default) ── */
-  --bg-app:         #f1f5f9;
+  /* ── Light Theme Variables (Default Enterprise) ── */
+  --bg-app:         #f8fafc;
   --bg-card:        #ffffff;
-  --bg-hover:       #f8fafc;
+  --bg-hover:       #f1f5f9;
   --text-main:      #0f172a;
   --text-muted:     #64748b;
   --border-subtle:  #e2e8f0;
   
   /* ── Constant Brand Palette ── */
-  --primary:        #6366f1;
-  --primary-glow:   rgba(99, 102, 241, 0.4);
-  --primary-dark:   #4f46e5;
-  --success:        #10b981;
-  --danger:         #ef4444;
+  --primary:        #2563eb;
+  --primary-glow:   rgba(37, 99, 235, 0.2);
+  --primary-dark:   #1d4ed8;
+  --success:        #059669;
+  --danger:         #dc2626;
 }
 
 [data-theme="dark"] {
-  --bg-app:         #0f172a;
-  --bg-card:        #1e293b;
-  --bg-hover:       #334155;
+  --bg-app:         #0b0f17;
+  --bg-card:        #131b2a;
+  --bg-hover:       #1a2438;
   --text-main:      #f8fafc;
   --text-muted:     #94a3b8;
-  --border-subtle:  #334155;
+  --border-subtle:  #26334d;
 }
 
 /* ── Reset & Core ── */
@@ -58,11 +58,11 @@ html, body {
   height: 100%;
   width: 100%;
   overflow: hidden; 
-  font-family: 'Cairo', 'Inter', 'Segoe UI', Tahoma, system-ui, sans-serif;
+  font-family: 'Readex Pro', 'IBM Plex Sans Arabic', 'Tajawal', system-ui, sans-serif;
   background-color: var(--bg-app);
   color: var(--text-main);
   direction: rtl;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 #root {

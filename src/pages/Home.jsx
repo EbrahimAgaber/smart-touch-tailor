@@ -5,8 +5,9 @@ import { useLicenseStore } from '../store/useLicenseStore';
 import { useAppSettings } from '../App';
 import AppLayout from '../components/AppLayout';
 import { 
-  Play, BarChart2, Package, Shield, Settings, 
-  Users, CreditCard, ChevronLeft, Clock, Wallet, Award, Coffee
+  Scissors, Factory, Users, Package, BarChart3, Settings as SettingsIcon,
+  ShoppingCart, Wallet, Award, Clock, ChevronLeft, Fingerprint,
+  TrendingUp, CheckCircle2, AlertTriangle, Calendar, Truck, AlertCircle, FileText
 } from 'lucide-react';
 
 export default function Home() {
@@ -71,18 +72,18 @@ export default function Home() {
       id: 'tailor-pos',
       title: 'طلب تفصيل جديد',
       desc: 'استقبال عميل جديد، أخذ المقاسات، وتسجيل الطلب',
-      icon: <Play size={24} />,
-      color: '#6366f1',
+      icon: <Scissors size={24} strokeWidth={2.2} />,
+      color: '#2563eb',
       path: '/tailor-pos',
       permission: null,
       feature: null
     },
     {
       id: 'orders-board',
-      title: 'شاشة المعمل',
+      title: 'لوحة إنتاج المعمل',
       desc: 'متابعة مراحل الإنتاج: قص، خياطة، تشطيب، كوي، جاهز',
-      icon: <Package size={24} />,
-      color: '#10b981',
+      icon: <Factory size={24} strokeWidth={2.2} />,
+      color: '#059669',
       path: '/orders-board',
       permission: null,
       feature: null
@@ -91,8 +92,8 @@ export default function Home() {
       id: 'customers',
       title: 'العملاء وسجل المقاسات',
       desc: 'إدارة العملاء، عرض بروفايلات المقاسات وسجل الطلبات',
-      icon: <Users size={24} />,
-      color: '#8b5cf6',
+      icon: <Users size={24} strokeWidth={2.2} />,
+      color: '#7c3aed',
       path: '/customers',
       permission: null,
       feature: 'customers'
@@ -101,8 +102,8 @@ export default function Home() {
       id: 'stock',
       title: 'مخزون الأقمشة والمواد',
       desc: 'متابعة الأقمشة المتوفرة، كميات الأمتار، وتنبيهات النفاد',
-      icon: <BarChart2 size={24} />,
-      color: '#f59e0b',
+      icon: <Package size={24} strokeWidth={2.2} />,
+      color: '#d97706',
       path: '/stock',
       permission: 'view_stock',
       feature: 'stock.view'
@@ -111,8 +112,8 @@ export default function Home() {
       id: 'dashboard',
       title: 'لوحة التحكم والتحليلات',
       desc: 'مراقبة الإيرادات والأرباح والأداء العام للمحل',
-      icon: <CreditCard size={24} />,
-      color: '#ec4899',
+      icon: <BarChart3 size={24} strokeWidth={2.2} />,
+      color: '#0284c7',
       path: '/dashboard',
       permission: 'view_dashboard',
       feature: 'dashboard'
@@ -121,8 +122,8 @@ export default function Home() {
       id: 'settings',
       title: 'إعدادات النظام',
       desc: 'هوية المنشأة، الطابعات، وربط هيئة الزكاة',
-      icon: <Settings size={24} />,
-      color: '#64748b',
+      icon: <SettingsIcon size={24} strokeWidth={2.2} />,
+      color: '#475569',
       path: '/settings',
       permission: 'manage_settings',
       feature: null
@@ -132,8 +133,8 @@ export default function Home() {
       id: 'pos',
       title: 'نقطة البيع الكاشير',
       desc: 'بدء عمليات بيع جديدة وإصدار الفواتير الفورية',
-      icon: <Play size={24} />,
-      color: '#3b82f6',
+      icon: <ShoppingCart size={24} strokeWidth={2.2} />,
+      color: '#2563eb',
       path: '/pos',
       permission: null,
       feature: 'pos'
@@ -142,8 +143,8 @@ export default function Home() {
       id: 'dashboard',
       title: 'لوحة التحكم والتحليلات',
       desc: 'مراقبة المبيعات الحية، الأرباح، وتنبيهات المخزون',
-      icon: <BarChart2 size={24} />,
-      color: '#10b981',
+      icon: <BarChart3 size={24} strokeWidth={2.2} />,
+      color: '#059669',
       path: '/dashboard',
       permission: 'view_dashboard',
       feature: 'dashboard'
@@ -152,8 +153,8 @@ export default function Home() {
       id: 'stock',
       title: 'إدارة المخزون والمنتجات',
       desc: 'مراقبة كميات السلع، أوامر الشراء، والتوريد',
-      icon: <Package size={24} />,
-      color: '#f59e0b',
+      icon: <Package size={24} strokeWidth={2.2} />,
+      color: '#d97706',
       path: '/stock',
       permission: 'view_stock',
       feature: 'stock.view'
@@ -162,8 +163,8 @@ export default function Home() {
       id: 'customers',
       title: 'العملاء والولاء CRM',
       desc: 'إدارة قاعدة بيانات العملاء، النقاط، والمستويات',
-      icon: <Users size={24} />,
-      color: '#8b5cf6',
+      icon: <Users size={24} strokeWidth={2.2} />,
+      color: '#7c3aed',
       path: '/customers',
       permission: null,
       feature: 'customers'
@@ -172,8 +173,8 @@ export default function Home() {
       id: 'finance',
       title: 'المركز المالي والمحاسبة',
       desc: 'القيود اليومية، القوائم المالية، وإقرارات الضريبة',
-      icon: <CreditCard size={24} />,
-      color: '#ec4899',
+      icon: <TrendingUp size={24} strokeWidth={2.2} />,
+      color: '#0284c7',
       path: '/finance-hub',
       permission: 'view_reports',
       feature: 'finance_hub'
@@ -182,8 +183,8 @@ export default function Home() {
       id: 'settings',
       title: 'إعدادات النظام والربط',
       desc: 'إعداد هوية المنشأة، الطابعات، وربط هيئة الزكاة',
-      icon: <Settings size={24} />,
-      color: '#64748b',
+      icon: <SettingsIcon size={24} strokeWidth={2.2} />,
+      color: '#475569',
       path: '/settings',
       permission: 'manage_settings',
       feature: null
@@ -196,7 +197,6 @@ export default function Home() {
     return true;
   });
 
-
   const getGreeting = () => {
     const hrs = new Date().getHours();
     if (hrs < 12) return 'صباح الخير';
@@ -206,23 +206,29 @@ export default function Home() {
 
   return (
     <AppLayout title="لوحة التشغيل الرئيسية">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', flex: 1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '22px', flex: 1 }}>
         
         {/* Welcome Section */}
         <div style={{
-          background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-          borderRadius: '24px',
-          padding: '28px',
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '16px',
+          padding: '24px 28px',
           color: '#ffffff',
           position: 'relative',
           overflow: 'hidden',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+          boxShadow: 'var(--shadow-md)',
           display: 'flex',
           flexWrap: 'wrap',
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: '20px'
         }}>
+          {/* Subtle Watermark */}
+          <div style={{ position: 'absolute', left: '-20px', bottom: '-20px', opacity: 0.04, pointerEvents: 'none' }}>
+            <Fingerprint size={200} />
+          </div>
+
           <div style={{ zIndex: 2 }}>
             <h2 
               onClick={async () => {
@@ -239,13 +245,12 @@ export default function Home() {
                   }
                 }
               }}
-              style={{ fontSize: '24px', fontWeight: '900', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'default', userSelect: 'none' }}
+              style={{ fontSize: '22px', fontWeight: '700', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'default', userSelect: 'none', letterSpacing: '-0.02em' }}
             >
               <span>{getGreeting()}، {userName || 'المستخدم'}</span>
-              <span className="animate-bounce"></span>
             </h2>
-            <p style={{ color: '#94a3b8', fontSize: '14px', fontWeight: '500' }}>
-              مرحباً بك في لوحة تشغيل ورديتك الحالية. ابدأ يومك التشغيلي أو تصفح الأقسام أدناه.
+            <p style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '400', margin: 0 }}>
+              مرحباً بك في لوحة تشغيل ورديتك الحالية. ابدأ يومك التشغيلي أو تصفح الأقسام السريعة أدناه.
             </p>
           </div>
           
@@ -255,19 +260,19 @@ export default function Home() {
             flexWrap: 'wrap',
             zIndex: 2
           }}>
-            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 18px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Coffee size={20} color="#3b82f6" />
+            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 16px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Users size={18} color="#38bdf8" />
               <div>
-                <div style={{ fontSize: '11px', color: '#94a3b8' }}>صلاحية الموظف</div>
-                <div style={{ fontSize: '13px', fontWeight: '800' }}>{role === 'Admin' ? '️ مدير النظام' : role === 'Manager' ? ' مشرف' : ' كاشير'}</div>
+                <div style={{ fontSize: '10.5px', color: '#94a3b8' }}>صلاحية الحساب</div>
+                <div style={{ fontSize: '12.5px', fontWeight: '700' }}>{role === 'Admin' ? 'مدير النظام' : role === 'Manager' ? 'مشرف عام' : 'كاشير نقطة البيع'}</div>
               </div>
             </div>
             {shift && (
-              <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', padding: '12px 18px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Clock size={20} color="#10b981" />
+              <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 16px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Clock size={18} color="#10b981" />
                 <div>
-                  <div style={{ fontSize: '11px', color: '#94a3b8' }}>بدء الوردية</div>
-                  <div style={{ fontSize: '13px', fontWeight: '800' }}>{new Date(shift.opened_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}</div>
+                  <div style={{ fontSize: '10.5px', color: '#94a3b8' }}>بدء الوردية</div>
+                  <div style={{ fontSize: '12.5px', fontWeight: '700' }}>{new Date(shift.opened_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}</div>
                 </div>
               </div>
             )}
@@ -277,89 +282,124 @@ export default function Home() {
         {/* KPI Stats — tailor mode vs retail mode */}
         {businessType === 'tailor' && tailorStats ? (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-              <div style={{ background: 'var(--bg-card)', padding: '18px', borderRadius: '18px', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(99,102,241,0.1)', color:'#6366f1', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px', flexShrink:0 }}>️</div>
-              <div><div style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:'700' }}>طلبات اليوم</div><div style={{ fontSize:'22px', fontWeight:'900', color:'var(--text-main)' }}>{tailorStats.newOrdersToday}</div></div>
-            </div>
-            <div style={{ background: 'var(--bg-card)', padding: '18px', borderRadius: '18px', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(16,185,129,0.1)', color:'#10b981', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px', flexShrink:0 }}></div>
-              <div><div style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:'700' }}>إيراد اليوم</div><div style={{ fontSize:'22px', fontWeight:'900', color:'var(--text-main)' }}>SAR {Number(tailorStats.todayRevenue || 0).toFixed(2)}</div></div>
-            </div>
-            <button onClick={() => navigate('/orders-board')} style={{ background:'#ecfdf5', padding:'18px', borderRadius:'18px', border:'2px solid #a7f3d0', display:'flex', alignItems:'center', gap:'14px', cursor:'pointer', fontFamily:'inherit', textAlign:'right' }}>
-              <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(16,185,129,0.2)', color:'#10b981', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px', flexShrink:0 }}></div>
-              <div><div style={{ fontSize:'11px', color:'#065f46', fontWeight:'800' }}>جاهز للاستلام</div><div style={{ fontSize:'26px', fontWeight:'900', color:'#10b981' }}>{tailorStats.readyForPickup}</div></div>
-            </button>
-            {tailorStats.overdue > 0 && (
-              <button onClick={() => navigate('/orders-board')} style={{ background:'#fef2f2', padding:'18px', borderRadius:'18px', border:'2px solid #fecaca', display:'flex', alignItems:'center', gap:'14px', cursor:'pointer', fontFamily:'inherit', textAlign:'right' }}>
-                <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(239,68,68,0.15)', color:'#ef4444', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px', flexShrink:0 }}>️</div>
-                <div><div style={{ fontSize:'11px', color:'#7f1d1d', fontWeight:'800' }}>طلبات متأخرة</div><div style={{ fontSize:'26px', fontWeight:'900', color:'#ef4444' }}>{tailorStats.overdue}</div></div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+              <div style={{ background: 'var(--bg-card)', padding: '18px 20px', borderRadius: '14px', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-sm)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(37,99,235,0.08)', color:'#2563eb', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <FileText size={22} strokeWidth={2.2} />
+                </div>
+                <div>
+                  <div style={{ fontSize:'11.5px', color:'var(--text-muted)', fontWeight:'600' }}>طلبات اليوم الجديدة</div>
+                  <div style={{ fontSize:'22px', fontWeight:'700', color:'var(--text-main)', marginTop:'2px' }} className="font-mono">{tailorStats.newOrdersToday}</div>
+                </div>
+              </div>
+              <div style={{ background: 'var(--bg-card)', padding: '18px 20px', borderRadius: '14px', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-sm)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(5,150,105,0.08)', color:'#059669', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <TrendingUp size={22} strokeWidth={2.2} />
+                </div>
+                <div>
+                  <div style={{ fontSize:'11.5px', color:'var(--text-muted)', fontWeight:'600' }}>إيراد تفصيل اليوم</div>
+                  <div style={{ fontSize:'22px', fontWeight:'700', color:'var(--text-main)', marginTop:'2px' }} className="font-mono">SAR {Number(tailorStats.todayRevenue || 0).toFixed(2)}</div>
+                </div>
+              </div>
+              <button onClick={() => navigate('/orders-board')} style={{ background:'rgba(5,150,105,0.05)', padding:'18px 20px', borderRadius:'14px', border:'1px solid rgba(5,150,105,0.2)', display:'flex', alignItems:'center', gap:'14px', cursor:'pointer', fontFamily:'inherit', textAlign:'right', transition:'all 0.15s ease' }}>
+                <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(5,150,105,0.12)', color:'#059669', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <CheckCircle2 size={22} strokeWidth={2.2} />
+                </div>
+                <div>
+                  <div style={{ fontSize:'11.5px', color:'#065f46', fontWeight:'700' }}>جاهز للاستلام والتسليم</div>
+                  <div style={{ fontSize:'22px', fontWeight:'700', color:'#059669', marginTop:'2px' }} className="font-mono">{tailorStats.readyForPickup}</div>
+                </div>
               </button>
-            )}
-          </div>
-          {/* Mulam Control Center Widgets */}
-          {businessType === 'tailor' && tailorStats && (
-            <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-               <div onClick={() => navigate('/stock')} style={{ cursor:'pointer', background: 'var(--bg-card)', padding: '18px', borderRadius: '18px', border: tailorStats.lowFabrics > 0 ? '2px solid #f59e0b' : '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                 <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(245,158,11,0.1)', color:'#f59e0b', display:'flex', alignItems:'center', justifyContent:'center' }}>⚠️</div>
-                 <div><div style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:'700' }}>أقمشة على وشك النفاد</div><div style={{ fontSize:'22px', fontWeight:'900', color: tailorStats.lowFabrics > 0 ? '#d97706' : 'var(--text-main)' }}>{tailorStats.lowFabrics} طاقة</div></div>
-               </div>
-               <div style={{ background: 'var(--bg-card)', padding: '18px', borderRadius: '18px', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                 <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(59,130,246,0.1)', color:'#3b82f6', display:'flex', alignItems:'center', justifyContent:'center' }}>📅</div>
-                 <div><div style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:'700' }}>بروفات مجدولة اليوم</div><div style={{ fontSize:'22px', fontWeight:'900', color:'var(--text-main)' }}>{tailorStats.todayFittings}</div></div>
-               </div>
-               <div style={{ background: 'var(--bg-card)', padding: '18px', borderRadius: '18px', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                 <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(139,92,246,0.1)', color:'#8b5cf6', display:'flex', alignItems:'center', justifyContent:'center' }}>🚚</div>
-                 <div><div style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:'700' }}>شحنات موردين (٧ أيام)</div><div style={{ fontSize:'22px', fontWeight:'900', color:'var(--text-main)' }}>{tailorStats.recentDeliveries} استلام</div></div>
-               </div>
+              {tailorStats.overdue > 0 && (
+                <button onClick={() => navigate('/orders-board')} style={{ background:'rgba(220,38,38,0.05)', padding:'18px 20px', borderRadius:'14px', border:'1px solid rgba(220,38,38,0.2)', display:'flex', alignItems:'center', gap:'14px', cursor:'pointer', fontFamily:'inherit', textAlign:'right', transition:'all 0.15s ease' }}>
+                  <div style={{ width:'44px', height:'44px', borderRadius:'10px', background:'rgba(220,38,38,0.12)', color:'#dc2626', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    <AlertTriangle size={22} strokeWidth={2.2} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize:'11.5px', color:'#991b1b', fontWeight:'700' }}>طلبات متأخرة بالمعمل</div>
+                    <div style={{ fontSize:'22px', fontWeight:'700', color:'#dc2626', marginTop:'2px' }} className="font-mono">{tailorStats.overdue}</div>
+                  </div>
+                </button>
+              )}
             </div>
-          )}
-        </>
+            {/* Mulam Control Center Widgets */}
+            {businessType === 'tailor' && tailorStats && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+                 <div onClick={() => navigate('/stock')} style={{ cursor:'pointer', background: 'var(--bg-card)', padding: '16px 20px', borderRadius: '14px', border: tailorStats.lowFabrics > 0 ? '1px solid rgba(217,119,6,0.3)' : '1px solid var(--border-subtle)', boxShadow:'var(--shadow-sm)', display: 'flex', alignItems: 'center', gap: '14px', transition:'all 0.15s ease' }}>
+                   <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'rgba(217,119,6,0.08)', color:'#d97706', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                     <AlertCircle size={20} strokeWidth={2.2} />
+                   </div>
+                   <div>
+                     <div style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:'600' }}>أقمشة قاربت على النفاد</div>
+                     <div style={{ fontSize:'18px', fontWeight:'700', color: tailorStats.lowFabrics > 0 ? '#d97706' : 'var(--text-main)', marginTop:'2px' }} className="font-mono">{tailorStats.lowFabrics} طاقة</div>
+                   </div>
+                 </div>
+                 <div style={{ background: 'var(--bg-card)', padding: '16px 20px', borderRadius: '14px', border: '1px solid var(--border-subtle)', boxShadow:'var(--shadow-sm)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                   <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'rgba(37,99,235,0.08)', color:'#2563eb', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                     <Calendar size={20} strokeWidth={2.2} />
+                   </div>
+                   <div>
+                     <div style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:'600' }}>بروفات مجدولة اليوم</div>
+                     <div style={{ fontSize:'18px', fontWeight:'700', color:'var(--text-main)', marginTop:'2px' }} className="font-mono">{tailorStats.todayFittings}</div>
+                   </div>
+                 </div>
+                 <div style={{ background: 'var(--bg-card)', padding: '16px 20px', borderRadius: '14px', border: '1px solid var(--border-subtle)', boxShadow:'var(--shadow-sm)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                   <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'rgba(124,58,237,0.08)', color:'#7c3aed', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                     <Truck size={20} strokeWidth={2.2} />
+                   </div>
+                   <div>
+                     <div style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:'600' }}>شحنات موردين (٧ أيام)</div>
+                     <div style={{ fontSize:'18px', fontWeight:'700', color:'var(--text-main)', marginTop:'2px' }} className="font-mono">{tailorStats.recentDeliveries} استلام</div>
+                   </div>
+                 </div>
+              </div>
+            )}
+          </>
         ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: '20px'
-        }}>
-          {shift && (
-            <div style={{ background: 'var(--bg-card)', padding: '20px', borderRadius: '20px', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center' }}>
-                <Wallet size={24} />
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '16px'
+          }}>
+            {shift && (
+              <div style={{ background: 'var(--bg-card)', padding: '18px 20px', borderRadius: '14px', border: '1px solid var(--border-subtle)', boxShadow:'var(--shadow-sm)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(37, 99, 235, 0.08)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink:0 }}>
+                  <Wallet size={22} strokeWidth={2.2} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', fontWeight: '600' }}>الرصيد الافتتاحي للدرج</div>
+                  <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)', marginTop: '2px' }} className="font-mono">SAR {parseFloat(shift.starting_cash || 0).toFixed(2)}</div>
+                </div>
+              </div>
+            )}
+            <div style={{ background: 'var(--bg-card)', padding: '18px 20px', borderRadius: '14px', border: '1px solid var(--border-subtle)', boxShadow:'var(--shadow-sm)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(5, 150, 105, 0.08)', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink:0 }}>
+                <Award size={22} strokeWidth={2.2} />
               </div>
               <div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '700' }}>الرصيد الافتتاحي للدرج</div>
-                <div style={{ fontSize: '20px', fontWeight: '900', color: 'var(--text-main)', marginTop: '2px' }}>SAR {parseFloat(shift.starting_cash || 0).toFixed(2)}</div>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', fontWeight: '600' }}>مبيعات اليوم المحققة</div>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)', marginTop: '2px' }} className="font-mono">SAR {stats.todaySalesTotal.toFixed(2)}</div>
               </div>
             </div>
-          )}
-          <div style={{ background: 'var(--bg-card)', padding: '20px', borderRadius: '20px', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center' }}>
-              <Award size={24} />
-            </div>
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '700' }}>مبيعات اليوم المحققة</div>
-              <div style={{ fontSize: '20px', fontWeight: '900', color: 'var(--text-main)', marginTop: '2px' }}>SAR {stats.todaySalesTotal.toFixed(2)}</div>
-            </div>
-          </div>
-          <div style={{ background: 'var(--bg-card)', padding: '20px', borderRadius: '20px', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center' }}>
-              <Clock size={24} />
-            </div>
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '700' }}>عدد فواتير اليوم</div>
-              <div style={{ fontSize: '20px', fontWeight: '900', color: 'var(--text-main)', marginTop: '2px' }}>{stats.todaySalesCount} فاتورة</div>
+            <div style={{ background: 'var(--bg-card)', padding: '18px 20px', borderRadius: '14px', border: '1px solid var(--border-subtle)', boxShadow:'var(--shadow-sm)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(124, 58, 237, 0.08)', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink:0 }}>
+                <Clock size={22} strokeWidth={2.2} />
+              </div>
+              <div>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', fontWeight: '600' }}>عدد فواتير اليوم</div>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)', marginTop: '2px' }} className="font-mono">{stats.todaySalesCount} فاتورة</div>
+              </div>
             </div>
           </div>
-        </div>
         )}
 
         {/* Launch Cards Grid */}
         <div>
-          <h3 style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '16px' }}>إطلاق سريع للمحطات التشغيلية</h3>
+          <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '14px' }}>إطلاق سريع للمحطات التشغيلية</h3>
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-            gap: '20px'
+            gap: '16px'
           }}>
             {visibleModules.map(m => (
               <button
@@ -368,9 +408,10 @@ export default function Home() {
                 className="active-press"
                 style={{
                   background: 'var(--bg-card)',
-                  padding: '20px',
-                  borderRadius: '20px',
+                  padding: '18px 20px',
+                  borderRadius: '14px',
                   border: '1px solid var(--border-subtle)',
+                  boxShadow: 'var(--shadow-sm)',
                   textAlign: 'right',
                   cursor: 'pointer',
                   display: 'flex',
@@ -378,18 +419,24 @@ export default function Home() {
                   justifyContent: 'space-between',
                   width: '100%',
                   outline: 'none',
-                  transition: 'background-color 0.15s ease, transform 0.1s ease',
+                  transition: 'all 0.15s ease',
                   fontFamily: 'inherit'
                 }}
-                onMouseOver={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-                onMouseOut={e => e.currentTarget.style.backgroundColor = 'var(--bg-card)'}
+                onMouseOver={e => {
+                  e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
+                  e.currentTarget.style.borderColor = 'var(--color-border-bright)';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.backgroundColor = 'var(--bg-card)';
+                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', minWidth: 0 }}>
                   <div style={{
-                    width: '52px',
-                    height: '52px',
-                    borderRadius: '16px',
-                    background: `${m.color}15`,
+                    width: '46px',
+                    height: '46px',
+                    borderRadius: '12px',
+                    background: `${m.color}12`,
                     color: m.color,
                     display: 'flex',
                     alignItems: 'center',
@@ -399,11 +446,11 @@ export default function Home() {
                     {m.icon}
                   </div>
                   <div style={{ minWidth: 0 }}>
-                    <h4 style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-main)', margin: '0 0 4px 0' }}>{m.title}</h4>
+                    <h4 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', margin: '0 0 3px 0' }}>{m.title}</h4>
                     <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.desc}</p>
                   </div>
                 </div>
-                <ChevronLeft size={20} color="var(--text-muted)" style={{ flexShrink: 0, marginRight: '10px' }} />
+                <ChevronLeft size={18} color="var(--text-muted)" style={{ flexShrink: 0, marginRight: '8px' }} />
               </button>
             ))}
           </div>
@@ -413,3 +460,4 @@ export default function Home() {
     </AppLayout>
   );
 }
+

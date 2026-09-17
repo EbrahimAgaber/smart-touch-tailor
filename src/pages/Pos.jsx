@@ -7,6 +7,7 @@ import { useLicenseStore } from '../store/useLicenseStore';
 import { CreditCard, Pause, ChefHat, Trash2, Edit3, X, Save, MessageSquare, Headphones, LayoutGrid, Table, Scissors, Ruler, Factory, ArrowRight } from 'lucide-react';
 import QRCode from '../utils/qr-gen';
 import TabularView from '../features/pos/components/TabularView';
+import { playPaymentChime } from '../utils/audioFeedback';
 
 // ── Category → Emoji mapping ───────────────────────────────────
 const CATEGORY_ICONS = {
@@ -716,6 +717,7 @@ export default function Pos() {
       } else {
         showToast(t('pos.alerts.invoice_saved'));
       }
+      playPaymentChime();
     } catch (err) {
       alert(`${t('pos.alerts.network_error')} ` + (err.message || err));
     } finally {
@@ -735,13 +737,49 @@ export default function Pos() {
   // ── Keyboard shortcuts ─────────────────────────────────────────
   useEffect(() => {
     const handler = (e) => {
-      if (e.key === 'F2' && viewMode === 'grid')  { e.preventDefault(); if (order.length > 0) setShowPayment(true); }
-      if (e.key === 'Escape') { setShowPayment(false); setShowSuccess(false); setShowHeld(false); }
-      if (e.key === 'Enter' && showPayment && canFinalize) { e.preventDefault(); finalizeSale(); }
+      const tag = e.target?.tagName?.toLowerCase();
+      const isInput = tag === 'input' || tag === 'textarea' || e.target?.isContentEditable;
+
+      if (e.key === 'F1') {
+        e.preventDefault();
+        barcodeRef.current?.focus();
+        barcodeRef.current?.select();
+      } else if (e.key === 'F2' && viewMode === 'grid') {
+        e.preventDefault();
+        if (order.length > 0) openPayment();
+      } else if (e.key === 'F4' && !isInput) {
+        e.preventDefault();
+        if (order.length > 0) holdCurrentOrder(false);
+      } else if (e.key === 'F8') {
+        e.preventDefault();
+        if (!showPayment && order.length > 0) {
+          setPayments([{ type: 'Cash', amount: finalTotal.toFixed(2) }]);
+          setShowPayment(true);
+        } else if (showPayment) {
+          setPayments([{ type: 'Cash', amount: finalTotal.toFixed(2) }]);
+        }
+      } else if (e.key === 'F9') {
+        e.preventDefault();
+        if (!showPayment && order.length > 0) {
+          setPayments([{ type: 'Card', amount: finalTotal.toFixed(2) }]);
+          setShowPayment(true);
+        } else if (showPayment) {
+          setPayments([{ type: 'Card', amount: finalTotal.toFixed(2) }]);
+        }
+      } else if (e.key === 'F10' || (e.key === 'Enter' && showPayment)) {
+        if (showPayment && canFinalize) {
+          e.preventDefault();
+          finalizeSale();
+        }
+      } else if (e.key === 'Escape') {
+        setShowPayment(false);
+        setShowSuccess(false);
+        setShowHeld(false);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [order, showPayment, canFinalize, finalizeSale, viewMode]);
+  }, [order, showPayment, canFinalize, finalizeSale, viewMode, finalTotal, openPayment, holdCurrentOrder]);
 
   const holdCurrentOrder = async (isKds = false) => {
     if (order.length === 0) return;
@@ -1762,7 +1800,7 @@ export default function Pos() {
         {viewMode === 'grid' && (
           <div style={{ padding:'12px 14px', borderBottom:'1px solid #f1f5f9' }}>
             <input ref={barcodeRef} autoFocus value={barcode} onChange={handleBarcodeChange} onKeyDown={handleBarcodeKeyDown}
-              placeholder={t('pos.grid.search_placeholder')}
+              placeholder={`${t('pos.grid.search_placeholder')} [F1]`}
               style={{ width:'100%', padding:'10px 12px', borderRadius:'10px', border:'2px solid #3b82f6', background:'#f0f7ff', fontSize:'13px', fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} />
           </div>
         )}
@@ -2090,12 +2128,15 @@ export default function Pos() {
               )}
               <button onClick={() => holdCurrentOrder(false)} disabled={order.length===0}
                 style={holdBtnStyle}>
-                <Pause size={18} /> {isRestaurant ? t('pos.actions.hold') : t('pos.actions.hold_order')}
+                <Pause size={18} />
+                <span>{isRestaurant ? t('pos.actions.hold') : t('pos.actions.hold_order')}</span>
+                <kbd style={{ background:'#e2e8f0', padding:'1px 4px', borderRadius:'3px', fontSize:'9px', fontFamily:'monospace', marginRight:'4px' }}>F4</kbd>
               </button>
             </div>
-            <button className="btn btn-primary" style={{ padding:'16px', fontSize:'16px', fontWeight:'900' }}
+            <button className="btn btn-primary" style={{ padding:'16px', fontSize:'16px', fontWeight:'900', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}
               disabled={order.length === 0} onClick={openPayment}>
-              {t('pos.actions.checkout')} 💳
+              <span>{t('pos.actions.checkout')} 💳</span>
+              <kbd style={{ background:'rgba(255,255,255,0.25)', padding:'1px 6px', borderRadius:'4px', fontSize:'11px', fontFamily:'monospace' }}>F2</kbd>
             </button>
           </div>
         </section>
@@ -2215,6 +2256,52 @@ export default function Pos() {
                   ⟳ {t('pos.payment.sync_amount')}
                 </button>
               </div>
+
+              {/* Quick Method Hotkey Buttons */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginBottom:'10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setPayments([{ type: 'Cash', amount: finalTotal.toFixed(2) }])}
+                  style={{
+                    padding:'8px 12px',
+                    borderRadius:'10px',
+                    border: payments[0]?.type === 'Cash' ? '2px solid #10b981' : '1px solid #cbd5e1',
+                    background: payments[0]?.type === 'Cash' ? '#ecfdf5' : '#ffffff',
+                    color: payments[0]?.type === 'Cash' ? '#047857' : '#334155',
+                    fontWeight:'800',
+                    fontSize:'12px',
+                    cursor:'pointer',
+                    display:'flex',
+                    alignItems:'center',
+                    justifyContent:'center',
+                    gap:'6px'
+                  }}
+                >
+                  <span>💵 نقداً (Cash)</span>
+                  <kbd style={{ background: payments[0]?.type === 'Cash' ? '#10b981' : '#e2e8f0', color: payments[0]?.type === 'Cash' ? '#fff' : '#64748b', padding:'0 5px', borderRadius:'4px', fontSize:'9px', fontFamily:'monospace' }}>F8</kbd>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPayments([{ type: 'Card', amount: finalTotal.toFixed(2) }])}
+                  style={{
+                    padding:'8px 12px',
+                    borderRadius:'10px',
+                    border: payments[0]?.type === 'Card' ? '2px solid #3b82f6' : '1px solid #cbd5e1',
+                    background: payments[0]?.type === 'Card' ? '#eff6ff' : '#ffffff',
+                    color: payments[0]?.type === 'Card' ? '#1d4ed8' : '#334155',
+                    fontWeight:'800',
+                    fontSize:'12px',
+                    cursor:'pointer',
+                    display:'flex',
+                    alignItems:'center',
+                    justifyContent:'center',
+                    gap:'6px'
+                  }}
+                >
+                  <span>💳 شبكة (Card)</span>
+                  <kbd style={{ background: payments[0]?.type === 'Card' ? '#3b82f6' : '#e2e8f0', color: payments[0]?.type === 'Card' ? '#fff' : '#64748b', padding:'0 5px', borderRadius:'4px', fontSize:'9px', fontFamily:'monospace' }}>F9</kbd>
+                </button>
+              </div>
               {/* Credit warning: block finalization if Credit is selected but no customer */}
               {payments.some(p => p.type === 'Credit') && !selectedCustomer && (
                 <div style={{ marginBottom:'12px', padding:'12px 14px', background:'#fef2f2', border:'1px solid #fecaca', borderRadius:'12px', display:'flex', alignItems:'center', gap:'10px' }}>
@@ -2291,8 +2378,9 @@ export default function Pos() {
             <div style={{ padding:'14px 22px', borderTop:'1px solid #f1f5f9', display:'flex', gap:'10px', justifyContent:'flex-end' }}>
               <button onClick={() => setShowPayment(false)} className="btn btn-secondary">{t('pos.actions.cancel')}</button>
               <button onClick={finalizeSale} disabled={!canFinalize} className="btn btn-primary"
-                style={{ opacity: canFinalize ? 1 : .5 }}>
-                {t('pos.actions.confirm_pay')}
+                style={{ opacity: canFinalize ? 1 : .5, display:'flex', alignItems:'center', gap:'8px' }}>
+                <span>{t('pos.actions.confirm_pay')}</span>
+                <kbd style={{ background:'rgba(255,255,255,0.25)', padding:'1px 6px', borderRadius:'4px', fontSize:'11px', fontFamily:'monospace' }}>F10 / ↵</kbd>
               </button>
             </div>
           </div>

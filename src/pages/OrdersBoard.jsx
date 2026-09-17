@@ -34,12 +34,14 @@ import {
   LayoutGrid,
   ListFilter,
   ArrowRight,
-  TrendingUp
+  TrendingUp,
+  Barcode
 } from 'lucide-react';
 import TailorPrintModal from '../components/mulam/TailorPrintModal';
 import TailorWhatsAppModal from '../components/mulam/TailorWhatsAppModal';
 import GarmentLabelModal from '../components/mulam/GarmentLabelModal';
 import HandoverSettlementModal from '../components/mulam/HandoverSettlementModal';
+import WorkshopBarcodeStationModal from '../components/WorkshopBarcodeStationModal';
 
 // ── Production Stages Configuration ──────────────────────────────────────────
 const STAGES = [
@@ -49,6 +51,63 @@ const STAGES = [
   { id: 'qc',        label: 'فحص الجودة',   shortLabel: 'فحص',     color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.08)', border: '#06b6d4' },
   { id: 'ironing',   label: 'كوي وتجهيز',   shortLabel: 'كوي',     color: '#ec4899', bg: 'rgba(236, 72, 153, 0.08)', border: '#ec4899' },
   { id: 'ready',     label: 'جاهز للتسليم', shortLabel: 'جاهز',    color: '#10b981', bg: 'rgba(16, 185, 129, 0.08)', border: '#10b981' },
+];
+
+// ── Streamlined Workshop Stations (Consolidated Pipeline for Zero Clutter) ──
+// Voice of 100 Mu'allams & 100 Business Owners: 4 core physical workstations
+const STREAMLINED_STATIONS = [
+  {
+    id: 'station_cutting',
+    label: 'قص وتفصيل',
+    shortLabel: 'قص',
+    stageIds: ['cutting'],
+    color: '#2563eb',
+    bg: 'rgba(37, 99, 235, 0.08)',
+    border: '#2563eb',
+    icon: Scissors,
+    desc: 'طاولة القصاص وتجهيز القماش',
+    nextStageId: 'stitching',
+    nextLabel: 'خياطة'
+  },
+  {
+    id: 'station_stitching',
+    label: 'خياطة وتركيب',
+    shortLabel: 'خياطة',
+    stageIds: ['stitching'],
+    color: '#7c3aed',
+    bg: 'rgba(124, 58, 237, 0.08)',
+    border: '#7c3aed',
+    icon: Layers,
+    desc: 'ماكينات الخياطة وتجميع الأجزاء',
+    nextStageId: 'finishing',
+    nextLabel: 'تشطيب/كوي'
+  },
+  {
+    id: 'station_finishing',
+    label: 'تشطيب، كوي وفحص QC',
+    shortLabel: 'تشطيب/كوي',
+    stageIds: ['finishing', 'qc', 'ironing'],
+    color: '#d97706',
+    bg: 'rgba(217, 119, 6, 0.08)',
+    border: '#d97706',
+    icon: Sparkles,
+    desc: 'تطريز الأزرار، الكوي بالبخار والتكييس',
+    nextStageId: 'ready',
+    nextLabel: 'جاهز للتسليم'
+  },
+  {
+    id: 'station_ready',
+    label: 'جاهز للتسليم',
+    shortLabel: 'جاهز',
+    stageIds: ['ready'],
+    color: '#059669',
+    bg: 'rgba(5, 150, 105, 0.08)',
+    border: '#059669',
+    icon: CheckCircle2,
+    desc: 'في انتظار استلام العميل والمخالصة المالية',
+    nextStageId: null,
+    nextLabel: null
+  }
 ];
 
 function StageIcon({ stage, size = 16, color = 'currentColor' }) {
@@ -114,6 +173,7 @@ export default function OrdersBoard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all'); // all, urgent, ready, overdue
   const [viewMode, setViewMode] = useState('kanban'); // 'kanban' | 'list'
+  const [pipelineMode, setPipelineMode] = useState('streamlined'); // 'streamlined' (4 core stations) | 'detailed' (6 micro-stages)
 
   // Expandable garments state (orderId -> boolean)
   const [expandedOrders, setExpandedOrders] = useState({});
@@ -122,6 +182,7 @@ export default function OrdersBoard() {
   const [printModalOrder, setPrintModalOrder] = useState(null);
   const [whatsAppModalOrder, setWhatsAppModalOrder] = useState(null);
   const [labelModalOrder, setLabelModalOrder] = useState(null);
+  const [showBarcodeStation, setShowBarcodeStation] = useState(false);
 
   const [settings, setSettings] = useState({});
 
@@ -195,6 +256,134 @@ export default function OrdersBoard() {
     return () => clearInterval(timer);
   }, [fetchOrders]);
 
+  // ── Global Hotkeys for Workshop Board ──────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const tag = e.target?.tagName?.toLowerCase();
+      const isInput = tag === 'input' || tag === 'textarea' || e.target?.isContentEditable;
+
+      if (e.key === 'F1') {
+        e.preventDefault();
+        document.getElementById('orders-search-input')?.focus();
+      } else if (e.key === 'F2' && !isInput) {
+        e.preventDefault();
+        setPipelineMode(prev => prev === 'streamlined' ? 'detailed' : 'streamlined');
+      } else if (e.key === 'F3' && !showBarcodeStation) {
+        e.preventDefault();
+        setShowBarcodeStation(true);
+      } else if ((e.key === 'b' || e.key === 'B') && !isInput && (e.ctrlKey || e.altKey)) {
+        e.preventDefault();
+        setShowBarcodeStation(prev => !prev);
+      } else if (e.key === 'F5' && !isInput) {
+        e.preventDefault();
+        fetchOrders();
+      } else if (e.key === 'Escape') {
+        setShowBarcodeStation(false);
+        setPrintModalOrder(null);
+        setWhatsAppModalOrder(null);
+        setLabelModalOrder(null);
+        setHandoverOrder(null);
+        setShowPayment(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [fetchOrders, showBarcodeStation]);
+
+  // ── Barcode Hands-Free Advance Order Handler ─────────────────────────────
+  const handleBarcodeAdvanceOrder = useCallback(async (orderId, forcedStation = null) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return { success: false, error: 'الطلب غير موجود' };
+    const garments = garmentMap[orderId] || [];
+    if (garments.length === 0) return { success: false, error: 'لا توجد قطع مسجلة لهذا الطلب' };
+
+    let targetStage;
+    if (forcedStation) {
+      targetStage = forcedStation === 'station_cutting' ? 'cutting' 
+                  : forcedStation === 'station_stitching' ? 'stitching' 
+                  : forcedStation === 'station_finishing' ? 'ironing' 
+                  : forcedStation === 'station_ready' ? 'ready' 
+                  : forcedStation;
+    } else {
+      let minIdx = STAGES.length;
+      for (const g of garments) {
+        const idx = STAGE_INDEX[g.production_stage] ?? 0;
+        if (idx < minIdx) minIdx = idx;
+      }
+      if (minIdx >= STAGES.length - 1) {
+        return { 
+          success: true, 
+          isReady: true, 
+          actionText: `الطلب #${orderId} جاهز للتسليم بالفعل (${fmt(order.balance_due || 0)} ر.س متبقي)` 
+        };
+      }
+      targetStage = STAGES[Math.min(minIdx + 1, STAGES.length - 1)]?.id || 'ready';
+    }
+
+    try {
+      await Promise.all(
+        garments.map(async (g) => {
+          if (g.production_stage === 'ready' || g.production_stage === 'delivered') return;
+          await window.api?.tailor?.updateStage?.({ garment_id: g.id, stage: targetStage });
+        })
+      );
+
+      setGarmentMap(prev => {
+        const next = { ...prev };
+        if (next[orderId]) {
+          next[orderId] = next[orderId].map(g => {
+            if (g.production_stage === 'ready' || g.production_stage === 'delivered') return g;
+            return { ...g, production_stage: targetStage };
+          });
+        }
+        return next;
+      });
+
+      const stageObj = STAGES.find(s => s.id === targetStage);
+      const stageLabel = stageObj?.label || targetStage;
+      const isReady = targetStage === 'ready';
+
+      return {
+        success: true,
+        isReady,
+        actionText: `تمت ترقية جميع أثواب الطلب #${orderId} إلى محطة: ${stageLabel}`
+      };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }, [orders, garmentMap]);
+
+  // ── Barcode Hands-Free Advance Single Garment Handler ─────────────────────
+  const handleBarcodeAdvanceGarment = useCallback(async (garmentId, currentStage) => {
+    const curIdx = STAGE_INDEX[currentStage] ?? 0;
+    if (curIdx >= STAGES.length - 1) {
+      return { success: false, error: 'القطعة في المرحلة النهائية بالفعل' };
+    }
+    const nextStageObj = STAGES[curIdx + 1];
+    const targetStage = nextStageObj.id;
+
+    try {
+      await window.api?.tailor?.updateStage?.({ garment_id: garmentId, stage: targetStage });
+
+      setGarmentMap(prev => {
+        const next = { ...prev };
+        for (const orderId of Object.keys(next)) {
+          next[orderId] = next[orderId].map(g =>
+            g.id === garmentId ? { ...g, production_stage: targetStage } : g
+          );
+        }
+        return next;
+      });
+
+      return {
+        success: true,
+        nextStageLabel: nextStageObj.shortLabel || nextStageObj.label
+      };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }, []);
+
   // ── Stage advance / revert for a single garment ───────────────────────────
   const handleStageChange = async (garmentId, newStage) => {
     setAdvancing(garmentId);
@@ -257,6 +446,49 @@ export default function OrdersBoard() {
       setAdvancing(null);
     }
   };
+
+  // ── Advance order to a specific target stage / station ────────────────────
+  const handleAdvanceToTargetStage = async (orderId, targetStage) => {
+    const garments = garmentMap[orderId] || [];
+    const nonReady = garments.filter(g => g.production_stage !== 'ready' && g.production_stage !== 'delivered');
+    if (nonReady.length === 0) return;
+
+    setAdvancing(`batch-${orderId}`);
+    try {
+      await Promise.all(
+        nonReady.map(g => {
+          return window.api?.tailor?.updateStage?.({ garment_id: g.id, stage: targetStage });
+        })
+      );
+
+      // Optimistic update
+      setGarmentMap(prev => {
+        const next = { ...prev };
+        if (next[orderId]) {
+          next[orderId] = next[orderId].map(g => {
+            if (g.production_stage === 'ready' || g.production_stage === 'delivered') return g;
+            return { ...g, production_stage: targetStage };
+          });
+        }
+        return next;
+      });
+
+      showToast?.({ type: 'success', message: `تمت ترقية طلب #${orderId} بنجاح` });
+    } catch (err) {
+      showToast?.({ type: 'error', message: 'خطأ في الترقية: ' + err.message });
+    } finally {
+      setAdvancing(null);
+    }
+  };
+
+  // ── Get Station for an Order in Streamlined 4-Station Mode ────────────────
+  const getOrderStationId = useCallback((orderId) => {
+    const earliestStage = getOrderBoardStage(orderId);
+    if (earliestStage === 'cutting') return 'station_cutting';
+    if (earliestStage === 'stitching') return 'station_stitching';
+    if (earliestStage === 'ready' || earliestStage === 'delivered') return 'station_ready';
+    return 'station_finishing'; // 'finishing', 'qc', 'ironing'
+  }, [getOrderBoardStage]);
 
   // ── Add Payment handler ───────────────────────────────────────────────────
   const handleAddPaymentConfirm = async () => {
@@ -553,6 +785,29 @@ export default function OrdersBoard() {
           {/* Quick Actions & Navigation */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
+              onClick={() => setShowBarcodeStation(true)}
+              style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: '#ffffff',
+                border: 'none',
+                minHeight: '40px',
+                padding: '0 14px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
+              }}
+              title="فتح محطة المسح الضوئي للمعمل بدون لمس الشاشة [F3]"
+            >
+              <Barcode size={16} />
+              <span>محطة المسح بالباركود</span>
+              <kbd style={{ background: 'rgba(0,0,0,0.2)', padding: '1px 5px', borderRadius: '4px', fontSize: '10px', fontFamily: 'monospace' }}>F3</kbd>
+            </button>
+            <button
               onClick={() => navigate('/pos')}
               style={{
                 background: 'var(--color-primary, #6366f1)',
@@ -592,8 +847,9 @@ export default function OrdersBoard() {
           {/* Search Input */}
           <div style={{ position: 'relative', minWidth: '240px', flex: '1 1 240px', maxWidth: '340px' }}>
             <input
+              id="orders-search-input"
               type="text"
-              placeholder="ابحث باسم العميل، الجوال أو رقم الطلب..."
+              placeholder="ابحث باسم العميل، الجوال أو رقم الطلب... [F1]"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{
@@ -655,6 +911,52 @@ export default function OrdersBoard() {
                 {f.label}
               </button>
             ))}
+          </div>
+
+          {/* Pipeline Mode Toggle: 4 Stations vs 6 Stages (Voice of 100 Mu'allams & 100 Business Owners) */}
+          <div style={{ display: 'flex', background: 'var(--bg-hover, #f8fafc)', padding: '3px', borderRadius: '8px', border: '1px solid var(--border-subtle, #e2e8f0)' }}>
+            <button
+              type="button"
+              onClick={() => setPipelineMode('streamlined')}
+              style={{
+                padding: '5px 12px',
+                borderRadius: '6px',
+                border: 'none',
+                background: pipelineMode === 'streamlined' ? 'var(--color-primary, #6366f1)' : 'transparent',
+                color: pipelineMode === 'streamlined' ? '#fff' : 'var(--text-muted, #64748b)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontSize: '11px',
+                fontWeight: 800
+              }}
+              title="المسار المعملي السلس (4 محطات رئيسية بدون ازدحام)"
+            >
+              <Zap size={13} />
+              <span>المسار السلس (4 محطات)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPipelineMode('detailed')}
+              style={{
+                padding: '5px 12px',
+                borderRadius: '6px',
+                border: 'none',
+                background: pipelineMode === 'detailed' ? 'var(--color-primary, #6366f1)' : 'transparent',
+                color: pipelineMode === 'detailed' ? '#fff' : 'var(--text-muted, #64748b)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontSize: '11px',
+                fontWeight: 800
+              }}
+              title="المسار التفصيلي الكامل (6 مراحل)"
+            >
+              <Layers size={13} />
+              <span>المسار المفصل (6 مراحل)</span>
+            </button>
           </div>
 
           {/* View Switcher (Kanban vs List) & Refresh */}
@@ -748,30 +1050,34 @@ export default function OrdersBoard() {
             alignItems: 'stretch'
           }}
         >
-          {STAGES.map((stage) => {
-            const stageOrders = filteredOrders.filter(o => getOrderBoardStage(o.id) === stage.id);
+          {(pipelineMode === 'streamlined' ? STREAMLINED_STATIONS : STAGES).map((col) => {
+            const isStreamlined = pipelineMode === 'streamlined';
+            const stageOrders = isStreamlined
+              ? filteredOrders.filter(o => col.stageIds.includes(getOrderBoardStage(o.id)))
+              : filteredOrders.filter(o => getOrderBoardStage(o.id) === col.id);
+            const IconComponent = isStreamlined ? col.icon : null;
 
             return (
               <div
-                key={stage.id}
+                key={col.id}
                 style={{
-                  minWidth: '310px',
-                  maxWidth: '320px',
+                  minWidth: isStreamlined ? '260px' : '310px',
+                  maxWidth: isStreamlined ? 'none' : '320px',
+                  flex: isStreamlined ? '1 1 0' : '0 0 auto',
                   display: 'flex',
                   flexDirection: 'column',
                   background: 'var(--bg-card, #ffffff)',
                   borderRadius: '14px',
                   overflow: 'hidden',
                   border: '1px solid var(--border-subtle, #e2e8f0)',
-                  flexShrink: 0,
                   boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)'
                 }}
               >
                 {/* Stage Header */}
                 <div 
                   style={{
-                    background: stage.bg,
-                    borderBottom: `2.5px solid ${stage.border}`,
+                    background: col.bg,
+                    borderBottom: `2.5px solid ${col.border}`,
                     padding: '12px 14px',
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -779,14 +1085,25 @@ export default function OrdersBoard() {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <StageIcon stage={stage.id} size={17} color={stage.color} />
-                    <span style={{ fontWeight: 900, fontSize: '14px', color: stage.color }}>
-                      {stage.label}
-                    </span>
+                    {isStreamlined ? (
+                      <IconComponent size={17} color={col.color} />
+                    ) : (
+                      <StageIcon stage={col.id} size={17} color={col.color} />
+                    )}
+                    <div>
+                      <div style={{ fontWeight: 900, fontSize: '14px', color: col.color, lineHeight: 1.2 }}>
+                        {col.label}
+                      </div>
+                      {isStreamlined && col.desc && (
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted, #64748b)', fontWeight: 600, marginTop: '2px' }}>
+                          {col.desc}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <span 
                     style={{
-                      background: stage.color,
+                      background: col.color,
                       color: '#fff',
                       borderRadius: '999px',
                       minWidth: '24px',
@@ -827,7 +1144,7 @@ export default function OrdersBoard() {
                         fontWeight: 700
                       }}
                     >
-                      لا توجد أثواب في مرحلة {stage.label}
+                      لا توجد أثواب في {isStreamlined ? 'محطة' : 'مرحلة'} {col.label}
                     </div>
                   )}
 
@@ -842,8 +1159,8 @@ export default function OrdersBoard() {
                     const isBatchAdvancing = advancing === `batch-${order.id}`;
                     const isExpanded = Boolean(expandedOrders[order.id]);
 
-                    // Determine next stage for this order
-                    const currentStageIdx = STAGES.findIndex(s => s.id === stage.id);
+                    // Determine next stage for this order in detailed mode
+                    const currentStageIdx = STAGES.findIndex(s => s.id === col.id);
                     const nextStageObj = currentStageIdx < STAGES.length - 1 ? STAGES[currentStageIdx + 1] : null;
 
                     return (
@@ -852,7 +1169,7 @@ export default function OrdersBoard() {
                         style={{
                           background: 'var(--bg-card, #ffffff)',
                           border: overdue ? '1.5px solid #ef4444' : order.is_urgent ? '1.5px solid #f59e0b' : '1px solid var(--border-subtle, #e2e8f0)',
-                          borderRight: overdue ? '4px solid #ef4444' : order.is_urgent ? '4px solid #f59e0b' : `4px solid ${stage.color}`,
+                          borderRight: overdue ? '4px solid #ef4444' : order.is_urgent ? '4px solid #f59e0b' : `4px solid ${col.color}`,
                           borderRadius: '12px',
                           padding: '12px',
                           boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
@@ -992,7 +1309,7 @@ export default function OrdersBoard() {
                         )}
 
                         {/* 4. THE GOLDEN PATH: Smart Primary Action Button */}
-                        {allReady ? (
+                        {allReady || (isStreamlined && col.id === 'station_ready') ? (
                           /* Order is completely ready: Handover & Receipt Settlement Button */
                           <button
                             type="button"
@@ -1017,8 +1334,34 @@ export default function OrdersBoard() {
                             <PackageCheck size={16} />
                             <span>تسليم للعميل وطباعة السند 🧾</span>
                           </button>
-                        ) : nextStageObj ? (
-                          /* Not ready: 1-Tap Advance to Next Stage */
+                        ) : isStreamlined && col.nextStageId ? (
+                          /* Streamlined 4-Station: 1-Tap Advance to Next Station */
+                          <button
+                            type="button"
+                            onClick={() => handleAdvanceToTargetStage(order.id, col.nextStageId)}
+                            disabled={isBatchAdvancing}
+                            style={{
+                              width: '100%',
+                              minHeight: '40px',
+                              borderRadius: '8px',
+                              background: 'var(--color-primary, #6366f1)',
+                              color: '#ffffff',
+                              fontWeight: 800,
+                              fontSize: '12px',
+                              cursor: isBatchAdvancing ? 'not-allowed' : 'pointer',
+                              border: 'none',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              opacity: isBatchAdvancing ? 0.7 : 1
+                            }}
+                          >
+                            <ArrowRight size={14} />
+                            <span>{isBatchAdvancing ? 'جاري الترقية...' : `ترقية إلى ${col.nextLabel} ⇦`}</span>
+                          </button>
+                        ) : !isStreamlined && nextStageObj ? (
+                          /* Detailed 6-Stage: 1-Tap Advance to Next Micro-Stage */
                           <button
                             type="button"
                             onClick={() => handleBatchAdvance(order.id)}
@@ -1596,6 +1939,18 @@ export default function OrdersBoard() {
           settings={settings}
         />
       )}
+
+      {/* ── Hands-Free Barcode Scanner Station Modal ──────────────────────── */}
+      <WorkshopBarcodeStationModal
+        isOpen={showBarcodeStation}
+        onClose={() => setShowBarcodeStation(false)}
+        orders={orders}
+        garmentMap={garmentMap}
+        onAdvanceOrder={handleBarcodeAdvanceOrder}
+        onAdvanceGarment={handleBarcodeAdvanceGarment}
+        onOpenHandover={(order) => setHandoverOrder(order)}
+        showToast={showToast}
+      />
 
     </div>
   );

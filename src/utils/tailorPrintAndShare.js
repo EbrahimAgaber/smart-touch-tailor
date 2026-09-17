@@ -1134,43 +1134,117 @@ export function generateHandoverWhatsAppText({
 export async function printHandoverReceiptDirect(params) {
   const html = generateHandoverReceiptHTML(params);
   
+  // 1. Desktop native Electron API if present
   if (window.api?.printHTML) {
     try {
-      await window.api.printHTML(html);
+      const res = await window.api.printHTML(html);
+      return { success: true, res };
     } catch (e) {
-      console.warn('window.api.printHTML failed, trying iframe fallback:', e);
+      console.warn('window.api.printHTML failed, proceeding to web print fallback:', e);
     }
   }
 
-  // Fallback direct iframe print
+  // 2. Direct Web Print Portal (Bulletproof in all modern browsers and iframe environments)
   try {
+    // Remove any previously existing print container
+    const oldContainer = document.getElementById('mulam-handover-print-portal');
+    if (oldContainer) oldContainer.remove();
+    const oldStyle = document.getElementById('mulam-handover-print-style');
+    if (oldStyle) oldStyle.remove();
+    const oldIframe = document.getElementById('mulam-handover-print-iframe');
+    if (oldIframe) oldIframe.remove();
+
+    // Create print container in DOM with strict print stylesheet
+    const printContainer = document.createElement('div');
+    printContainer.id = 'mulam-handover-print-portal';
+    printContainer.innerHTML = html;
+
+    const styleEl = document.createElement('style');
+    styleEl.id = 'mulam-handover-print-style';
+    styleEl.innerHTML = `
+      @media screen {
+        #mulam-handover-print-portal {
+          display: none !important;
+        }
+      }
+      @media print {
+        body > *:not(#mulam-handover-print-portal) {
+          display: none !important;
+        }
+        #mulam-handover-print-portal {
+          display: block !important;
+          position: absolute !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: 80mm !important;
+          margin: 0 auto !important;
+          padding: 2mm !important;
+          background: #ffffff !important;
+          color: #000000 !important;
+          font-family: 'Courier New', Courier, monospace !important;
+        }
+      }
+    `;
+
+    document.head.appendChild(styleEl);
+    document.body.appendChild(printContainer);
+
+    // Create properly sized offscreen iframe (non-zero size so Chromium doesn't suppress it)
     const iframe = document.createElement('iframe');
+    iframe.id = 'mulam-handover-print-iframe';
     iframe.style.position = 'fixed';
-    iframe.style.top = '-9999px';
-    iframe.style.left = '-9999px';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '300px';
+    iframe.style.height = '400px';
     iframe.style.border = 'none';
+    iframe.style.zIndex = '-999';
+    iframe.style.opacity = '0.01';
+    iframe.style.pointerEvents = 'none';
     document.body.appendChild(iframe);
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write(html);
-    doc.close();
+
+    let printed = false;
+    try {
+      const doc = iframe.contentWindow?.document;
+      if (doc) {
+        doc.open();
+        doc.write(html);
+        doc.close();
+        setTimeout(() => {
+          try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            printed = true;
+          } catch (err) {
+            console.warn('Iframe print blocked, invoking window.print fallback:', err);
+            window.print();
+            printed = true;
+          }
+        }, 350);
+      }
+    } catch (err) {
+      console.warn('Iframe document write failed, falling back to window.print:', err);
+      window.print();
+      printed = true;
+    }
+
     setTimeout(() => {
       try {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-      } catch (err) {
-        console.warn('Iframe print error:', err);
-      }
-      setTimeout(() => {
-        try { document.body.removeChild(iframe); } catch (_) {}
-      }, 2000);
-    }, 400);
+        printContainer.remove();
+        styleEl.remove();
+        iframe.remove();
+      } catch (_) {}
+    }, 6000);
+
     return { success: true };
   } catch (err) {
     console.error('Direct print failed:', err);
-    return { success: false, error: err.message };
+    try {
+      window.print();
+      return { success: true };
+    } catch (e2) {
+      return { success: false, error: err.message };
+    }
   }
 }
 

@@ -204,7 +204,14 @@ export default function MenuAdmin() {
 
   const existingCategories = Array.from(new Set(items.map(i => i.Category || i.category).filter(Boolean)));
 
-  const filtered = items.filter(i => !search || i.Name.toLowerCase().includes(search.toLowerCase()) || (i.Barcode && i.Barcode.includes(search)));
+  const filtered = items.filter(i => {
+    if (!search) return true;
+    const s = search.toLowerCase();
+    const nameMatch = (i?.Name || '').toLowerCase().includes(s);
+    const barcodeMatch = i?.Barcode ? String(i.Barcode).toLowerCase().includes(s) : false;
+    const catMatch = (i?.Category || i?.category || '').toLowerCase().includes(s);
+    return nameMatch || barcodeMatch || catMatch;
+  });
 
   return (
     <AppLayout title="نقطة البيع">
@@ -482,10 +489,10 @@ export default function MenuAdmin() {
                           </div>
                         ) : (
                           <div style={{ display:'inline-block', padding:'6px 14px', borderRadius:'12px', fontSize:'13px', fontWeight:'900', background: isLow ? '#fef2f2' : '#f0fdf4', color: isLow ? '#ef4444' : '#16a34a' }}>
-                            {parseFloat(p.Stock).toFixed(p.IsDivisible ? 2 : 0)} {p.Unit.includes('PCE') ? 'وحدة' : p.Unit.includes('KGM') ? 'كجم' : p.Unit.split(' ')[0]}
+                            {parseFloat(p.Stock || 0).toFixed(p.IsDivisible ? 2 : 0)} {p.Unit ? (p.Unit.includes('PCE') ? 'وحدة' : p.Unit.includes('KGM') ? 'كجم' : p.Unit.split(' ')[0]) : 'وحدة'}
                             {p.IsDivisible && p.SubUnitName && p.PiecesPerUnit > 1 && (
                               <span style={{ fontSize:'11px', color:'#94a3b8', marginRight:'4px' }}>
-                                ({Math.round(parseFloat(p.Stock) * p.PiecesPerUnit)} {p.SubUnitName})
+                                ({Math.round(parseFloat(p.Stock || 0) * p.PiecesPerUnit)} {p.SubUnitName})
                               </span>
                             )}
                           </div>

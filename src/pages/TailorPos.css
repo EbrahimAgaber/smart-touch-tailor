@@ -1,15 +1,15 @@
 .tailor-pos-page {
-    --bg-main: #f8fafc;
-    --card-bg: #ffffff;
-    --border-color: #e2e8f0;
-    --border-focus: #3b82f6;
-    --text-main: #0f172a;
-    --text-muted: #64748b;
-    --primary: #0284c7;
-    --primary-hover: #0369a1;
-    --accent: #2563eb;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --bg-main: var(--bg-app, #f8fafc);
+    --card-bg: var(--bg-card, #ffffff);
+    --border-color: var(--border-subtle, #e2e8f0);
+    --border-focus: var(--color-primary, #6366f1);
+    --text-main: var(--text-main, #0f172a);
+    --text-muted: var(--text-muted, #64748b);
+    --primary: var(--color-primary, #6366f1);
+    --primary-hover: var(--color-primary-hover, #4f46e5);
+    --accent: var(--color-primary, #6366f1);
+    --shadow-sm: var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, 0.05));
+    --shadow-md: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06));
     background-color: var(--bg-main);
     color: var(--text-main);
     height: 100vh;
@@ -209,9 +209,9 @@
 }
 
 .tailor-pos-page .pill.active {
-    background: #0284c7;
+    background: var(--color-primary, #6366f1);
     color: white;
-    border-color: #0284c7;
+    border-color: var(--color-primary, #6366f1);
 }
 
 .tailor-pos-page .pill-remove {

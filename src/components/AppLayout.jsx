@@ -22,34 +22,74 @@ import ZatcaQueueBanner from './ZatcaQueueBanner';
 // ───────────────────────────────────────────────────────────────────────────
 
 import { useTranslation } from 'react-i18next';
+import {
+  LayoutDashboard,
+  BarChart3,
+  Scissors,
+  Factory,
+  Tag,
+  Ruler,
+  ShoppingCart,
+  Users,
+  Handshake,
+  Receipt,
+  Wrench,
+  Utensils,
+  ChefHat,
+  Package,
+  Inbox,
+  Truck,
+  FileText,
+  WalletCards,
+  Briefcase,
+  ShieldCheck,
+  Landmark,
+  TrendingUp,
+  Sparkles,
+  CreditCard,
+  Settings as SettingsIcon,
+  Menu,
+  X,
+  Plus,
+  Clock,
+  LogOut,
+  MessageCircle,
+  Mail,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
+  ChevronDown,
+  ChevronLeft,
+  Fingerprint
+} from 'lucide-react';
 
 const LINKS = [
-  { path: '/home',         labelKey: 'home',          icon: '🏠', permission: null, feature: null, fallbackLabel: 'الرئيسية' },
-  { path: '/dashboard',    labelKey: 'dashboard',       icon: '📊', permission: 'view_dashboard', feature: 'dashboard', fallbackLabel: 'لوحة التحكم' },
-  { path: '/tailor-pos',    labelKey: 'tailor_pos',     icon: '✂️', permission: null, feature: null, fallbackLabel: 'تفصيل جديد' },
-  { path: '/orders-board', labelKey: 'orders_board',    icon: '🏭', permission: null, feature: null, fallbackLabel: 'لوحة المعمل' },
-  { path: '/alterations',   labelKey: 'alterations',    icon: '🏷️', permission: null, feature: null, fallbackLabel: 'إدارة التعديلات' },
-  { path: '/measurements', labelKey: 'measurements',    icon: '📐', permission: null, feature: null, fallbackLabel: 'دفتر المقاسات' },
-  { path: '/pos',          labelKey: 'pos',        icon: '🛒', permission: null, feature: 'pos', fallbackLabel: 'نقطة البيع' }, // always visible
+  { path: '/home',         labelKey: 'home',          icon: <LayoutDashboard size={18} strokeWidth={2.2} />, permission: null, feature: null, fallbackLabel: 'الرئيسية' },
+  { path: '/dashboard',    labelKey: 'dashboard',     icon: <BarChart3 size={18} strokeWidth={2.2} />, permission: 'view_dashboard', feature: 'dashboard', fallbackLabel: 'لوحة التحكم' },
+  { path: '/tailor-pos',    labelKey: 'tailor_pos',    icon: <Scissors size={18} strokeWidth={2.2} />, permission: null, feature: null, fallbackLabel: 'تفصيل جديد' },
+  { path: '/orders-board', labelKey: 'orders_board',  icon: <Factory size={18} strokeWidth={2.2} />, permission: null, feature: null, fallbackLabel: 'لوحة المعمل' },
+  { path: '/alterations',   labelKey: 'alterations',   icon: <Tag size={18} strokeWidth={2.2} />, permission: null, feature: null, fallbackLabel: 'إدارة التعديلات' },
+  { path: '/measurements', labelKey: 'measurements',  icon: <Ruler size={18} strokeWidth={2.2} />, permission: null, feature: null, fallbackLabel: 'دفتر المقاسات' },
+  { path: '/pos',          labelKey: 'pos',           icon: <ShoppingCart size={18} strokeWidth={2.2} />, permission: null, feature: 'pos', fallbackLabel: 'نقطة البيع' }, // always visible
 
-  { path: '/customers',    labelKey: 'customers',     icon: '👥', permission: null, feature: 'customers', fallbackLabel: 'العملاء' },
-  { path: '/sponsors',     labelKey: 'sponsors', icon: '🤝', permission: 'admin', feature: null, fallbackLabel: 'الجهات الداعمة' },
-  { path: '/sales-history',labelKey: 'sales_history',     icon: '📜', permission: 'view_reports', feature: 'sales_history', fallbackLabel: 'سجل المبيعات' },
-  { path: '/services',     labelKey: 'services',  icon: '🔧', permission: null, feature: 'services', fallbackLabel: 'الخدمات' },
-  { path: '/tables',       labelKey: 'tables',    icon: '🪑', permission: null, feature: 'tables', fallbackLabel: 'الطاولات' },
-  { path: '/kds',          labelKey: 'kds',       icon: '🍳', permission: null, feature: 'kds', fallbackLabel: 'شاشة المطبخ' },
-  { path: '/stock',        labelKey: 'stock',           icon: '📦', permission: 'view_stock', feature: 'stock.view', fallbackLabel: 'المخزون' },
-  { path: '/purchases',    labelKey: 'purchases',          icon: '📥', permission: 'manage_purchases', feature: 'purchases', fallbackLabel: 'المشتريات' },
-  { path: '/suppliers',    labelKey: 'suppliers',          icon: '🚚', permission: 'manage_purchases', feature: 'suppliers', fallbackLabel: 'الموردون' },
-  { path: '/menu-admin',   labelKey: 'menu_admin',    icon: '📋', permission: 'manage_menu', feature: 'menu_admin', fallbackLabel: 'إدارة الأصناف' },
-  { path: '/expenditures', labelKey: 'expenditures',         icon: '💸', permission: 'view_reports', feature: 'expenditures', fallbackLabel: 'المصروفات' },
-  { path: '/staff',        labelKey: 'staff',          icon: '👔', permission: 'manage_staff', feature: 'staff.multi', fallbackLabel: 'الموظفون' },
-  { path: '/audit-logs',   labelKey: 'audit_logs',      icon: '🛡️', permission: 'manage_staff', feature: 'audit_logs', fallbackLabel: 'سجل المراقبة' },
-  { path: '/finance-hub',   labelKey: 'finance_hub', icon: '🏛️', permission: 'view_reports', feature: 'finance_hub', fallbackLabel: 'المركز المالي' },
-  { path: '/finance-hub-p2', labelKey: 'finance_hub_p2',     icon: '📈', permission: 'view_reports', feature: 'finance_hub_p2', fallbackLabel: 'محاسبة متقدمة' },
-  { path: '/promotions',   labelKey: 'promotions',  icon: '🏷️', permission: 'manage_menu', feature: 'promotions', fallbackLabel: 'العروض' },
-  { path: '/subscription-hub', labelKey: 'subscription_hub', icon: '⭐', permission: null, feature: null, fallbackLabel: 'الاشتراكات' },
-  { path: '/settings',     labelKey: 'settings',         icon: '⚙️', permission: 'manage_settings', feature: null, fallbackLabel: 'الإعدادات' },
+  { path: '/customers',    labelKey: 'customers',     icon: <Users size={18} strokeWidth={2.2} />, permission: null, feature: 'customers', fallbackLabel: 'العملاء' },
+  { path: '/sponsors',     labelKey: 'sponsors',      icon: <Handshake size={18} strokeWidth={2.2} />, permission: 'admin', feature: null, fallbackLabel: 'الجهات الداعمة' },
+  { path: '/sales-history',labelKey: 'sales_history', icon: <Receipt size={18} strokeWidth={2.2} />, permission: 'view_reports', feature: 'sales_history', fallbackLabel: 'سجل المبيعات' },
+  { path: '/services',     labelKey: 'services',      icon: <Wrench size={18} strokeWidth={2.2} />, permission: null, feature: 'services', fallbackLabel: 'الخدمات' },
+  { path: '/tables',       labelKey: 'tables',        icon: <Utensils size={18} strokeWidth={2.2} />, permission: null, feature: 'tables', fallbackLabel: 'الطاولات' },
+  { path: '/kds',          labelKey: 'kds',           icon: <ChefHat size={18} strokeWidth={2.2} />, permission: null, feature: 'kds', fallbackLabel: 'شاشة المطبخ' },
+  { path: '/stock',        labelKey: 'stock',         icon: <Package size={18} strokeWidth={2.2} />, permission: 'view_stock', feature: 'stock.view', fallbackLabel: 'المخزون' },
+  { path: '/purchases',    labelKey: 'purchases',     icon: <Inbox size={18} strokeWidth={2.2} />, permission: 'manage_purchases', feature: 'purchases', fallbackLabel: 'المشتريات' },
+  { path: '/suppliers',    labelKey: 'suppliers',     icon: <Truck size={18} strokeWidth={2.2} />, permission: 'manage_purchases', feature: 'suppliers', fallbackLabel: 'الموردون' },
+  { path: '/menu-admin',   labelKey: 'menu_admin',    icon: <FileText size={18} strokeWidth={2.2} />, permission: 'manage_menu', feature: 'menu_admin', fallbackLabel: 'إدارة الأصناف' },
+  { path: '/expenditures', labelKey: 'expenditures',   icon: <WalletCards size={18} strokeWidth={2.2} />, permission: 'view_reports', feature: 'expenditures', fallbackLabel: 'المصروفات' },
+  { path: '/staff',        labelKey: 'staff',         icon: <Briefcase size={18} strokeWidth={2.2} />, permission: 'manage_staff', feature: 'staff.multi', fallbackLabel: 'الموظفون' },
+  { path: '/audit-logs',   labelKey: 'audit_logs',    icon: <ShieldCheck size={18} strokeWidth={2.2} />, permission: 'manage_staff', feature: 'audit_logs', fallbackLabel: 'سجل المراقبة' },
+  { path: '/finance-hub',   labelKey: 'finance_hub',   icon: <Landmark size={18} strokeWidth={2.2} />, permission: 'view_reports', feature: 'finance_hub', fallbackLabel: 'المركز المالي' },
+  { path: '/finance-hub-p2', labelKey: 'finance_hub_p2', icon: <TrendingUp size={18} strokeWidth={2.2} />, permission: 'view_reports', feature: 'finance_hub_p2', fallbackLabel: 'محاسبة متقدمة' },
+  { path: '/promotions',   labelKey: 'promotions',    icon: <Sparkles size={18} strokeWidth={2.2} />, permission: 'manage_menu', feature: 'promotions', fallbackLabel: 'العروض' },
+  { path: '/subscription-hub', labelKey: 'subscription_hub', icon: <CreditCard size={18} strokeWidth={2.2} />, permission: null, feature: null, fallbackLabel: 'الاشتراكات' },
+  { path: '/settings',     labelKey: 'settings',       icon: <SettingsIcon size={18} strokeWidth={2.2} />, permission: 'manage_settings', feature: null, fallbackLabel: 'الإعدادات' },
 ];
 
 // ── Sidebar navigation categories (stable constant — outside component to
@@ -237,8 +277,8 @@ export default function AppLayout({ children, title }) {
           className="sidebar-hamburger"
           onClick={() => setSidebarOpen(true)}
           aria-label="فتح القائمة"
-          style={{ position:'fixed', top:'16px', right:'16px', zIndex:200, width:'44px', height:'44px', borderRadius:'12px', border:'none', background:'white', boxShadow:'0 4px 12px rgba(0,0,0,0.1)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'20px' }}>
-          
+          style={{ position:'fixed', top:'16px', right:'16px', zIndex:200, width:'42px', height:'42px', borderRadius:'12px', border:'1px solid var(--border-subtle)', background:'var(--bg-card)', boxShadow:'var(--shadow-md)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-main)' }}>
+          <Menu size={22} />
         </button>
       )}
 
@@ -252,19 +292,14 @@ export default function AppLayout({ children, title }) {
       )}
 
       {/* ── SIDEBAR ─────────────────────────────────────────────────────── */}
-      {/* WHY className="app-sidebar" instead of inline width:
-          Inline style width:'240px' has higher CSS specificity than any @media
-          rule — it cannot be overridden by breakpoints in index.css.
-          Removing width from the inline style and applying it via .app-sidebar
-          in index.css allows @media (max-width:1024px) to freely override it. */}
       <aside
         className={`app-sidebar${sidebarOpen ? '' : ' app-sidebar--collapsed'}`}
         style={{
           background:'var(--bg-card)', display:'flex', flexDirection:'column',
-          borderLeft:'1px solid var(--border-subtle)', boxShadow:'4px 0 24px rgba(0,0,0,0.03)',
+          borderLeft:'1px solid var(--border-subtle)', boxShadow:'var(--shadow-sm)',
           flexShrink:0, zIndex:50,
           color: 'var(--text-main)',
-          transition:'width 0.2s ease, transform 0.2s ease, background-color 0.3s ease',
+          transition:'width 0.2s ease, transform 0.2s ease, background-color 0.2s ease',
         }}>
 
         {/* Close button visible when sidebar is open at ≤1024px */}
@@ -272,24 +307,36 @@ export default function AppLayout({ children, title }) {
           className="sidebar-close-btn"
           onClick={() => setSidebarOpen(false)}
           aria-label="إغلاق القائمة"
-          style={{ position:'absolute', top:'12px', left:'12px', width:'32px', height:'32px', borderRadius:'8px', border:'none', background:'#f1f5f9', cursor:'pointer', fontSize:'16px', alignItems:'center', justifyContent:'center' }}>
-          
+          style={{ position:'absolute', top:'14px', left:'14px', width:'32px', height:'32px', borderRadius:'8px', border:'1px solid var(--border-subtle)', background:'var(--bg-hover)', cursor:'pointer', display:'none', alignItems:'center', justifyContent:'center', color:'var(--text-muted)' }}>
+          <X size={16} />
         </button>
 
         {/* Brand */}
-        <div style={{ padding:'20px 16px', borderBottom:'1px solid #f1f5f9', flexShrink:0 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'14px' }}>
+        <div style={{ padding:'20px 16px', borderBottom:'1px solid var(--border-subtle)', flexShrink:0 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px' }}>
             {settings.business_logo ? (
               <img src={settings.business_logo} alt="logo"
-                style={{ width:'42px', height:'42px', borderRadius:'10px', objectFit:'contain', background:'#f8fafc', border:'1px solid #e2e8f0', flexShrink:0 }} />
+                style={{ width:'42px', height:'42px', borderRadius:'12px', objectFit:'contain', background:'var(--bg-hover)', border:'1px solid var(--border-subtle)', flexShrink:0 }} />
             ) : (
-              <div style={{ width:'42px', height:'42px', background:'linear-gradient(135deg,#3b82f6,#2563eb)', borderRadius:'10px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px', color:'white', flexShrink:0, boxShadow:'0 4px 12px rgba(37,99,235,0.3)' }}></div>
+              <div style={{
+                width:'42px', height:'42px',
+                background:'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                border:'1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius:'12px', display:'flex', alignItems:'center', justifyContent:'center',
+                color:'#38bdf8', flexShrink:0,
+                boxShadow:'0 4px 14px rgba(15, 23, 42, 0.2)'
+              }}>
+                <Fingerprint size={24} strokeWidth={2.2} />
+              </div>
             )}
-            <div className="sidebar-label-text">
-              <div style={{ fontWeight:'900', fontSize:'14px', color:'#0f172a', lineHeight:1.2 }}>
+            <div className="sidebar-label-text" style={{ minWidth:0 }}>
+              <div style={{ fontWeight:'700', fontSize:'14px', color:'var(--text-main)', lineHeight:1.3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
                 {settings.business_name_ar || t('layout.default_title')}
               </div>
-              <div style={{ fontSize:'10px', color:'#94a3b8', fontWeight:'700' }}>{branchName}</div>
+              <div style={{ fontSize:'10.5px', color:'var(--text-muted)', fontWeight:'500', display:'flex', alignItems:'center', gap:'6px', marginTop:'2px' }}>
+                <span style={{ width:'6px', height:'6px', borderRadius:'50%', background:'#10b981', display:'inline-block' }}></span>
+                <span style={{ whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{branchName}</span>
+              </div>
             </div>
           </div>
 
@@ -302,20 +349,32 @@ export default function AppLayout({ children, title }) {
               }
             }} 
             className="sidebar-label-text" 
-            style={{ width:'100%', padding:'12px', background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'white', border:'none', borderRadius:'12px', fontWeight:'800', fontSize:'13px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', boxShadow:'0 4px 15px rgba(37,99,235,0.25)' }}>
-            <span></span> {businessType === 'tailor' ? 'طلب تفصيل جديد' : t('layout.sidebar.new_invoice')}
+            style={{
+              width:'100%', padding:'10px 14px',
+              background:'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+              color:'white', border:'none', borderRadius:'10px',
+              fontWeight:'700', fontSize:'13px', cursor:'pointer',
+              display:'flex', alignItems:'center', justifyContent:'center', gap:'8px',
+              boxShadow:'0 2px 8px rgba(37, 99, 235, 0.25)',
+              transition:'all 0.15s ease'
+            }}
+            onMouseOver={e => e.currentTarget.style.filter = 'brightness(1.05)'}
+            onMouseOut={e => e.currentTarget.style.filter = 'none'}
+          >
+            <Plus size={16} strokeWidth={2.5} />
+            <span>{businessType === 'tailor' ? 'طلب تفصيل جديد' : t('layout.sidebar.new_invoice')}</span>
           </button>
         </div>
 
         {/* Nav */}
-        <nav style={{ flex:1, overflowY:'auto', padding:'14px 10px', maxHeight:'calc(100vh - 200px)' }}>
+        <nav style={{ flex:1, overflowY:'auto', padding:'12px 10px', maxHeight:'calc(100vh - 210px)' }}>
           {CATEGORIES.map(cat => {
             const catLinks = visible.filter(l => cat.links.includes(l.path));
             if (catLinks.length === 0) return null;
             const isOpen = !!openCategories[cat.labelKey];
 
             return (
-              <div key={cat.labelKey} style={{ marginBottom:'12px', borderBottom:'1px solid rgba(0,0,0,0.03)', paddingBottom:'6px' }}>
+              <div key={cat.labelKey} style={{ marginBottom:'8px', borderBottom:'1px solid var(--border-subtle)', paddingBottom:'4px' }}>
                 <button
                   onClick={() => setOpenCategories(prev => ({ ...prev, [cat.labelKey]: !prev[cat.labelKey] }))}
                   style={{
@@ -329,18 +388,18 @@ export default function AppLayout({ children, title }) {
                     background: 'transparent',
                     cursor: 'pointer',
                     color: 'var(--text-muted)',
-                    fontWeight: '800',
+                    fontWeight: '700',
                     fontSize: '11px',
                     textAlign: 'right',
                     fontFamily: 'inherit',
-                    transition: 'background-color 0.15s ease'
+                    transition: 'all 0.15s ease'
                   }}
                   onMouseOver={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
                   onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
                   <span className="sidebar-label-text">{t(`layout.sidebar.categories.${cat.labelKey}`)}</span>
-                  <span style={{ fontSize: '9px' }} className="sidebar-label-text">
-                    {isOpen ? '▼' : '◀'}
+                  <span className="sidebar-label-text" style={{ color:'var(--text-muted)' }}>
+                    {isOpen ? <ChevronDown size={14} /> : <ChevronLeft size={14} />}
                   </span>
                 </button>
 
@@ -349,7 +408,7 @@ export default function AppLayout({ children, title }) {
                   overflow: 'hidden',
                   transition: 'max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                   marginTop: isOpen ? '4px' : '0px',
-                  paddingRight: '6px'
+                  paddingRight: '4px'
                 }}>
                   {catLinks.map(l => {
                     const active = location.pathname === l.path;
@@ -364,20 +423,28 @@ export default function AppLayout({ children, title }) {
                         }}
                         style={{
                           display:'flex', alignItems:'center', gap:'10px',
-                          padding:'9px 12px', borderRadius:'10px', border:'none',
-                          cursor:'pointer', fontWeight: active ? '800' : '600', fontSize:'13px',
+                          padding:'8px 12px', borderRadius:'10px', border:'none',
+                          cursor:'pointer', fontWeight: active ? '700' : '500', fontSize:'13px',
                           width:'100%', textAlign:'right', fontFamily:'inherit',
-                          marginBottom:'2px', transition:'all 0.1s',
-                          background: active ? (isDark ? '#1e3a8a' : '#f0f7ff') : 'transparent',
-                          color: active ? (isDark ? '#60a5fa' : '#2563eb') : 'var(--text-muted)',
-                          borderRight: active ? '3px solid #2563eb' : '3px solid transparent',
+                          marginBottom:'2px', transition:'all 0.12s ease',
+                          background: active ? (isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(37, 99, 235, 0.08)') : 'transparent',
+                          color: active ? (isDark ? '#38bdf8' : '#2563eb') : 'var(--text-secondary)',
                           position:'relative',
-                        }}>
-                        <span style={{ fontSize:'16px', opacity: active ? 1 : 0.7, flexShrink:0 }}>{l.icon}</span>
+                        }}
+                        onMouseOver={e => {
+                          if (!active) e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
+                        }}
+                        onMouseOut={e => {
+                          if (!active) e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                        >
+                        <span style={{ display:'flex', alignItems:'center', justifyContent:'center', color: active ? (isDark ? '#38bdf8' : '#2563eb') : 'var(--text-muted)', flexShrink:0 }}>
+                          {l.icon}
+                        </span>
                         <span className="sidebar-label-text">{t(`layout.sidebar.links.${l.labelKey}`, l.fallbackLabel || l.labelKey)}</span>
-                        {/* HIDDEN-07: Low stock badge on المخزون link */}
+                        {/* Low stock badge */}
                         {isStock && lowStockCount > 0 && (
-                          <span style={{ marginRight:'auto', background:'#ef4444', color:'white', fontSize:'9px', fontWeight:'900', padding:'2px 6px', borderRadius:'99px', flexShrink:0 }}>
+                          <span style={{ marginRight:'auto', background:'#dc2626', color:'white', fontSize:'10px', fontWeight:'700', padding:'1px 7px', borderRadius:'99px', flexShrink:0 }}>
                             {lowStockCount}
                           </span>
                         )}
@@ -389,58 +456,62 @@ export default function AppLayout({ children, title }) {
             );
           })}
 
-          <div className="sidebar-label-text" style={{ marginTop:'20px', padding:'12px', background:'#f0f9ff', borderRadius:'14px', border:'1px solid #bae6fd' }}>
-            <div style={{ fontSize:'11px', fontWeight:'800', color:'#0369a1', marginBottom:'8px' }}>
-               {t('layout.sidebar.support')}
+          <div className="sidebar-label-text" style={{ marginTop:'16px', padding:'12px', background:'var(--bg-hover)', borderRadius:'12px', border:'1px solid var(--border-subtle)' }}>
+            <div style={{ fontSize:'11px', fontWeight:'700', color:'var(--text-main)', marginBottom:'8px', display:'flex', alignItems:'center', gap:'6px' }}>
+               <span>الدعم والمساعدة</span>
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
               <button onClick={() => window.api?.openExternal?.('https://wa.me/966533174895')} style={supportBtnStyle}>
-                 {t('layout.sidebar.whatsapp')}
+                <MessageCircle size={14} className="text-emerald-600" />
+                <span>{t('layout.sidebar.whatsapp')}</span>
               </button>
               <button onClick={() => window.api?.openExternal?.('mailto:ea.gaber10@gmail.com')} style={supportBtnStyle}>
-                 {t('layout.sidebar.email')}
+                <Mail size={14} className="text-blue-600" />
+                <span>{t('layout.sidebar.email')}</span>
               </button>
             </div>
           </div>
         </nav>
 
         {/* Footer */}
-        <div style={{ padding:'12px 8px', borderTop:'1px solid #f1f5f9', background:'#fafafa', flexShrink:0 }}>
+        <div style={{ padding:'12px 10px', borderTop:'1px solid var(--border-subtle)', background:'var(--bg-hover)', flexShrink:0 }}>
           <div className="sidebar-label-text" style={{ display:'flex', justifyContent:'center', marginBottom:'8px' }}>
-            <span style={{ fontSize:'10px', fontWeight:'900', padding:'3px 10px', borderRadius:'99px', background: String(role || '').toLowerCase() === 'admin' ? '#eff6ff' : '#f0fdf4', color: String(role || '').toLowerCase() === 'admin' ? '#2563eb' : '#16a34a', border: `1px solid ${String(role || '').toLowerCase() === 'admin' ? '#bfdbfe' : '#bbf7d0'}` }}>
+            <span style={{ fontSize:'10.5px', fontWeight:'700', padding:'3px 10px', borderRadius:'99px', background: String(role || '').toLowerCase() === 'admin' ? 'rgba(37, 99, 235, 0.08)' : 'rgba(5, 150, 105, 0.08)', color: String(role || '').toLowerCase() === 'admin' ? '#2563eb' : '#059669', border: `1px solid ${String(role || '').toLowerCase() === 'admin' ? 'rgba(37, 99, 235, 0.2)' : 'rgba(5, 150, 105, 0.2)'}` }}>
               {String(role || '').toLowerCase() === 'admin' ? t('layout.sidebar.roles.admin') : String(role || '').toLowerCase() === 'manager' ? t('layout.sidebar.roles.manager') : t('layout.sidebar.roles.cashier')}
             </span>
           </div>
           <button onClick={() => navigate('/shift?action=close')} style={closeBtnStyle} className="sidebar-label-text">
-             {t('layout.sidebar.close_shift')}
+             <Clock size={14} />
+             <span>{t('layout.sidebar.close_shift')}</span>
           </button>
           <button onClick={() => { logout(); navigate('/login'); }} style={logoutBtnStyle} className="sidebar-label-text">
-            ↩ {t('layout.sidebar.logout')}
+            <LogOut size={14} />
+            <span>{t('layout.sidebar.logout')}</span>
           </button>
         </div>
       </aside>
 
       {/* ── MAIN CONTENT ────────────────────────────────────────────────── */}
       <main style={{ flex:1, display:'flex', flexDirection:'column', height:'100%', overflow:'hidden', background:'var(--bg-app)', minWidth:0 }}>
-        <header style={{ padding:'16px 28px', background:'var(--bg-card)', borderBottom:'1px solid var(--border-subtle)', display:'flex', justifyContent:'space-between', items:'center', flexWrap:'wrap', gap:'12px', zIndex:40, flexShrink:0 }}>
-          <h1 style={{ fontSize:'20px', fontWeight:'900', color:'var(--text-main)' }}>{title}</h1>
-          <div style={{ display:'flex', alignItems:'center', gap:'20px' }}>
+        <header style={{ padding:'14px 24px', background:'var(--bg-card)', borderBottom:'1px solid var(--border-subtle)', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'12px', zIndex:40, flexShrink:0 }}>
+          <h1 style={{ fontSize:'18px', fontWeight:'700', color:'var(--text-main)', letterSpacing:'-0.01em' }}>{title}</h1>
+          <div style={{ display:'flex', alignItems:'center', gap:'14px' }}>
             
             {/* Global ZATCA Phase 2 Compliance Status Badge */}
             {canAccess('pos.zatca_p2') && (
               zatcaDevice && zatcaDevice.production_csid ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#10b981', background: '#ecfdf5', border: '1px solid #bbf7d0', padding: '6px 12px', borderRadius: '99px' }}>
-                  <span style={{ display:'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }}></span>
-                  <span>️ {t('layout.header.zatca_linked')}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '700', color: '#059669', background: 'rgba(5, 150, 105, 0.08)', border: '1px solid rgba(5, 150, 105, 0.2)', padding: '5px 12px', borderRadius: '99px' }}>
+                  <CheckCircle2 size={13} className="text-emerald-600" />
+                  <span>{t('layout.header.zatca_linked')}</span>
                 </div>
               ) : (
                 <button 
                   onClick={() => navigate('/settings')} 
                   className="active-press" 
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '800', color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', padding: '6px 12px', borderRadius: '99px', cursor: 'pointer', fontFamily: 'inherit', borderStyle: 'solid' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: '700', color: '#d97706', background: 'rgba(217, 119, 6, 0.08)', border: '1px solid rgba(217, 119, 6, 0.2)', padding: '5px 12px', borderRadius: '99px', cursor: 'pointer', fontFamily: 'inherit' }}
                 >
-                  <span style={{ display:'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b', animation: 'pulse 2s infinite' }}></span>
-                  <span>️ {t('layout.header.zatca_unlinked')}</span>
+                  <AlertCircle size={13} className="text-amber-500" />
+                  <span>{t('layout.header.zatca_unlinked')}</span>
                 </button>
               )
             )}
@@ -448,29 +519,30 @@ export default function AppLayout({ children, title }) {
             {/* ZATCA STATUS WIDGET */}
             {(zatcaQueue.pending > 0 || zatcaQueue.failed > 0) && (
               <div style={{ 
-                display:'flex', alignItems:'center', gap:'12px', padding:'6px 12px', 
-                background: zatcaQueue.failed > 0 ? '#fef2f2' : '#eff6ff', 
-                border: `1px solid ${zatcaQueue.failed > 0 ? '#fecaca' : '#bfdbfe'}`,
+                display:'flex', alignItems:'center', gap:'10px', padding:'5px 12px', 
+                background: zatcaQueue.failed > 0 ? 'rgba(220, 38, 38, 0.08)' : 'rgba(37, 99, 235, 0.08)', 
+                border: `1px solid ${zatcaQueue.failed > 0 ? 'rgba(220, 38, 38, 0.2)' : 'rgba(37, 99, 235, 0.2)'}`,
                 borderRadius:'99px' 
               }}>
-                <div style={{ display:'flex', alignItems:'center', gap:'6px', fontSize:'11px', fontWeight:'800', color:'#1e40af' }}>
-                  <span style={{ display:'inline-block', width:'8px', height:'8px', borderRadius:'50%', background:'#3b82f6', animation:'pulse 2s infinite' }}></span>
-                  {t('layout.header.syncing', { count: zatcaQueue.pending })}
+                <div style={{ display:'flex', alignItems:'center', gap:'6px', fontSize:'11px', fontWeight:'700', color:'#2563eb' }}>
+                  <RefreshCw size={12} className="animate-spin text-blue-600" />
+                  <span>{t('layout.header.syncing', { count: zatcaQueue.pending })}</span>
                 </div>
                 {zatcaQueue.failed > 0 && (
-                  <div style={{ display:'flex', alignItems:'center', gap:'6px', fontSize:'11px', fontWeight:'800', color:'#b91c1c', borderRight:'1px solid #fecaca', paddingRight:'12px' }}>
-                    ️ {t('layout.header.failed', { count: zatcaQueue.failed })}
-                    <button onClick={() => window.api.retryZatcaQueue()} style={{ background:'transparent', border:'none', color:'#b91c1c', cursor:'pointer', textDecoration:'underline', fontSize:'10px' }}>{t('layout.header.retry')}</button>
+                  <div style={{ display:'flex', alignItems:'center', gap:'6px', fontSize:'11px', fontWeight:'700', color:'#dc2626', borderRight:'1px solid var(--border-subtle)', paddingRight:'10px' }}>
+                    <AlertCircle size={12} className="text-red-500" />
+                    <span>{t('layout.header.failed', { count: zatcaQueue.failed })}</span>
+                    <button onClick={() => window.api.retryZatcaQueue()} style={{ background:'transparent', border:'none', color:'#dc2626', cursor:'pointer', textDecoration:'underline', fontSize:'10px', fontFamily:'inherit' }}>{t('layout.header.retry')}</button>
                   </div>
                 )}
               </div>
             )}
 
             <div style={{ textAlign:'right' }}>
-              <div style={{ fontSize:'13px', color:'var(--text-main)', fontWeight:'800' }}>
+              <div style={{ fontSize:'12.5px', color:'var(--text-main)', fontWeight:'700' }}>
                 {formatDate(new Date(), { weekday:'long', day:'numeric', month:'long' })}
               </div>
-              <div style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:'600' }}>{branchName}</div>
+              <div style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:'500' }}>{branchName}</div>
             </div>
           </div>
         </header>
@@ -478,7 +550,7 @@ export default function AppLayout({ children, title }) {
         <ZatcaQueueBanner />
         {/* Page Scroll Zone */}
         <div id="main-content-zone" style={{ flex:1, overflowY:'auto', overflowX:'hidden', position:'relative', minHeight:0, display:'flex', flexDirection:'column' }}>
-          <div className="p-4 md:p-7" style={{ maxWidth:'1400px', margin:'0 auto', width:'100%', flex:1, display:'flex', flexDirection:'column' }}>
+          <div className="p-4 md:p-6" style={{ maxWidth:'1400px', margin:'0 auto', width:'100%', flex:1, display:'flex', flexDirection:'column' }}>
             {children}
           </div>
         </div>
@@ -487,6 +559,7 @@ export default function AppLayout({ children, title }) {
   );
 }
 
-const closeBtnStyle = { display:'flex', alignItems:'center', gap:'10px', padding:'10px 10px', borderRadius:'10px', border:'1px solid #fee2e2', cursor:'pointer', fontWeight:'700', fontSize:'12px', width:'100%', textAlign:'right', fontFamily:'inherit', background:'white', color:'#ef4444', marginBottom:'6px', transition:'all 0.2s' };
-const logoutBtnStyle = { display:'flex', alignItems:'center', gap:'10px', padding:'9px 10px', borderRadius:'10px', border:'none', cursor:'pointer', fontWeight:'600', fontSize:'12px', width:'100%', textAlign:'right', fontFamily:'inherit', color:'#94a3b8', background:'transparent' };
-const supportBtnStyle = { width:'100%', padding:'8px', background:'white', border:'1px solid #bae6fd', borderRadius:'10px', cursor:'pointer', fontSize:'11px', fontWeight:'700', color:'#0369a1', textAlign:'right', fontFamily:'inherit', transition:'all 0.2s' };
+const closeBtnStyle = { display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', borderRadius:'8px', border:'1px solid rgba(220, 38, 38, 0.2)', cursor:'pointer', fontWeight:'600', fontSize:'12px', width:'100%', textAlign:'right', fontFamily:'inherit', background:'rgba(220, 38, 38, 0.05)', color:'#dc2626', marginBottom:'6px', transition:'all 0.15s ease' };
+const logoutBtnStyle = { display:'flex', alignItems:'center', gap:'8px', padding:'8px 10px', borderRadius:'8px', border:'none', cursor:'pointer', fontWeight:'600', fontSize:'12px', width:'100%', textAlign:'right', fontFamily:'inherit', color:'var(--text-muted)', background:'transparent', transition:'all 0.15s ease' };
+const supportBtnStyle = { display:'flex', alignItems:'center', gap:'8px', width:'100%', padding:'7px 10px', background:'var(--bg-card)', border:'1px solid var(--border-subtle)', borderRadius:'8px', cursor:'pointer', fontSize:'11px', fontWeight:'600', color:'var(--text-main)', textAlign:'right', fontFamily:'inherit', transition:'all 0.15s ease' };
+

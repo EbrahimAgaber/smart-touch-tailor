@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MulamSubNav from '../components/mulam/MulamSubNav';
 import TailorWorkOrder from '../components/TailorWorkOrder';
@@ -8,6 +8,7 @@ import { useTailorPos } from '../hooks/useTailorPos';
 import TailorPrintModal from '../components/mulam/TailorPrintModal';
 import TailorWhatsAppModal from '../components/mulam/TailorWhatsAppModal';
 import { printTailorWorkOrderDirect, generateTailorWhatsAppText } from '../utils/tailorPrintAndShare';
+import { playPaymentChime } from '../utils/audioFeedback';
 import './TailorPos.css';
 
 export default function TailorPos() {
@@ -64,6 +65,7 @@ export default function TailorPos() {
     } = useTailorPos();
 
     const printRef = useRef();
+    const phoneInputRef = useRef(null);
 
     // Work Order Drawer Toggle (eliminates 33% permanent screen hog)
     const [showWorkOrderDrawer, setShowWorkOrderDrawer] = useState(false);
@@ -71,6 +73,56 @@ export default function TailorPos() {
     const [showPrintModal, setShowPrintModal] = useState(false);
     const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
     const [settings, setSettings] = useState({});
+
+    // ── Global Hotkeys for Tailor Pos Station ─────────────────────────
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            const tag = e.target?.tagName?.toLowerCase();
+            const isInput = tag === 'input' || tag === 'textarea' || e.target?.isContentEditable;
+
+            if (e.key === 'F1') {
+                e.preventDefault();
+                phoneInputRef.current?.focus();
+                phoneInputRef.current?.select();
+            } else if (e.key === 'F2' && !isInput) {
+                e.preventDefault();
+                addItem();
+            } else if (e.key === 'F3' && !isInput) {
+                e.preventDefault();
+                setShowProfilesModal(prev => !prev);
+            } else if (e.key === 'F4' && !isInput) {
+                e.preventDefault();
+                setShowWorkOrderDrawer(prev => !prev);
+            } else if (e.key === 'F8') {
+                e.preventDefault();
+                setPaymentMethod('Cash');
+            } else if (e.key === 'F9') {
+                e.preventDefault();
+                setPaymentMethod('Card');
+            } else if (e.key === 'F10') {
+                e.preventDefault();
+                if (!saving) {
+                    processOrderDirectPay().then(res => {
+                        if (res) playPaymentChime();
+                    });
+                }
+            } else if (e.key === 'F12') {
+                e.preventDefault();
+                if (!saving) {
+                    handleCheckoutToPOS();
+                }
+            } else if (e.key === 'Escape') {
+                if (showWorkOrderDrawer) setShowWorkOrderDrawer(false);
+                else if (showProfilesModal) setShowProfilesModal(false);
+                else if (showPrintModal) setShowPrintModal(false);
+                else if (showWhatsAppModal) setShowWhatsAppModal(false);
+                else if (completedOrder) setCompletedOrder(null);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [addItem, saving, processOrderDirectPay, handleCheckoutToPOS, setPaymentMethod, showWorkOrderDrawer, showProfilesModal, showPrintModal, showWhatsAppModal, completedOrder, setCompletedOrder]);
 
     useEffect(() => {
         window.api?.getSettings?.().then(s => {
@@ -96,12 +148,12 @@ export default function TailorPos() {
         return () => window.removeEventListener('mulam:unit-changed', handleUnitEvent);
     }, []);
 
-    const handleCheckoutToPOS = async () => {
+    const handleCheckoutToPOS = useCallback(async () => {
         const handoffData = await createTailorOrder('pending');
         if (handoffData) {
             navigate('/pos', { state: { tailorHandoff: handoffData } });
         }
-    };
+    }, [createTailorOrder, navigate]);
 
     if (loading) {
         return (
@@ -342,10 +394,14 @@ export default function TailorPos() {
                     {/* Customer Inputs */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', flexShrink: 0 }}>
                         <div>
-                            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted, #64748b)', marginBottom: '5px' }}>
-                                رقم الجوال
-                            </label>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                                <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted, #64748b)' }}>
+                                    رقم الجوال
+                                </label>
+                                <kbd style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '1px 5px', borderRadius: '4px', fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>F1</kbd>
+                            </div>
                             <input
+                                ref={phoneInputRef}
                                 type="tel"
                                 placeholder="05xxxxxxxx"
                                 value={phone}
@@ -689,8 +745,8 @@ export default function TailorPos() {
                     <div style={{ flexShrink: 0 }}>
                         <div style={{ display: 'flex', gap: '8px' }}>
                             {[
-                                { id: 'Card', label: 'شبكة (Card)' },
-                                { id: 'Cash', label: 'نقداً (Cash)' },
+                                { id: 'Card', label: 'شبكة (Card)', hotkey: 'F9' },
+                                { id: 'Cash', label: 'نقداً (Cash)', hotkey: 'F8' },
                                 { id: 'Split', label: 'مقسم' }
                             ].map(m => (
                                 <button
@@ -710,10 +766,19 @@ export default function TailorPos() {
                                         color: paymentMethod === m.id ? 'var(--primary, #6366f1)' : 'var(--text-muted, #64748b)',
                                         fontWeight: 800,
                                         fontSize: '12px',
-                                        cursor: 'pointer'
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '5px'
                                     }}
                                 >
-                                    {m.label}
+                                    <span>{m.label}</span>
+                                    {m.hotkey && (
+                                        <kbd style={{ background: paymentMethod === m.id ? '#6366f1' : '#e2e8f0', color: paymentMethod === m.id ? '#fff' : '#64748b', padding: '0 4px', borderRadius: '4px', fontSize: '9px', fontFamily: 'monospace' }}>
+                                            {m.hotkey}
+                                        </kbd>
+                                    )}
                                 </button>
                             ))}
                         </div>
@@ -743,7 +808,8 @@ export default function TailorPos() {
                             <button
                                 type="button"
                                 onClick={async () => {
-                                    await processOrderDirectPay();
+                                    const res = await processOrderDirectPay();
+                                    if (res) playPaymentChime();
                                 }}
                                 disabled={saving}
                                 style={{
@@ -762,10 +828,11 @@ export default function TailorPos() {
                                     justifyContent: 'center',
                                     gap: '6px'
                                 }}
-                                title="إتمام الفاتورة وتأكيد طلب التفصيل فورياً والطباعة"
+                                title="إتمام الفاتورة وتأكيد طلب التفصيل فورياً والطباعة [F10]"
                             >
                                 <CreditCard size={16} />
                                 <span>حفظ ودفع فوري (المعلم)</span>
+                                <kbd style={{ background: 'rgba(0,0,0,0.2)', padding: '1px 5px', borderRadius: '4px', fontSize: '10px', fontFamily: 'monospace' }}>F10</kbd>
                                 <span style={{ fontSize: '12px', opacity: 0.9 }}>
                                     ({(paid && parseFloat(paid) > 0 ? parseFloat(paid) : total).toFixed(2)} ر.س)
                                 </span>
@@ -791,10 +858,11 @@ export default function TailorPos() {
                                     justifyContent: 'center',
                                     gap: '6px'
                                 }}
-                                title="ترحيل الطلب إلى شاشة الكاشير للتحصيل"
+                                title="ترحيل الطلب إلى شاشة الكاشير للتحصيل [F12]"
                             >
                                 <ShoppingCart size={16} />
                                 <span>تحويل للكاشير</span>
+                                <kbd style={{ background: 'rgba(0,0,0,0.2)', padding: '1px 5px', borderRadius: '4px', fontSize: '10px', fontFamily: 'monospace' }}>F12</kbd>
                                 <ArrowLeft size={14} />
                             </button>
                         </div>
@@ -844,6 +912,7 @@ export default function TailorPos() {
                             >
                                 <FileSpreadsheet size={14} />
                                 <span>ورقة العمل A4</span>
+                                <kbd style={{ background: '#e2e8f0', padding: '1px 4px', borderRadius: '3px', fontSize: '9px', fontFamily: 'monospace' }}>F4</kbd>
                             </button>
                             <button
                                 type="button"
@@ -930,10 +999,11 @@ export default function TailorPos() {
                                     cursor: 'pointer',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '4px'
+                                    gap: '5px'
                                 }}
                             >
-                                + قطعة جديدة
+                                <span>+ قطعة جديدة</span>
+                                <kbd style={{ background: 'rgba(255,255,255,0.25)', padding: '0 4px', borderRadius: '3px', fontSize: '9px', fontFamily: 'monospace' }}>F2</kbd>
                             </button>
                             <button
                                 type="button"

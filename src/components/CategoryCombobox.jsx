@@ -13,14 +13,15 @@ const CategoryCombobox = ({ value, onChange, existingCategories = [], suggestedC
   const inputRef = useRef(null);
   const newCategoryInputRef = useRef(null);
 
-  const customCategories = existingCategories.filter(
-    cat => !STANDARD_CATEGORIES.find(s => s.name === cat)
+  const customCategories = (existingCategories || []).filter(
+    cat => typeof cat === 'string' && cat.trim() && !STANDARD_CATEGORIES.find(s => s.name === cat)
   ).map(cat => ({ name: cat, icon: '📌' }));
 
   const allCategories = [...STANDARD_CATEGORIES, ...customCategories];
 
+  const searchTarget = (inputValue || '').toLowerCase();
   const filteredCategories = allCategories.filter(cat =>
-    cat.name.toLowerCase().includes(inputValue.toLowerCase())
+    cat && cat.name && cat.name.toLowerCase().includes(searchTarget)
   );
 
   useEffect(() => {

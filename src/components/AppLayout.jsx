@@ -102,14 +102,14 @@ const CATEGORIES = [
   { labelKey: 'system', links: ['/customers', '/sponsors', '/promotions', '/staff', '/audit-logs', '/subscription-hub', '/settings'] },
 ];
 
-export default function AppLayout({ children, title }) {
+export default function AppLayout({ children, title, hideSidebar = false }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { role, logout } = useAuthStore();
   const { businessType } = useAppSettings(); // ← shared context, reactive to Settings saves
   const [settings, setSettings] = useState({});
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(!hideSidebar);
   const [isMobile, setIsMobile] = useState(false);
   const [lowStockCount, setLowStockCount] = useState(0);
   const [zatcaQueue, setZatcaQueue] = useState({ pending: 0, failed: 0, reported: 0, total: 0 });
@@ -197,6 +197,10 @@ export default function AppLayout({ children, title }) {
 
   // ── Collapse sidebar on small screens by default ───────────────────────
   useEffect(() => {
+    if (hideSidebar) {
+      setSidebarOpen(false);
+      return;
+    }
     const handleResize = () => {
       const w = window.innerWidth;
       const isLandscape = window.matchMedia('(orientation: landscape)').matches;
@@ -215,7 +219,7 @@ export default function AppLayout({ children, title }) {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', handleResize);
     };
-  }, []);
+  }, [hideSidebar]);
 
   const canAccess = useLicenseStore(s => s.canAccess);
 
@@ -494,7 +498,29 @@ export default function AppLayout({ children, title }) {
       {/* ── MAIN CONTENT ────────────────────────────────────────────────── */}
       <main style={{ flex:1, display:'flex', flexDirection:'column', height:'100%', overflow:'hidden', background:'var(--bg-app)', minWidth:0 }}>
         <header style={{ padding:'14px 24px', background:'var(--bg-card)', borderBottom:'1px solid var(--border-subtle)', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'12px', zIndex:40, flexShrink:0 }}>
-          <h1 style={{ fontSize:'18px', fontWeight:'700', color:'var(--text-main)', letterSpacing:'-0.01em' }}>{title}</h1>
+          <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+            {hideSidebar && (
+              <button
+                onClick={() => setSidebarOpen(prev => !prev)}
+                title="إظهار/إخفاء القائمة الجانبية"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-subtle)',
+                  background: 'var(--bg-app)',
+                  color: 'var(--text-main)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Menu size={18} />
+              </button>
+            )}
+            <h1 style={{ fontSize:'18px', fontWeight:'700', color:'var(--text-main)', letterSpacing:'-0.01em' }}>{title}</h1>
+          </div>
           <div style={{ display:'flex', alignItems:'center', gap:'14px' }}>
             
             {/* Global ZATCA Phase 2 Compliance Status Badge */}

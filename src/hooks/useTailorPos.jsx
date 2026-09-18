@@ -267,18 +267,62 @@ export function useTailorPos() {
                     const profiles = await window.api?.tailor?.getMeasurements?.({ customer_id: c.id });
                     if (profiles && profiles.length > 0) {
                         const sorted = profiles.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+                        const topProfile = sorted[0];
                         setCustomerProfiles(sorted);
-                        setLatestProfile(sorted[0]);
-                        setProfileLoaded(false);
-                        showToast({ type: 'info', message: 'تم العثور على مقاسات سابقة للعميل' });
+                        setLatestProfile(topProfile);
+
+                        // Smart Recall: Automatically load the customer's measurements directly into the active order
+                        if (topProfile?.measurements) {
+                            const m = topProfile.measurements;
+                            setItems(prevItems => {
+                                const copy = [...prevItems];
+                                const targetIdx = 0; // Populate first/active item seamlessly
+                                if (copy[targetIdx]) {
+                                    copy[targetIdx] = {
+                                        ...copy[targetIdx],
+                                        measurements: {
+                                            length: m.length || '',
+                                            shoulder: m.shoulder || '',
+                                            chest: m.chest || '',
+                                            waist: m.waist || '',
+                                            neck: m.neck || '',
+                                            sleeve: m.sleeve || '',
+                                            wrist: m.wrist || m.cuff || m.cuffs || '',
+                                            hand_opening: m.hand_opening || m.bottom || '',
+                                            bottom_flare: m.bottom_flare || '',
+                                            khaban: m.khaban || '',
+                                            collar_height: m.collar_height || '',
+                                            jabzor: m.jabzor || ''
+                                        },
+                                        config: {
+                                            collar: m.collar || copy[targetIdx].config?.collar || 'classic',
+                                            cuff: m.cuff || m.cuffs || copy[targetIdx].config?.cuff || 'single'
+                                        },
+                                        notes: m.notes || copy[targetIdx].notes || ''
+                                    };
+                                    if (topProfile.garment_type) {
+                                        const gt = topProfile.garment_type;
+                                        copy[targetIdx].garment_type = gt === 'ثوب' ? 'thobe' : gt === 'سروال' ? 'sirwal' : gt === 'قميص' ? 'shirt' : gt === 'بشت' ? 'bisht' : gt;
+                                    }
+                                }
+                                return copy;
+                            });
+                            setProfileLoaded(true);
+                            showToast({ type: 'success', message: `تم استرجاع مقاسات "${c.name}" (${topProfile.garment_type || 'ثوب'}) تلقائياً` });
+                        } else {
+                            setProfileLoaded(false);
+                            showToast({ type: 'info', message: 'تم العثور على العميل، لا توجد مقاسات مسجلة' });
+                        }
                     } else {
                         setCustomerProfiles([]);
                         setLatestProfile(null);
+                        setProfileLoaded(false);
                     }
                 } else {
                     setCustomer(null);
                     setCustomerProfiles([]);
                     setLatestProfile(null);
+                    setProfileLoaded(false);
                 }
             } catch (e) {
                 console.error(e);
@@ -287,6 +331,7 @@ export function useTailorPos() {
             setCustomer(null);
             setCustomerProfiles([]);
             setLatestProfile(null);
+            setProfileLoaded(false);
         }
     }, [showToast]);
 

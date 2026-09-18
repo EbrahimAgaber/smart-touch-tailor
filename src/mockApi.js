@@ -1003,6 +1003,37 @@ const rawMockApi = {
     { id: 2, user_name: 'محمد العمري', action: 'إنشاء طلب تفصيل ORD-2001', timestamp: new Date(Date.now() - 3600000).toISOString() }
   ],
 
+  // ── WhatsApp Automation ──────────────────────────────────────────
+  whatsapp: {
+    getStatus: async () => ({ 
+      connected: false, 
+      qr: '2@DemoWhatsAppSessionKeyMockForPreviewApp_ScanWithWhatsAppOnMobileToPair',
+      isMock: true 
+    }),
+    logout: async () => ({ success: true }),
+    send: async ({ phone, text }) => {
+      console.log('[mockApi whatsapp:send]', { phone, text });
+      return { success: true };
+    },
+    sendHTML: async ({ phone, text, html }) => {
+      console.log('[mockApi whatsapp:sendHTML]', { phone, text, hasHtml: !!html });
+      return { success: true };
+    },
+    onStatus: (cb) => {
+      // simulate connection status
+      const timer = setTimeout(() => {
+        cb({ connected: false, qr: '2@DemoWhatsAppSessionKeyMockForPreviewApp_ScanWithWhatsAppOnMobileToPair' });
+      }, 500);
+      return () => clearTimeout(timer);
+    },
+    onQr: (cb) => {
+      const timer = setTimeout(() => {
+        cb('2@DemoWhatsAppSessionKeyMockForPreviewApp_ScanWithWhatsAppOnMobileToPair');
+      }, 500);
+      return () => clearTimeout(timer);
+    },
+  },
+
   // ── Helpers ──────────────────────────────────────────────────────
   openExternal: (url) => {
     if (typeof window !== 'undefined') window.open(url, '_blank');
@@ -1029,14 +1060,26 @@ function createSafeProxy(target) {
       if (prop.startsWith('on')) {
         return () => () => {};
       }
-      // Otherwise default to an async no-op returning an empty collection or success
-      return async (...args) => {
+      // Otherwise default to an async no-op returning an empty collection or success,
+      // wrapped in a callable Proxy so sub-property accesses like obj.whatsapp.getStatus don't throw.
+      const fallbackFn = async (...args) => {
         console.warn(`[mockApi Proxy fallback] Called unmocked method: "${String(prop)}"`, args);
         if (String(prop).startsWith('get') || String(prop).startsWith('fetch') || String(prop).startsWith('list')) {
           return [];
         }
         return { success: true };
       };
+
+      return new Proxy(fallbackFn, {
+        get(fnTarget, subProp) {
+          if (typeof subProp === 'symbol') return fnTarget[subProp];
+          if (subProp.startsWith('on')) return () => () => {};
+          return async (...args) => {
+            console.warn(`[mockApi Proxy fallback] Called unmocked sub-method: "${String(prop)}.${String(subProp)}"`, args);
+            return { success: true };
+          };
+        }
+      });
     }
   });
 }

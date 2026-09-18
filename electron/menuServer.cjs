@@ -225,17 +225,17 @@ function startMenuServer(mainWindow, db) {
         }
     });
 
-    // Serve Frontend
-    if (process.env.NODE_ENV === 'development') {
+    const isDev = process.env.NODE_ENV === 'development' || process.argv.includes('--dev');
+    if (isDev) {
         app.use((req, res, next) => {
             if (req.path.startsWith('/api')) return next();
             
             const options = {
                 hostname: '127.0.0.1',
-                port: 5173,
+                port: 3000,
                 path: req.originalUrl,
                 method: req.method,
-                headers: { ...req.headers, host: '127.0.0.1:5173' }
+                headers: { ...req.headers, host: '127.0.0.1:3000' }
             };
             
             const proxyReq = http.request(options, (proxyRes) => {

@@ -61,31 +61,10 @@ const ORDER_TYPES = (t) => [
   { value:'delivery', label: t('pos.order_types.delivery') },
 ];
 
-// ── FIX: Normalize a phone number to international format for wa.me ──
-// Strips non-digits, then converts Saudi leading-zero format (05xxxxxxxx)
-// to international format (966xxxxxxxxx). Falls back gracefully for
-// numbers that already start with a country code.
-const normalizeWhatsAppPhone = (raw = '') => {
-  let digits = raw.replace(/\D/g, '');
-  
-  // Handle 00 prefix (e.g. 00966...)
-  if (digits.startsWith('00')) {
-    digits = digits.slice(2);
-  }
+import { sanitizePhoneNumber, openWhatsApp } from '../utils/whatsapp';
 
-  // Saudi domestic: 05xxxxxxxx -> 9665xxxxxxxx
-  if (digits.startsWith('05') && digits.length === 10) {
-    digits = '966' + digits.slice(1);
-  } 
-  // Saudi domestic short: 5xxxxxxxx -> 9665xxxxxxxx
-  else if (digits.startsWith('5') && digits.length === 9) {
-    digits = '966' + digits;
-  }
-  // Saudi international with zero: 96605xxxxxxxx -> 9665xxxxxxxx
-  else if (digits.startsWith('96605') && digits.length === 13) {
-    digits = '966' + digits.slice(4);
-  }
-  return digits;
+const normalizeWhatsAppPhone = (raw = '') => {
+  return sanitizePhoneNumber(raw);
 };
 
 export default function Pos() {
@@ -734,6 +713,42 @@ export default function Pos() {
     alert(t('pos.alerts.void_success'));
   };
 
+  const holdCurrentOrder = async (isKds = false) => {
+    if (order.length === 0) return;
+    try {
+      const label = table ? `${t('pos.hold.table')} ${table.name}` : (orderNote || `${t('pos.hold.order')} ${new Date().toLocaleTimeString('ar-SA')}`);
+      const res = await window.api?.holdOrder?.({ 
+        items: order, 
+        customer_id: selectedCustomer?.id, 
+        order_type: table ? 'dineIn' : orderType, 
+        note: orderNote,
+        label: label,
+        table_id: table?.id,
+        kds_status: isKds ? 'pending' : 'none'
+      });
+
+      if (table) {
+        await window.api?.updateTable?.({ 
+          id: table.id, 
+          status: 'occupied', 
+          current_order_id: res.id,
+          name: table.name,
+          zone: '', capacity: 0
+        });
+      }
+
+      clearCart();
+      setSelectedCustomer(null);
+      setOrderNote('');
+      setTable(null);
+      const held = await window.api?.getHeldOrders?.();
+      setHeldOrders(held || []);
+      alert(isKds ? t('pos.alerts.sent_to_kitchen') : t('pos.alerts.order_held'));
+    } catch (e) {
+      alert(t('pos.alerts.hold_failed') + e.message);
+    }
+  };
+
   // ── Keyboard shortcuts ─────────────────────────────────────────
   useEffect(() => {
     const handler = (e) => {
@@ -781,41 +796,6 @@ export default function Pos() {
     return () => window.removeEventListener('keydown', handler);
   }, [order, showPayment, canFinalize, finalizeSale, viewMode, finalTotal, openPayment, holdCurrentOrder]);
 
-  const holdCurrentOrder = async (isKds = false) => {
-    if (order.length === 0) return;
-    try {
-      const label = table ? `${t('pos.hold.table')} ${table.name}` : (orderNote || `${t('pos.hold.order')} ${new Date().toLocaleTimeString('ar-SA')}`);
-      const res = await window.api?.holdOrder?.({ 
-        items: order, 
-        customer_id: selectedCustomer?.id, 
-        order_type: table ? 'dineIn' : orderType, 
-        note: orderNote,
-        label: label,
-        table_id: table?.id,
-        kds_status: isKds ? 'pending' : 'none'
-      });
-
-      if (table) {
-        await window.api?.updateTable?.({ 
-          id: table.id, 
-          status: 'occupied', 
-          current_order_id: res.id,
-          name: table.name,
-          zone: '', capacity: 0
-        });
-      }
-
-      clearCart();
-      setSelectedCustomer(null);
-      setOrderNote('');
-      setTable(null);
-      const held = await window.api?.getHeldOrders?.();
-      setHeldOrders(held || []);
-      alert(isKds ? t('pos.alerts.sent_to_kitchen') : t('pos.alerts.order_held'));
-    } catch (e) {
-      alert(t('pos.alerts.hold_failed') + e.message);
-    }
-  };
 
   const resetOrder = () => {
     clearCart();
@@ -1047,7 +1027,7 @@ export default function Pos() {
     setShowHeld(false);
   };
 
-  const printReceiptData = async (invoiceObj, forceWidth) => {
+  const printReceiptData = async (invoiceObj, forceWidth, returnHtmlOnly = false) => {
     if (!invoiceObj) return;
     const needsWatermark = useLicenseStore.getState().needsWatermark();
     const bizAr  = settings.business_name_ar || 'نظام البصمة الذكية';
@@ -1384,7 +1364,17 @@ export default function Pos() {
                           <p class="invoice-subtitle">${invoiceTitleEn}</p>
                           <div class="meta-line">
                               رقم الفاتورة (Invoice No): <span>${invoiceObj.invoice}</span><br>
-                              تاريخ الإصدار (Issue Date): <span dir="ltr">${new Date(invoiceObj.date).toLocaleString('ar-SA')}</span>
+                              تاريخ الإصدار (Issue Date): <span dir="ltr">${new Date(invoiceObj.date).toLocaleString('ar-SA')}</span><br>
+                              نوع الطلب (Order Type): <span style="font-weight:900; color:#ef4444;">${
+                                (() => {
+                                    const oType = invoiceObj.order_type || invoiceObj.orderType || 'counter';
+                                    if (oType === 'tailor') return (parseFloat(invoiceObj.paid || 0) + 0.01 < parseFloat(invoiceObj.total)) ? 'تفصيل' : 'استلام';
+                                    if (oType === 'alteration') return 'تعديل';
+                                    if (oType === 'delivery') return 'توصيل';
+                                    if (oType === 'takeaway') return 'سفري';
+                                    return 'محلي';
+                                })()
+                              }</span>
                           </div>
                       </td>
                       <td class="header-logo-box">
@@ -1614,6 +1604,16 @@ export default function Pos() {
 
           <div class="info-line"><span>رقم الفاتورة:</span><span>${invoiceObj.invoice}</span></div>
           <div class="info-line"><span>التاريخ:</span><span dir="ltr">${new Date(invoiceObj.date).toLocaleString('ar-SA')}</span></div>
+          <div class="info-line"><span>نوع الطلب:</span><span style="font-weight:900;">${
+            (() => {
+                const oType = invoiceObj.order_type || invoiceObj.orderType || 'counter';
+                if (oType === 'tailor') return (parseFloat(invoiceObj.paid || 0) + 0.01 < parseFloat(invoiceObj.total)) ? 'تفصيل' : 'استلام';
+                if (oType === 'alteration') return 'تعديل';
+                if (oType === 'delivery') return 'توصيل';
+                if (oType === 'takeaway') return 'سفري';
+                return 'محلي';
+            })()
+          }</span></div>
           ${invoiceObj.customerName ? `<div class="info-line"><span>العميل:</span><span>${invoiceObj.customerName}</span></div>` : ''}
           ${invoiceObj.customerTaxId ? `<div class="info-line"><span>رقم الضريبة للعميل:</span><span>${invoiceObj.customerTaxId}</span></div>` : ''}
 
@@ -1697,6 +1697,10 @@ export default function Pos() {
       }
     }
 
+    if (returnHtmlOnly) {
+      return html;
+    }
+
     if (window.api?.printHTML) {
       await window.api.printHTML(html);
     } else {
@@ -1753,8 +1757,14 @@ export default function Pos() {
       return;
     }
 
+    // Generate PDF HTML
+    let html = null;
+    try {
+        html = await printReceiptData(lastInvoice, 'A4', true);
+    } catch(err) { console.error('Failed to gen html', err); }
+
     // Open WhatsApp
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+    openWhatsApp(phone, msg, html);
     
     // Record in backend (async, don't block window.open)
     if (window.api?.recordWhatsAppShare) {
@@ -2619,6 +2629,11 @@ export default function Pos() {
                 <label style={{ display:'block', fontSize:'12px', color:'#94a3b8', marginBottom:'6px', fontWeight:'700' }}>{t('pos.whatsapp.phone_label')}</label>
                 <input autoFocus value={waPhone} onChange={e => setWAPhone(e.target.value)} 
                   placeholder="966512345678" style={modalInput} />
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:'12px', color:'#94a3b8', marginBottom:'6px', fontWeight:'700' }}>نص الرسالة</label>
+                <textarea value={waMsg} onChange={e => setWAMsg(e.target.value)} 
+                  placeholder="رسالة مرفقة" style={{ ...modalInput, minHeight: '60px', resize: 'vertical' }} />
               </div>
               <div style={{ display:'flex', gap:'10px' }}>
                 <button onClick={() => setShowWAModal(false)} style={{ flex:1, padding:'12px', background:'#f1f5f9', border:'none', borderRadius:'12px', fontWeight:'700', cursor:'pointer' }}>{t('pos.actions.cancel')}</button>

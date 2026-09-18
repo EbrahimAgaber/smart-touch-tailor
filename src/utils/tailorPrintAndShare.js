@@ -7,13 +7,10 @@ import { generateBarcodeSVG } from './barcodeSvg';
  */
 
 // Format phone number to international WhatsApp format (e.g., 05xxxxxxxx -> 9665xxxxxxxx)
+import { sanitizePhoneNumber, openWhatsApp } from './whatsapp';
+
 export function formatWhatsAppPhone(phone) {
-  if (!phone) return '';
-  const digits = phone.replace(/\D/g, '');
-  if (digits.startsWith('966')) return digits;
-  if (digits.startsWith('05')) return '966' + digits.slice(1);
-  if (digits.startsWith('5') && digits.length === 9) return '966' + digits;
-  return digits;
+  return sanitizePhoneNumber(phone);
 }
 
 /**
@@ -182,25 +179,7 @@ export async function shareViaWhatsAppDirect({ phone = '', message = '' }) {
     console.warn('Clipboard write failed:', err);
   }
 
-  const cleanPhone = formatWhatsAppPhone(phone);
-  const encodedText = encodeURIComponent(message);
-  
-  const url = cleanPhone
-    ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`
-    : `https://api.whatsapp.com/send?text=${encodedText}`;
-
-  // Open WhatsApp in new window/tab safely
-  const win = window.open(url, '_blank');
-  if (!win) {
-    // If popup blocked, create anchor and click
-    const a = document.createElement('a');
-    a.href = url;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }
+  openWhatsApp(phone, message);
 }
 
 /**

@@ -110,7 +110,7 @@ export default function SalesHistory() {
       ]);
       let fetchedSales = Array.isArray(data) ? data : [];
       if (statusFilter === 'partial') {
-          fetchedSales = fetchedSales.filter(s => parseFloat(s.paid) < parseFloat(s.total) && s.status !== 'void' && s.status !== 'credit');
+        fetchedSales = fetchedSales.filter(s => parseFloat(s.paid || 0) + 0.01 < parseFloat(s.total || 0) && s.status !== 'void' && s.status !== 'credit');
       }
       setSales(fetchedSales);
       setQuotes((Array.isArray(qData) ? qData : []).filter(o => o.order_type === 'quote'));
@@ -673,7 +673,17 @@ export default function SalesHistory() {
                           <p class="invoice-subtitle">${invoiceTitleEn}</p>
                           <div class="meta-line">
                               رقم الفاتورة (Invoice No): <span>${sale.invoice}</span><br>
-                              تاريخ الإصدار (Issue Date): <span dir="ltr">${new Date(sale.sale_date).toLocaleString('ar-SA')}</span>
+                              تاريخ الإصدار (Issue Date): <span dir="ltr">${new Date(sale.sale_date).toLocaleString('ar-SA')}</span><br>
+                              نوع الطلب (Order Type): <span style="font-weight:900; color:#ef4444;">${
+                                (() => {
+                                    const oType = sale.order_type || 'counter';
+                                    if (oType === 'tailor') return (parseFloat(sale.paid || 0) + 0.01 < parseFloat(sale.total || 0)) ? 'تفصيل' : 'استلام';
+                                    if (oType === 'alteration') return 'تعديل';
+                                    if (oType === 'delivery') return 'توصيل';
+                                    if (oType === 'takeaway') return 'سفري';
+                                    return 'محلي';
+                                })()
+                              }</span>
                           </div>
                           ${settings.receipt_header ? `<div style="margin-top:8px; font-size:12px; color:#475569; white-space:pre-wrap; max-width:320px;">${settings.receipt_header}</div>` : ''}
                       </td>
@@ -910,6 +920,16 @@ export default function SalesHistory() {
 
           <div class="info-line"><span>رقم الفاتورة:</span><span>${sale.invoice}</span></div>
           <div class="info-line"><span>التاريخ:</span><span dir="ltr">${new Date(sale.sale_date).toLocaleString('ar-SA')}</span></div>
+          <div class="info-line"><span>نوع الطلب:</span><span style="font-weight:900;">${
+            (() => {
+                const oType = sale.order_type || 'counter';
+                if (oType === 'tailor') return (parseFloat(sale.paid || 0) + 0.01 < parseFloat(sale.total || 0)) ? 'تفصيل' : 'استلام';
+                if (oType === 'alteration') return 'تعديل';
+                if (oType === 'delivery') return 'توصيل';
+                if (oType === 'takeaway') return 'سفري';
+                return 'محلي';
+            })()
+          }</span></div>
           ${sale.customer_name ? `<div class="info-line"><span>العميل:</span><span>${sale.customer_name}</span></div>` : ''}
           ${sale.customer_tax_id ? `<div class="info-line"><span>رقم الضريبة للعميل:</span><span>${sale.customer_tax_id}</span></div>` : ''}
 
@@ -1535,7 +1555,7 @@ export default function SalesHistory() {
                   {t('history.table.no_sales')}
                 </td></tr>
               ) : sales.map((s, i) => {
-                const derivedStatus = (parseFloat(s.paid) < parseFloat(s.total) && s.status !== 'void' && s.status !== 'credit') ? 'partial' : s.status;
+                const derivedStatus = (parseFloat(s.paid || 0) + 0.01 < parseFloat(s.total || 0) && s.status !== 'void' && s.status !== 'credit') ? 'partial' : s.status;
                 const st = statusLabel(derivedStatus, t);
                 const vatAmt = parseFloat(s.tax || s.total * vatRate / (1 + vatRate));
                 const items = parsedItemsBySaleId.get(s.id) || [];
@@ -1617,7 +1637,7 @@ export default function SalesHistory() {
                             </button>
                           </>
                         )}
-                        {s.status !== 'void' && s.status !== 'credit' && parseFloat(s.paid) < parseFloat(s.total) && (
+                        {s.status !== 'void' && s.status !== 'credit' && parseFloat(s.paid || 0) + 0.01 < parseFloat(s.total || 0) && (
                           <button onClick={() => handlePayRemaining(s)} title="دفع المتبقي"
                             style={{ padding:'6px 8px', background:'#ecfdf5', border:'1px solid #a7f3d0', color:'#059669', borderRadius:'8px', cursor:'pointer', fontFamily:'inherit', fontSize:'12px', fontWeight:'800' }}>
                             دفع المتبقي

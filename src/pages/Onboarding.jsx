@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 
 const BUSINESS_TYPES = [
+  { value: 'tailor', label: 'خياطة ومقاسات', icon: <Scissors size={24} /> },
   { value: 'retail', label: 'تجزئة عامة', icon: <Store size={24} /> },
   { value: 'fruit_and_vegetables', label: 'خضار وفواكه', icon: <Package size={24} /> },
   { value: 'restaurant', label: 'مطعم / كافيه', icon: <Utensils size={24} /> },
@@ -33,7 +34,7 @@ export default function Onboarding() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     business_name_ar: '',
-    business_type: 'retail',
+    business_type: 'tailor',
     zatca_otp: '',
     country: 'sa',
     vat_rate: '0.15',
@@ -77,6 +78,7 @@ export default function Onboarding() {
       // 1. Save Settings (including CRN and VAT number entered in step 3)
       await window.api.saveSettings({
         ...form,
+        business_type: 'tailor', // STRICTLY FORCED TO TAILOR
         business_name_en: form.business_name_ar,
         branch_name: 'الفرع الرئيسي',
         invoice_prefix: 'INV-',

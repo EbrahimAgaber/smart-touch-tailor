@@ -74,6 +74,13 @@ export default function TailorPos() {
     const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
     const [settings, setSettings] = useState({});
 
+    const handleCheckoutToPOS = useCallback(async () => {
+        const handoffData = await createTailorOrder('pending');
+        if (handoffData) {
+            navigate('/pos', { state: { tailorHandoff: handoffData } });
+        }
+    }, [createTailorOrder, navigate]);
+
     // ── Global Hotkeys for Tailor Pos Station ─────────────────────────
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -147,13 +154,6 @@ export default function TailorPos() {
         window.addEventListener('mulam:unit-changed', handleUnitEvent);
         return () => window.removeEventListener('mulam:unit-changed', handleUnitEvent);
     }, []);
-
-    const handleCheckoutToPOS = useCallback(async () => {
-        const handoffData = await createTailorOrder('pending');
-        if (handoffData) {
-            navigate('/pos', { state: { tailorHandoff: handoffData } });
-        }
-    }, [createTailorOrder, navigate]);
 
     if (loading) {
         return (
@@ -690,154 +690,9 @@ export default function TailorPos() {
                         </div>
                     </div>
 
-                    {/* Payment Inputs */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', flexShrink: 0 }}>
-                        <div>
-                            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted, #64748b)', marginBottom: '5px' }}>
-                                المبلغ المدفوع (عربون)
-                            </label>
-                            <input
-                                type="number"
-                                placeholder="0.00"
-                                value={paid}
-                                onChange={e => setPaid(e.target.value)}
-                                dir="ltr"
-                                style={{
-                                    width: '100%',
-                                    padding: '9px 12px',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border-subtle, #e2e8f0)',
-                                    background: '#f8fafc',
-                                    color: 'var(--text-main, #0f172a)',
-                                    fontSize: '15px',
-                                    fontWeight: 800,
-                                    textAlign: 'right',
-                                    fontFamily: "'IBM Plex Mono', monospace"
-                                }}
-                            />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted, #64748b)', marginBottom: '5px' }}>
-                                المتبقي
-                            </label>
-                            <input
-                                type="text"
-                                value={balance.toFixed(2)}
-                                readOnly
-                                dir="ltr"
-                                style={{
-                                    width: '100%',
-                                    padding: '9px 12px',
-                                    borderRadius: '8px',
-                                    border: '1px solid var(--border-subtle, #e2e8f0)',
-                                    background: '#f8fafc',
-                                    color: balance > 0 ? '#f59e0b' : '#10b981',
-                                    fontSize: '15px',
-                                    fontWeight: 900,
-                                    textAlign: 'right',
-                                    fontFamily: "'IBM Plex Mono', monospace"
-                                }}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Payment Method */}
-                    <div style={{ flexShrink: 0 }}>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            {[
-                                { id: 'Card', label: 'شبكة (Card)', hotkey: 'F9' },
-                                { id: 'Cash', label: 'نقداً (Cash)', hotkey: 'F8' },
-                                { id: 'Split', label: 'مقسم' }
-                            ].map(m => (
-                                <button
-                                    key={m.id}
-                                    type="button"
-                                    onClick={() => setPaymentMethod(m.id)}
-                                    style={{
-                                        flex: 1,
-                                        minHeight: '40px',
-                                        borderRadius: '8px',
-                                        border: paymentMethod === m.id
-                                            ? '2px solid var(--primary, #6366f1)'
-                                            : '1px solid var(--border-subtle, #e2e8f0)',
-                                        background: paymentMethod === m.id
-                                            ? 'rgba(99, 102, 241, 0.08)'
-                                            : '#f8fafc',
-                                        color: paymentMethod === m.id ? 'var(--primary, #6366f1)' : 'var(--text-muted, #64748b)',
-                                        fontWeight: 800,
-                                        fontSize: '12px',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: '5px'
-                                    }}
-                                >
-                                    <span>{m.label}</span>
-                                    {m.hotkey && (
-                                        <kbd style={{ background: paymentMethod === m.id ? '#6366f1' : '#e2e8f0', color: paymentMethod === m.id ? '#fff' : '#64748b', padding: '0 4px', borderRadius: '4px', fontSize: '9px', fontFamily: 'monospace' }}>
-                                            {m.hotkey}
-                                        </kbd>
-                                    )}
-                                </button>
-                            ))}
-                        </div>
-                        {paymentMethod === 'Split' && (
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
-                                <input
-                                    type="number"
-                                    placeholder="نقدي"
-                                    value={splitCash}
-                                    onChange={e => setSplitCash(e.target.value)}
-                                    style={{ padding: '8px', borderRadius: '6px', background: '#f8fafc', border: '1px solid var(--border-subtle, #e2e8f0)', color: 'var(--text-main, #0f172a)', fontSize: '13px' }}
-                                />
-                                <input
-                                    type="number"
-                                    placeholder="شبكة"
-                                    value={splitCard}
-                                    readOnly
-                                    style={{ padding: '8px', borderRadius: '6px', background: '#f8fafc', border: '1px solid var(--border-subtle, #e2e8f0)', color: 'var(--text-muted, #64748b)', fontSize: '13px' }}
-                                />
-                            </div>
-                        )}
-                    </div>
-
                     {/* Action Buttons — Fast Mulam Seasonal Pipeline */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 'auto', paddingTop: '10px', flexShrink: 0 }}>
                         <div style={{ display: 'flex', gap: '10px' }}>
-                            <button
-                                type="button"
-                                onClick={async () => {
-                                    const res = await processOrderDirectPay();
-                                    if (res) playPaymentChime();
-                                }}
-                                disabled={saving}
-                                style={{
-                                    flex: 2,
-                                    minHeight: '48px',
-                                    background: '#10b981',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    borderRadius: '10px',
-                                    fontWeight: 900,
-                                    fontSize: '14px',
-                                    cursor: saving ? 'not-allowed' : 'pointer',
-                                    boxShadow: '0 4px 15px rgba(16, 185, 129, 0.25)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '6px'
-                                }}
-                                title="إتمام الفاتورة وتأكيد طلب التفصيل فورياً والطباعة [F10]"
-                            >
-                                <CreditCard size={16} />
-                                <span>حفظ ودفع فوري (المعلم)</span>
-                                <kbd style={{ background: 'rgba(0,0,0,0.2)', padding: '1px 5px', borderRadius: '4px', fontSize: '10px', fontFamily: 'monospace' }}>F10</kbd>
-                                <span style={{ fontSize: '12px', opacity: 0.9 }}>
-                                    ({(paid && parseFloat(paid) > 0 ? parseFloat(paid) : total).toFixed(2)} ر.س)
-                                </span>
-                            </button>
-
                             <button
                                 type="button"
                                 onClick={handleCheckoutToPOS}

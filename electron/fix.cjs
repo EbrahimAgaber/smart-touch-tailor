@@ -1,0 +1,1 @@
+const { app } = require('electron'); app.whenReady().then(() => { const db = require('./database.cjs'); db.initDatabase(app.getPath('userData')); db.getDbInstance().prepare('UPDATE settings SET value=\'tailor\' WHERE key=\'business_type\'').run(); console.log('Fixed'); app.quit(); });

@@ -1,18 +1,23 @@
 {
-  "name": "smart-touch-pos",
+  "name": "smart-tailor-pos",
   "private": true,
-  "version": "1.8.5",
+  "version": "1.9.0",
   "description": "البصمة الذكية - نظام إدارة نقاط البيع المتطور",
-  "productName": "البصمة الذكية",
+  "productName": "خياط البصمة الذكية",
   "main": "electron/main.cjs",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/EbrahimAgaber/smart-touch-pos.git"
   },
   "scripts": {
+    "start": "npm run electron:dev",
     "dev": "vite --host 0.0.0.0 --port 3000",
+    "electron": "electron .",
+    "electron:dev": "concurrently -k \"npm run dev\" \"wait-on tcp:127.0.0.1:3000 && electron . --dev\"",
     "build": "vite build",
     "clean": "rimraf dist dist-electron node_modules/.vite",
+    "dist": "npm run build && electron-builder",
+    "postinstall": "electron-rebuild -f -w better-sqlite3",
     "lint": "eslint src --ext js,jsx",
     "preview": "vite preview --host 0.0.0.0 --port 3000"
   },
@@ -65,6 +70,7 @@
   },
   "author": "AL-Basma (ea.gaber10@gmail.com)",
   "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
     "@xmldom/xmldom": "^0.8.13",
     "axios": "^1.15.2",
     "better-sqlite3": "^9.6.0",
@@ -82,6 +88,7 @@
     "node-forge": "^1.4.0",
     "node-nlp": "^5.0.0-alpha.5",
     "pdf-parse": "^1.1.1",
+    "pino": "^8.21.0",
     "playwright": "^1.62.1",
     "qrcode": "^1.5.4",
     "react": "^18.2.0",
@@ -123,5 +130,8 @@
   "bugs": {
     "url": "https://github.com/EbrahimAgaber/smart-touch-pos/issues"
   },
-  "homepage": "https://github.com/EbrahimAgaber/smart-touch-pos#readme"
+  "homepage": "https://github.com/EbrahimAgaber/smart-touch-pos#readme",
+  "overrides": {
+    "lru-cache": "7.14.1"
+  }
 }

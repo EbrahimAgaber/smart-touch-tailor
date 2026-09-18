@@ -232,7 +232,7 @@ export default function AppLayout({ children, title }) {
     if ((link.path === '/tailor-pos' || link.path === '/orders-board' || link.path === '/alterations' || link.path === '/measurements') && businessType !== 'tailor') return false;
     
     // Hide general POS features if Tailor is selected (tailors use tailor-pos instead)
-    if (businessType === 'tailor' && (link.path === '/pos' || link.path === '/services')) return false;
+    if (businessType === 'tailor' && (link.path === '/services')) return false;
 
     if (link.permission !== null && !can(link.permission)) return false;
     if (link.feature && !canAccess(link.feature)) return false;

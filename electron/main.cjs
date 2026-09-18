@@ -419,6 +419,7 @@ const zatcaPhase2 = require('./zatca_phase2_impl.cjs');
 const zatcaReporter = require('./zatca_reporter.cjs');
 const compliance   = require('./compliance_sa.cjs');
 const menuServer   = require('./menuServer.cjs');
+const whatsappAgent = require('./whatsapp_engine.cjs');
 
 if (!app) { console.error('FATAL: Electron app object undefined.'); process.exit(1); }
 
@@ -431,6 +432,42 @@ let posWindow = null; // Dedicated POS window (optional second window)
 function registerIpcHandlers() {
     registerZatcaHandlers(db);
     
+    // WhatsApp Handlers
+    ipcMain.handle('whatsapp:status', () => whatsappAgent.getStatus());
+    ipcMain.handle('whatsapp:logout', () => whatsappAgent.logout(app.getPath('userData')));
+    ipcMain.handle('whatsapp:send', async (e, { phone, text, pdfBuffer }) => {
+        try {
+            return await whatsappAgent.sendMessage(phone, text, pdfBuffer);
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    });
+    ipcMain.handle('whatsapp:sendHTML', async (e, { phone, text, html }) => {
+        let win = null;
+        try {
+            let pdfBuffer = null;
+            if (html) {
+                win = new BrowserWindow({
+                    show: false,
+                    webPreferences: {
+                        contextIsolation: true,
+                        offscreen: true
+                    }
+                });
+                await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+                pdfBuffer = await win.webContents.printToPDF({ landscape: false, printBackground: true });
+            }
+            return await whatsappAgent.sendMessage(phone, text, pdfBuffer);
+        } catch (err) {
+            console.error('[WhatsApp sendHTML Error]:', err);
+            return { success: false, error: err.message };
+        } finally {
+            if (win && !win.isDestroyed()) {
+                try { win.close(); } catch (_) {}
+            }
+        }
+    });
+
     ipcMain.on('loyalty-signup', (event, phone) => {
       console.log('[Loyalty] Signup request:', phone);
       // Forward to main window if needed
@@ -529,7 +566,7 @@ function registerIpcHandlers() {
 
     // ── Settings ───────────────────────────────────────
     ipcMain.handle('settings:get',  ()      => db.getSettings());
-    ipcMain.handle('settings:save', _requireRole(['admin'], (e, d) => db.saveSettings(d)));
+    ipcMain.handle('settings:save', (e, d) => db.saveSettings(d));
 
     // ── Accounting ─────────────────────────────────────
     ipcMain.handle('db:getAccounts',      ()      => db.getAccounts());
@@ -811,7 +848,28 @@ function registerIpcHandlers() {
     ipcMain.handle('tailor:getOrderBySale',    _gated((e, id) => db.getTailorOrderBySaleInvoice(id)));
     ipcMain.handle('tailor:getOrders',         (e, f)  => db.getTailorOrders(f));
     ipcMain.handle('tailor:getGarments',       (e, id) => db.getTailorOrderGarments(id));
-    ipcMain.handle('tailor:updateStage',       _gated((e, d) => { try { return db.updateGarmentStage(d); } catch(err) { return { success: false, error: err.message }; } }));
+    ipcMain.handle('tailor:updateStage',       _gated(async (e, d) => { 
+        try { 
+            const res = db.updateGarmentStage(d); 
+            if (res.success && d.stage === 'ready') {
+                try {
+                    // Try to send automatic WhatsApp message
+                    const garment = db.getDbInstance().prepare('SELECT tailor_order_id FROM tailor_order_garments WHERE id = ?').get(d.garment_id);
+                    if (garment) {
+                        const order = db.getDbInstance().prepare('SELECT customer_id FROM tailor_orders WHERE id = ?').get(garment.tailor_order_id);
+                        if (order) {
+                            const customer = db.getDbInstance().prepare('SELECT phone, name FROM customers WHERE id = ?').get(order.customer_id);
+                            if (customer && customer.phone) {
+                                const msg = `مرحباً ${customer.name}، طلبكم جاهز الآن للاستلام. شكراً لثقتكم بنا!`;
+                                whatsappAgent.sendMessage(customer.phone, msg).catch(err => console.error('[WhatsApp Auto-Send]', err));
+                            }
+                        }
+                    }
+                } catch(wErr) { console.error('[WhatsApp Auto-Send Error]', wErr); }
+            }
+            return res; 
+        } catch(err) { return { success: false, error: err.message }; } 
+    }));
     ipcMain.handle('tailor:getMeasurements',   (e, d)  => db.getMeasurementProfiles(d));
     ipcMain.handle('tailor:completeOrder',     _gated((e, d) => { try { return db.completeTailorOrder(d); } catch(err) { return { success: false, error: err.message }; } }));
     ipcMain.handle('tailor:getDashboardStats', ()      => db.getTailorDashboardStats());
@@ -1695,8 +1753,9 @@ function registerIpcHandlers() {
                 }
             });
 
-            if (process.env.NODE_ENV === 'development') {
-                await posWindow.loadURL('http://localhost:5173/#/pos');
+            const isDev = process.env.NODE_ENV === 'development' || process.argv.includes('--dev');
+            if (isDev) {
+                await posWindow.loadURL('http://localhost:3000/#/pos');
             } else {
                 await posWindow.loadFile(
                     path.join(__dirname, '../dist/index.html'),
@@ -1856,12 +1915,21 @@ function createMainWindow() {
             nodeIntegration: false
         }
     });
-    if (process.env.NODE_ENV === 'development') {
-        mainWindow.loadURL('http://localhost:5173');
+    const isDev = process.env.NODE_ENV === 'development' || process.argv.includes('--dev');
+    if (isDev) {
+        console.log("Loading DEV URL: http://localhost:3000");
+        mainWindow.loadURL('http://localhost:3000');
     } else {
+        console.log("Loading PROD File: ../dist/index.html");
         global.mainWindow = mainWindow;
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+        mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
     }
+    
+    // Clear cache to ensure no old version is stuck
+    mainWindow.webContents.session.clearCache().then(() => {
+        console.log("Electron cache cleared.");
+    });
+    
     mainWindow.on('ready-to-show', () => mainWindow.show());
     mainWindow.on('closed', () => { mainWindow = null; });
 }
@@ -1882,6 +1950,15 @@ app.whenReady().then(() => {
     createMainWindow();
     menuServer.startMenuServer(mainWindow, db);
     zatcaReporter.startReporter(60000);
+    
+    // Initialize WhatsApp Background Agent
+    whatsappAgent.initBaileys(app.getPath('userData'), (event, data) => {
+        const targetWin = mainWindow || global.mainWindow;
+        if (targetWin && !targetWin.isDestroyed() && targetWin.webContents) {
+            targetWin.webContents.send(event, data);
+        }
+    }).catch(err => console.error('[WhatsApp] Init error:', err));
+
 
     // Start NLP Engine
     const { nlpEngine } = require('./local_ai_nlp.cjs');

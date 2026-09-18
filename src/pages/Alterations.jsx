@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { openWhatsApp } from '../utils/whatsapp';
 import { useNavigate } from 'react-router-dom';
 import MulamSubNav from '../components/mulam/MulamSubNav';
 import { useToast } from '../components/ToastManager';
@@ -175,10 +176,6 @@ export default function Alterations() {
             showToast?.({ type: 'warning', message: 'لا يوجد رقم جوال مسجل لهذا العميل' });
             return;
         }
-        const cleanPhone = ticket.customer_phone.replace(/[^0-9]/g, '');
-        let saudiPhone = cleanPhone;
-        if (saudiPhone.startsWith('05')) saudiPhone = '966' + saudiPhone.substring(1);
-        else if (saudiPhone.startsWith('5')) saudiPhone = '966' + saudiPhone;
 
         const statusText = ticket.status === 'ready' 
             ? '✅ ثوبكم / قطعتكم جاهزة للاستلام في المشغل.' 
@@ -197,8 +194,7 @@ ${bal > 0 ? `المبلغ المتبقي للاستلام: ${bal.toFixed(2)} ر.
 ${ticket.target_delivery_date ? `موعد التسليم المتوقع: ${ticket.target_delivery_date}` : ''}
 نسعد دائماً بخدمتكم!`;
 
-        const url = `https://wa.me/${saudiPhone}?text=${encodeURIComponent(message)}`;
-        window.open(url, '_blank');
+        openWhatsApp(ticket.customer_phone, message);
     };
 
     // Filter customers as user types phone or name

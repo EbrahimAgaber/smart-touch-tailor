@@ -130,6 +130,8 @@ contextBridge.exposeInMainWorld('api', {
   deleteStaff:          (id)     => ipcRenderer.invoke('db:deleteStaff', id),
   updateStaffPermissions:(d)     => ipcRenderer.invoke('db:updateStaffPermissions', d),
   verifyStaffPin:       (p, id)  => ipcRenderer.invoke('db:verifyStaffPin', { pin: p, staffId: id }),
+  setSession:           (staff)  => ipcRenderer.invoke('auth:setSession', staff),
+  getCurrentSession:    ()       => ipcRenderer.invoke('auth:getCurrentSession'),
   getAuditLogs:         (l)      => ipcRenderer.invoke('db:getAuditLogs', l),
 
   // ── Suppliers ─────────────────────────────────
@@ -398,4 +400,22 @@ contextBridge.exposeInMainWorld('api', {
   },
   getPayroll: (d) => ipcRenderer.invoke('tailor:getPayroll', d),
   getCutterPayroll: (d) => ipcRenderer.invoke('tailor:getCutterPayroll', d),
+  
+  // ── WhatsApp Automation ──────────────────────────────
+  whatsapp: {
+      getStatus: () => ipcRenderer.invoke('whatsapp:status'),
+      logout: () => ipcRenderer.invoke('whatsapp:logout'),
+      send: (d) => ipcRenderer.invoke('whatsapp:send', d),
+      sendHTML: (d) => ipcRenderer.invoke('whatsapp:sendHTML', d),
+      onStatus: (cb) => {
+          const handler = (e, d) => cb(d);
+          ipcRenderer.on('whatsapp:status', handler);
+          return () => ipcRenderer.removeListener('whatsapp:status', handler);
+      },
+      onQr: (cb) => {
+          const handler = (e, d) => cb(d);
+          ipcRenderer.on('whatsapp:qr', handler);
+          return () => ipcRenderer.removeListener('whatsapp:qr', handler);
+      }
+  }
 });

@@ -5,6 +5,7 @@ import { useToast } from '../components/ToastManager';
 import AppLayout from '../components/AppLayout';
 import { useLicenseStore } from '../store/useLicenseStore';
 import LabelPrintSettings from '../components/LabelPrintSettings';
+import WhatsAppSettings from '../components/WhatsAppSettings';
 import {
   Building2, Receipt, Globe, Shield,
   Smartphone, Save, CheckCircle2,
@@ -49,6 +50,7 @@ const TABS = [
   { id: 'invoice',   label: 'الفواتير والطباعة', icon: Receipt },
   { id: 'tax',       label: 'الضريبة والعملات', icon: Globe },
   { id: 'tailor',    label: 'إعدادات الخياطة',   icon: Package },
+  { id: 'whatsapp',  label: 'الواتساب',        icon: Smartphone },
   { id: 'system',    label: 'النظام',           icon: Server },
   { id: 'ui',        label: 'واجهة المستخدم',   icon: Palette },
 ];
@@ -1147,6 +1149,9 @@ export default function Settings() {
               {/* ══════════════════════════════════════════
                   TAB 5 — النظام
               ══════════════════════════════════════════ */}
+              {activeTab === 'whatsapp' && (
+                  <WhatsAppSettings />
+              )}
               {activeTab === 'system' && (
                 <div style={colGap}>
                   <TabHeader icon={<Server size={18}/>} title={t('settings.tabs.system')}

@@ -203,7 +203,7 @@ function LicenseBanner({ banner, onEnterKey }) {
 }
 
 export default function App() {
-  const [businessType, setBusinessType] = useState('retail');
+  const [businessType, setBusinessType] = useState('tailor'); // STRICTLY FORCED TO TAILOR
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [loading, setLoading] = useState(true);
   // null = no banner | { type: 'grace', hoursLeft } | { type: 'expired' } | { type: 'days', daysLeft }
@@ -219,7 +219,7 @@ export default function App() {
     }
     try {
       const s = await window.api.getSettings();
-      if (s?.business_type) setBusinessType(s.business_type);
+      setBusinessType('tailor'); // STRICTLY FORCED TO TAILOR
       if (!s?.business_name_ar) setNeedsOnboarding(true);
       window.__vatRate__ = parseFloat(s?.vat_rate || '0.15');
       window.__dateFormat__ = s?.date_format || 'hijri';
@@ -243,6 +243,17 @@ export default function App() {
   // ── Load license tier once on mount ───────────────────────────────────────
   useEffect(() => {
     useLicenseStore.getState().loadLicense();
+  }, []);
+
+  // ── Restore Backend Session on Reload ─────────────────────────────────────
+  useEffect(() => {
+    const restoreSession = async () => {
+      const user = useAuthStore.getState().currentUser;
+      if (user && window.api?.setSession) {
+        await window.api.setSession(user);
+      }
+    };
+    restoreSession();
   }, []);
 
   // ── Session expiry ─────────────────────────────────────────────────────

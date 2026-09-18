@@ -3,6 +3,7 @@ import {
   Share2, Trash2, Printer, CheckCircle, X, 
   FileText, ArrowRight, ShoppingBag, Zap, MessageSquare
 } from 'lucide-react';
+import { openWhatsApp } from '../../../utils/whatsapp';
 
 const SuccessModal = memo(function SuccessModal({
   lastInvoice,
@@ -32,17 +33,10 @@ const SuccessModal = memo(function SuccessModal({
 
   const shareWhatsApp = () => {
     if (!lastInvoice) return;
-    const txt = encodeURIComponent(
-      `🧾 فاتورة: ${lastInvoice.invoice}\n` +
+    const txt = `🧾 فاتورة: ${lastInvoice.invoice}\n` +
       `💰 الإجمالي: SAR ${(lastInvoice.total || 0).toFixed(2)}\n` +
-      `✅ تم الدفع بنجاح`
-    );
-    const url = `https://wa.me/?text=${txt}`;
-    if (window.api?.openExternal) {
-      window.api.openExternal(url);
-    } else {
-      window.api?.openExternal?.(url);
-    }
+      `✅ تم الدفع بنجاح`;
+    openWhatsApp('', txt);
     if (window.api?.recordWhatsAppShare) {
       window.api.recordWhatsAppShare({ 
         customerId: lastInvoice.customer_id || null, 

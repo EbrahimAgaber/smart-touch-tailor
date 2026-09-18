@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { openWhatsApp } from '../utils/whatsapp';
 import { useNavigate } from 'react-router-dom';
 import MulamSubNav from '../components/mulam/MulamSubNav';
 import { useToast } from '../components/ToastManager';
@@ -159,6 +160,19 @@ export default function OrdersBoard() {
   const [orders, setOrders] = useState([]);
   const [garmentMap, setGarmentMap] = useState({}); // orderId → garments[]
   const [loading, setLoading] = useState(true);
+
+  // ── Compute board stage (earliest garment stage) ──────────────────────────
+  const getOrderBoardStage = useCallback((orderId) => {
+    const garments = garmentMap[orderId] || [];
+    if (garments.length === 0) return 'cutting';
+    let minIdx = STAGES.length;
+    for (const g of garments) {
+      const idx = STAGE_INDEX[g.production_stage] ?? 0;
+      if (idx < minIdx) minIdx = idx;
+    }
+    return STAGES[minIdx]?.id ?? 'cutting';
+  }, [garmentMap]);
+
   const [advancing, setAdvancing] = useState(null); // garment_id or 'batch-orderId'
   
   // Handover & Settlement Modal State (Fix for receipt printing bug)
@@ -513,17 +527,6 @@ export default function OrdersBoard() {
     }
   };
 
-  // ── Compute board stage (earliest garment stage) ──────────────────────────
-  const getOrderBoardStage = useCallback((orderId) => {
-    const garments = garmentMap[orderId] || [];
-    if (garments.length === 0) return 'cutting';
-    let minIdx = STAGES.length;
-    for (const g of garments) {
-      const idx = STAGE_INDEX[g.production_stage] ?? 0;
-      if (idx < minIdx) minIdx = idx;
-    }
-    return STAGES[minIdx]?.id ?? 'cutting';
-  }, [garmentMap]);
 
   // ── Analytics & Metrics (Voice of the 100 Business Owners) ────────────────
   const pipelineMetrics = useMemo(() => {
@@ -583,12 +586,9 @@ export default function OrdersBoard() {
       showToast?.({ type: 'error', message: 'لا يوجد رقم هاتف مسجل للعميل' });
       return;
     }
-    const clean = order.customer_phone.replace(/\D/g, '');
-    const intlPhone = clean.startsWith('0') ? '966' + clean.slice(1) : clean.startsWith('966') ? clean : '966' + clean;
     const balanceText = Number(order.balance_due) > 0 ? `المبلغ المتبقي عند الاستلام: ${fmt(order.balance_due)} ر.س.` : 'تم سداد الحساب بالكامل.';
     const msg = `مرحباً ${order.customer_name || 'عميلنا العزيز'}، ثيابكم للطلب رقم #${order.id} أصبحت جاهزة تماماً للاستلام من المشغل.\n${balanceText}\nأهلاً وسهلاً بكم في أي وقت.`;
-    const waUrl = `https://wa.me/${intlPhone}?text=${encodeURIComponent(msg)}`;
-    window.open(waUrl, '_blank');
+    openWhatsApp(order.customer_phone, msg);
   };
 
   const toggleOrderExpand = (orderId) => {

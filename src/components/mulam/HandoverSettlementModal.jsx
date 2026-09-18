@@ -12,6 +12,7 @@ import {
   Share2,
   PackageCheck
 } from 'lucide-react';
+import { openWhatsApp } from '../../utils/whatsapp';
 import { 
   printHandoverReceiptDirect, 
   generateHandoverWhatsAppText, 
@@ -126,9 +127,7 @@ export default function HandoverSettlementModal({
       alert('لا يوجد رقم جوال مسجل للعميل.');
       return;
     }
-    const cleanPhone = formatWhatsAppPhone(customerPhone);
-    const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(whatsAppText)}`;
-    window.open(waUrl, '_blank');
+    openWhatsApp(customerPhone, whatsAppText);
   };
 
   const handleCopyText = async () => {
